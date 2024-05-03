@@ -45,15 +45,16 @@ from collections import defaultdict
 import orthauth as oa
 import augpathlib as aug
 from dateutil import parser as dateparser
+#from dateutil.tz import tzutc
 from pyontutils.asyncd import Async, deferred
-from pyontutils.utils_fast import timeformat_friendly
+from pyontutils.utils_fast import timeformat_friendly, utcnowtz
 from sparcur import datasets as dat
 from sparcur import exceptions as exc
 from sparcur import pipelines as pipes
 from sparcur.core import HasErrors, JEncode, JApplyRecursive, get_nested_by_key
 from sparcur.paths import Path
 from sparcur.utils import fromJson, register_type, log as _log, logd as _logd
-from sparcur.utils import transitive_paths, GetTimeNow as _GetTimeNow, PennsieveId as RemoteId, levenshteinDistance
+from sparcur.utils import transitive_paths, PennsieveId as RemoteId, levenshteinDistance
 from sparcur.config import auth
 from sparcur.extract import xml as exml
 
@@ -70,7 +71,7 @@ __fsmeta_version__ = 0  # fsmeta is a bit different and will have version embedd
 __objind_version__ = 0
 __pathmeta_version__ = 0
 __extract_version__ = 0
-__errors_version__ = 0  # this one should probably never change
+__errors_version__ = 0  # TODO this one should probably never change or be set to __extract_version__?
 __combine_version__ = 0
 __index_version__ = 0
 
@@ -114,8 +115,13 @@ _metadata_file_types = (
     'performances', 'code_description', 'submission',
 )
 
-def GetTimeNow():
-    return _GetTimeNow()._start_time
+
+# sigh, but apparently not actually an issue
+# https://github.com/dateutil/dateutil/issues/1205
+# Difference in behavior between dateutil.tz.utc() and datetime.timezone.utc
+#def utcnowtzutc():
+    #return datetime.now(tz=tzutc())
+
 
 def test():
     # make sure we have the basics right
@@ -227,7 +233,7 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
     if False:
         [log.debug(p) for paths in aps for p in paths]
 
-    time_now = GetTimeNow()
+    time_now = utcnowtz()
 
     create_current_version_paths()
 
@@ -238,7 +244,7 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
     if debug:
         # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare to
         #object_id_types = [(o, t) for o, t, b in object_id_type_pathmeta_blobs]
-        #_time_now = GetTimeNow()  # have to pass a different time now otherwise invariant checks on combine objects-index will be violated
+        #_time_now = utcnowtz()  # have to pass a different time now otherwise invariant checks on combine objects-index will be violated
         # XXX OR we actually have a perfect situation where we have two file system trees that should be exactly identical and we test
         # before swap ... yes, that seems better
         _time_now = time_now
@@ -249,7 +255,7 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
 
 
 
-    missing_from_inds = [d for d, h, ty, ta, ne, mb in drps if not h and
+    missing_from_inds = [d for o, m, d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
                          # and we don't expect them for folders though they can be
                          # used to apply metadata to folders
@@ -263,14 +269,19 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
         # i.e. combine_export_path(dataset_id, dataset_id)
 
     blobs = [d[-1] for d in drps]
+    multis = [b for b in blobs if b['type'].startswith('multi-')]
     with_xml_ref = [b for b in blobs if 'external_records' in b and 'xml' in b['external_records']]
-    xml_files = [b for b in blobs if pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
-    xml_sources = [b for b in blobs if 'extracted' in b and 'xml' == b['extracted']['object_type']]
+    xml_files = [b for b in blobs if not b['type'].startswith('multi-') and
+                 pathlib.PurePath(b['path_metadata']['dataset_relative_path']).suffix == '.xml']
+    xml_sources = [b for b in blobs if not b['type'].startswith('multi-') and
+                   'extracted' in b and 'xml' == b['extracted']['object_type']]
     apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources
-                        if 'external_records' in x and
+                        if not b['type'].startswith('multi-') and
+                        'external_records' in x and
                         'manifest' in x['external_records'] and
                         'description' in x['external_records']['manifest']['input']]
-    maybe_matches = [b for b in blobs if b['path_metadata']['basename'] in apparent_targets]
+    maybe_matches = [b for b in blobs if not b['type'].startswith('multi-') and
+                     b['path_metadata']['basename'] in apparent_targets]
     if maybe_matches:
         breakpoint()
 
@@ -386,16 +397,28 @@ def _dataset_path_obj_path(dataset_id, object_id):
     return dataset_path, obj_path
 
 
-def _dump_path(dataset_id, object_id, blob, version_export_path):
+def _dump_path(dataset_id, object_id, blob, get_export_path, read_only=False):
     # this intentionally does not accept a version kwarg because
     # should always happen to the latests version when using this
     # use something else for testing this fun is made to be safe
-    path = version_export_path(dataset_id, object_id)
+    path = get_export_path(dataset_id, object_id)
     if not path.parent.exists():
         path.parent.mkdir(exist_ok=True, parents=True)
 
-    with open(path, 'wt') as f:
-        json.dump(blob, f, sort_keys=True, cls=JEncode)
+    try:
+        with open(path, 'wt') as f:
+            json.dump(blob, f, sort_keys=True, cls=JEncode)
+    except Exception as e:
+        breakpoint()
+        raise e
+
+    if read_only:
+        # pretty much everything we write should never change
+        # so progressively we will switch everything over to
+        # be read only so that only when force is set in a
+        # small number of places will be be able to rewrite
+        # e.g. for combine this is already the case
+        path.chmod(0o0444)
 
     return path
 
@@ -512,7 +535,7 @@ def combine_temp_export_path(dataset_id, object_id):
 
 
 def dump_combine_temp_path(dataset_id, object_id, blob):
-    return _dump_path(dataset_id, object_id, blob, combine_temp_export_path)
+    return _dump_path(dataset_id, object_id, blob, combine_temp_export_path, read_only=True)
 
 
 def combine_temp_dataset_path(dataset_id):
@@ -774,7 +797,7 @@ def expex_type_from_pathmeta_blob(pathmeta_blob):  # FIXME naming
 
 
 register_type(None, 'extract-object-metadata')  # currently unmapped
-def extract(dataset_uuid, path_string, expex_type, extract_fun=None):
+def extract(dataset_uuid, path_string, expex_type, extract_fun=None, do_write=True):
     """ actually run extraction for a single path
     see also sparcur.pipelines.XmlFilePipeline._do_xml_metadata
 
@@ -813,15 +836,17 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None):
                 logd.exception(e)
 
             he.embedErrors(_blob)
-            error_path = dump_error_path(dataset_id, object_id, _blob)
-            msg = f'extract error metadata written to {error_path}'
-            log.debug(msg)  # can caused by user data
+            if do_write:
+                error_path = dump_error_path(dataset_id, object_id, _blob)
+                msg = f'extract error metadata written to {error_path}'
+                log.debug(msg)  # can caused by user data
+
             # TODO it would be nice if we could unlink any existing export paths
             # here for convenience during development, but unfortunately the most
             # likely cause of a write to the error path is that there was a bug
             # in the code, so we should retain the export path, and during dev
             # just remove stale or known bad trees manually
-            return
+            return _blob, 'extract-error', error_path
 
         try:
             validate_extract(blob)
@@ -830,11 +855,13 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None):
                 log.exception(e)
 
             he.embedErrors(blob)
-            error_path = dump_error_path(dataset_id, object_id, blob)
-            msg = f'validate extract error written to {error_path}'
-            log.info(msg)  # 99% of the time caused by us
+            if do_write:
+                error_path = dump_error_path(dataset_id, object_id, blob)
+                msg = f'validate extract error written to {error_path}'
+                log.info(msg)  # 99% of the time caused by us
+
             # raise e  # this one is on us but grep for theh pipeline stage
-            return
+            return blob, 'validate-extract-error', error_path
 
         # FIXME TODO depending on what the workloads look like in prod
         # we can optimize to avoid writes by taking an extra read in cases
@@ -845,54 +872,10 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None):
         # it also means that the embedded version number and the path can
         # differ, but if they do it means that the version update did not
         # affect that file ...
-        previous_version = __extract_version__ - 1
-        if previous_version >= 0:
-            previous_path = extract_export_path(extract_version=previous_version)
-            if previous_path.exists():
-                previous_blob = path_json(previous_path)
-                for_comparison = json.loads(json.dumps(blob, cls=JEncode))
-                # FIXME TODO ... if this winds up being more efficient
-                # then do we need to embed the version at all ????
-                # the key question is about the cost of storage and
-                # network calls required to rerun an extract and avoiding
-                # doing that every time if we know nothing has changed ...
-                # so yes, I think we still need versions to minimize
-                # reruns, and we might need to roll with more inodes than
-                # default, but otherwise the space cost for the symlinks
-                # should be effectively zero because they are preallocated
-                # by the filesystem (if in the ext lineage)
-
-                # TODO a routine that detects old version folders where
-                # all files are symlinks and relinks the folder as a whole
-                # so that e.g. a whole dataset could be linked if all its
-                # objects were links with no files
-                previous_blob.pop('__extract_version__')
-                for_comparison.pop('__extract_version__')
-                if previous_blob == for_comparison:
-                    export_path = extract_export_path(dataset_id, object_id)
-                    if not export_path.parent.exists():
-                        export_path.parent.mkdir(exist_ok=True, parents=True)
-
-                    fp = previous_path.resolve()
-                    target = fp.relative_path_from(export_path)
-                    breakpoint()
-                    export_path.symlink_to(target)
-                    msg = f'extract object metadata matches previous so linked to {target}'
-                    log.log(9, msg)
-                    return
-                else:
-                    breakpoint()
-
-        export_path = dump_extract_path(dataset_id, object_id, blob)
-
-        # if we succeed in writing a blob unlink any previous
-        # error blob to keep things tidy
-        errors_path = errors_version_export_path(dataset_id, object_id)
-        if errors_path.exists():
-            errors_path.unlink()
-
-        msg = f'extract object metadata written to {export_path}'
-        log.log(9, msg)
+        if do_write:
+            return write_extract(dataset_id, object_id, blob)
+        else:
+            return blob, None, None
 
     else:
         # XXX FIXME TODO atm we only process files that
@@ -900,6 +883,62 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None):
         # extract, fetch, extract, fetch process is too much
         msg = f'not extracting because not fetched {path.name}'
         log.warning(msg)
+        return None, 'no-data', None
+
+
+def write_extract(dataset_id, object_id, blob, do_write=True):
+    previous_version = __extract_version__ - 1
+    if previous_version >= 0:
+        previous_path = extract_export_path(dataset_id, object_id, extract_version=previous_version)
+        if previous_path.exists():
+            previous_blob = path_json(previous_path)
+            for_comparison = json.loads(json.dumps(blob, cls=JEncode))
+            # FIXME TODO ... if this winds up being more efficient
+            # then do we need to embed the version at all ????
+            # the key question is about the cost of storage and
+            # network calls required to rerun an extract and avoiding
+            # doing that every time if we know nothing has changed ...
+            # so yes, I think we still need versions to minimize
+            # reruns, and we might need to roll with more inodes than
+            # default, but otherwise the space cost for the symlinks
+            # should be effectively zero because they are preallocated
+            # by the filesystem (if in the ext lineage)
+
+            # TODO a routine that detects old version folders where
+            # all files are symlinks and relinks the folder as a whole
+            # so that e.g. a whole dataset could be linked if all its
+            # objects were links with no files
+            previous_blob.pop('__extract_version__')
+            for_comparison.pop('__extract_version__')
+            if previous_blob == for_comparison:
+                export_path = extract_export_path(dataset_id, object_id)
+                if not export_path.parent.exists():
+                    export_path.parent.mkdir(exist_ok=True, parents=True)
+
+                fp = previous_path.resolve()
+                target = fp.relative_path_from(export_path)
+                breakpoint()
+                export_path.symlink_to(target)
+                msg = f'extract object metadata matches previous so linked to {target}'
+                log.log(9, msg)
+                # XXX NOTE THE VERSION IS CURRENT NOT SOURCE! will
+                # cause combine test mismatch violations at some
+                # point down the line
+                return blob, 'extract-symlink-previous-version', export_path
+            else:
+                breakpoint()
+
+    export_path = dump_extract_path(dataset_id, object_id, blob)
+    # if we succeed in writing a blob unlink any previous
+    # error blob to keep things tidy
+    errors_path = errors_version_export_path(dataset_id, object_id)
+    if errors_path.exists():
+        errors_path.unlink()
+
+    msg = f'extract object metadata written to {export_path}'
+    log.log(9, msg)
+
+    return blob, 'extract', export_path
 
 
 def validate_extract(blob):
@@ -1451,12 +1490,24 @@ for this particular use case we may want to use epoch instead of a full timestam
     # reconstruct the full state of the file
 
 
+def path_objind_header(path):
+    return next(path_objind(path))
+
+
 def path_objind(path):
-    with open(path, 'wt') as f:
+    with open(path, 'rt') as f:
         hstring = f.readline()
+        if not hstring:
+            # objind got truncated e.g. because the author
+            # was an idiot and had 'wt' instead of 'rt' ...
+            # TODO chmod everything to readonly before swap in
+            # to prevent idiotic mistakes like this
+            raise exc.NoDataError(path)
+
         yield objind_header_from_string(hstring)
         while (ln := f.readline()):
             yield RemoteId.fromCompact(ln)
+
 
 def objind_from_string(string):
     header_string, *ids = string.split('\n')
@@ -1478,7 +1529,8 @@ def objind_header_from_string(string):
         if k in raw_header:
             raw_header[k] = t(raw_header[k])
 
-    return raw_header
+    header = raw_header
+    return header
 
 
 def string_from_objind(objind):
@@ -1554,23 +1606,24 @@ def objmeta_from_pathmeta(pathmeta_blob, keep=tuple()):
     return blob
 
 
-def objmeta_write_from_pathmeta(dataset_id, object_id, pathmeta_blob, force=False):
+def objmeta_write_from_pathmeta(dataset_id, object_id, pathmeta_blob, keep=tuple(), force=False, do_write=True):
     export_path = objmeta_version_export_path(dataset_id, object_id)
     if export_path.exists() and not force:  # objmeta is invariant so if we have it we have it
         return
 
-    blob = objmeta_from_pathmeta(pathmeta_blob)
+    blob = objmeta_from_pathmeta(pathmeta_blob, keep=keep)
 
     if not export_path.parent.exists():
         export_path.parent.mkdir(exist_ok=True, parents=True)
 
-    with open(export_path, 'wt') as f:
-        json.dump(blob, f, sort_keys=True, cls=JEncode)
+    if do_write:
+        with open(export_path, 'wt') as f:
+            json.dump(blob, f, sort_keys=True, cls=JEncode)
 
     return blob
 
 
-def pathmeta_objmeta(dataset_id, object_id, path, force=False):
+def pathmeta_objmeta(dataset_id, object_id, path, objkeep=tuple(), force=False, do_write=True):
     blob = path._cache_jsonMetadata(with_created=True)
 
     if object_id.type == 'dataset':
@@ -1580,10 +1633,11 @@ def pathmeta_objmeta(dataset_id, object_id, path, force=False):
         blob['access_control_group_id'] = blob['parent_id']
         blob['parent_id'] = object_id
 
-    objmeta_write_from_pathmeta(dataset_id, object_id, blob, force=force)
+    objmeta_blob = objmeta_write_from_pathmeta(dataset_id, object_id, blob, keep=objkeep, force=force, do_write=do_write)
+
     blob['type'] = 'pathmeta'  # you can't actually invert everything back to Path because Path is only the name
     blob['__pathmeta_version__'] = __pathmeta_version__
-    return blob
+    return blob, objmeta_blob
 
 
 def pathmeta_refresh(dataset_id, object_id, path, force=False):
@@ -1633,7 +1687,7 @@ def pathmeta_refresh(dataset_id, object_id, path, force=False):
     return blob, changed
 
 
-def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, subprocess=False):
+def subprocess_extract(dataset_id, path, time_now, objkeep=tuple(), force=False, debug=False, subprocess=False, do_write=True):
     # FIXME TODO probably wire this into sparcron more directly
     # to avoid calling this via Async deferred
     object_id = path.cache_identifier #RemoteId(path.cache_id)
@@ -1645,7 +1699,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
 
     #maybe_objmeta_blob = objmeta(dataset_id, object_id, path)
 
-    pathmeta_blob = pathmeta_objmeta(dataset_id, object_id, path, force=force)
+    pathmeta_blob, objmeta_blob = pathmeta_objmeta(dataset_id, object_id, path, objkeep=objkeep, force=force, do_write=do_write)
     #pathmeta_blob, pathmeta_changed = pathmeta_refresh(dataset_id, object_id, path)  # FIXME TODO in point of fact this can run in parallel with extract because there is not any necessary interaction until combine
 
     export_path = extract_export_path(dataset_id, object_id)
@@ -1661,24 +1715,24 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
         success = 'already-done'
         msg = f'{object_id} already done {path}'
         log.log(9, msg)
-        return path, object_id, expex_type, success, updated, pathmeta_blob
+        return path, object_id, expex_type, success, updated, pathmeta_blob, objmeta_blob, None, None
 
     elif extract_fun is None:
         success = 'no-extract-fun-and-objmeta-already-written'
         msg = f'{object_id} objmeta already written and no extract_fun {path}'
         log.log(9, msg)
-        return path, object_id, expex_type, success, updated, pathmeta_blob
+        return path, object_id, expex_type, success, updated, pathmeta_blob, objmeta_blob, None, None
 
     elif debug or not subprocess:
         # TODO or raw expex_type in IMPORTANT i.e. stuff that should be in memory ... but that is and optimization
         try:
-            extract(dataset_id.uuid, path.as_posix(), expex_type, extract_fun=extract_fun)
+            blob, status, _e_path = extract(dataset_id.uuid, path.as_posix(), expex_type, extract_fun=extract_fun, do_write=do_write)
             success = True
         except Exception as e:
             success = False
             log.exception(e)
 
-        return path, object_id, expex_type, success, updated, pathmeta_blob
+        return path, object_id, expex_type, success, updated, pathmeta_blob, objmeta_blob, blob, status
 
     msg = "don't do this right now"
     # likely not needed
@@ -1725,7 +1779,7 @@ def subprocess_extract(dataset_id, path, time_now, force=False, debug=False, sub
         log.exception(e)
         success = False
 
-    return path, object_id, expex_type, success, updated, pathmeta_blob  # FIXME include pathmeta in the return ...
+    return path, object_id, expex_type, success, updated, pathmeta_blob, None, None  # FIXME include pathmeta in the return ...
 
 
 def from_dataset_path_get_path_to_fetch_and_extract():
@@ -1746,7 +1800,11 @@ def from_paths_extract_object_metadata(paths, time_now, force=False, debug=False
 
     # FIXME TODO, right now this makes way too many hardcore assumptions
 
-def multibads(dataset_id, rchildren, force=False):
+def multibads(dataset_id, rchildren, time_now, debug=False, force=False):
+    # FIXME we should be able to deduplicate a bunch of the functionality here
+    # because most of the logic is already present in
+    # from_dataset_path_extract_object_metadata
+
     # we have to dedupe the package ids before we run ... sigh
     dd = defaultdict(list)
     sigh = defaultdict(list)
@@ -1782,7 +1840,10 @@ def multibads(dataset_id, rchildren, force=False):
     #            json.dump(blob, f, sort_keys=True)
 
     updated_cache_transitive = None
+    bad_type_oids = {}
+    _bad_type_oids = defaultdict(list)
     bad_fsmeta_records = []
+    bad_pathmeta_blob_index = {}
     if bads_multi:
         #bad_curies = ' '.join(sigh)
         msg = f'dataset {dataset_id} has {len(sigh)} packages with multiple files' #: {bad_curies}
@@ -1797,49 +1858,109 @@ def multibads(dataset_id, rchildren, force=False):
             o = RemoteId(oiuuid)
             u = None
             ipnames = []
-            objmeta_blobs = []
-            export_path = objmeta_version_export_path(dataset_id, o)
-            objdone = export_path.exists()
+            poest_blobs = []
+            export_objmeta_path = objmeta_version_export_path(dataset_id, o)
+            objdone = export_objmeta_path.exists()
+            export_extract_path = extract_export_path(dataset_id, o)
+            exdone = export_extract_path.exists()
+
             for path in paths:
-                pathmeta_blob = path._cache_jsonMetadata(with_created=True)
+                # FIXME shouldn't we just use subprocess extract here? XXX no, because extract is
+                (_path, object_id, expex_type, success, updated, pathmeta_blob, objmeta_blob, blob, status
+                 ) = subprocess_extract(dataset_id, path, time_now, objkeep=('timestamp_updated'), force=force, debug=debug, do_write=False)
+
+                # we append with multi default to True here because we do the merge in combine or something
+                # FIXME I think we should be handling this here? not sure, at least this way we know how
+                # to process everything that shows up, so maybe this is the right way
+                # FIXME I do think this means we have to add the bad pathmeta blobs here though?
+                _bad_type_oids[expex_type].append((object_id, True))
+                bad_pathmeta_blob_index[object_id] = pathmeta_blob
+
+                #pathmeta_blob = path._cache_jsonMetadata(with_created=True)
                 p = pathmeta_blob['parent_id']
-                _u = pathmeta_blob['timestamp_updated']
-                if u is None or _u > u:
-                    u = _u
+                #_u = pathmeta_blob['timestamp_updated']
+                #if u is None or _u > u:
+                    #u = _u
+
+                if u is None or updated > u:
+                    u = updated
 
                 ipnames.append((pathmeta_blob['remote_inode_id'], pathmeta_blob['basename']))
-                if objdone and not force:
+
+                if objdone and exdone and not force:
                     continue
 
-                pathmeta_blob['type'] = 'pathmeta'
-                pathmeta_blob['__pathmeta_version__'] = __pathmeta_version__
+                poest_blobs.append((pathmeta_blob, objmeta_blob, blob, status, expex_type))
+
+                #pathmeta_blob['type'] = 'pathmeta'
+                #pathmeta_blob['__pathmeta_version__'] = __pathmeta_version__
                 # we keep timestamp_updated in this case because files in packages should never change
                 # so technically updated is immutable in this case ??? (derp?)
                 # FIXME TODO now it would seem that we also need to store package updated or something
                 # so we can detect rename or ... sigh who knows
-                _blob = objmeta_from_pathmeta(pathmeta_blob, keep=('timestamp_updated',))
-                objmeta_blobs.append(_blob)
+                #_blob = objmeta_from_pathmeta(pathmeta_blob, keep=('timestamp_updated',))
+                #objmeta_blobs.append(_blob)
 
-            if not objdone or force:
-                # XXX both name and remote_inode_id should be static for these
-                # so I think this will be safe since multipackage files can't
-                # really change names (yet another lol)
-                multi = sorted(objmeta_blobs, key=(lambda o:o['remote_inode_id']), reverse=True)
-                blob = {
-                    'type': 'multi-objmeta',
-                    'remote_id': o,
-                    'multi': multi,
-                }
-                dump_objmeta_version_path(dataset_id, o, blob)
+            poest_multi = sorted(poest_blobs, key=(lambda poe:poe[0]['remote_inode_id']))
+
+            if objdone and exdone and not force:
+                type_multi = [t for *_, t in poest_blobs]
+                pass
+            else:
+                type_multi = []
+                o_multi = []
+                e_multi = []  # hah, works out amusingly, if one fails they _all_ fail (derp)
+                ex_errors = []
+                for pm, om, em, s, t in poest_multi:
+                    type_multi.append(t)
+                    if not objdone or force:
+                        o_multi.append(om)
+
+                    if not exdone or force:
+                        e_multi.append(em)
+                        ex_errors.append(s)
+
+                if not objdone or force:
+                    blob = {
+                        'type': 'multi-objmeta',
+                        'remote_id': o,
+                        # FIXME package updated ...
+                        'multi': o_multi,
+                    }
+                    obj_dump_path = dump_objmeta_version_path(dataset_id, o, blob)
+
+                if not exdone or force:
+                    blob = {
+                        'type': 'multi-extract-object-meta',
+                        'remote_id': o,
+                        'multi': e_multi,
+                    }
+                    if (any(ex_errors) or  # actual issues -> errors
+                        # believe it or not, no data? also -> errors
+                        [_ for _ in e_multi if _ is None]):
+                        # where goes one so go we all :/
+                        blob['error_status'] = ex_errors
+                        err_dumped_path = dump_error_path(dataset_id, o, blob)
+                    else:
+                        _blob, multi_status, ex_dumped_path = write_extract(dataset_id, o, blob)
 
             if updated_cache_transitive is None or u > updated_cache_transitive:
                 updated_cache_transitive = u
 
-            pnames = [n for u, n in sorted(ipnames, reverse=True)]
+            pnames = [n for i, n in sorted(ipnames)]
             n = '/' + '/'.join(pnames)
             bad_fsmeta_records.append((o, p, u, n))
 
-    return safe_rchildren, bad_fsmeta_records, updated_cache_transitive
+            # XXX yes, if you have 100 files of the same type then it is its own type
+            # and it is its own type and pex_funs will fail as intended until handled
+            # in some way, yes, reordered by type but didn't drop to sorted set yet
+            #_bad_type_oids[tuple(sorted(type_multi, key=lambda t:(t is None, t)))].append((o, True))
+            # XXX no ? we want all the paths individually flagged as being multi and we handle it later?
+            # we can iron out the kinks later
+
+        bad_type_oids = dict(_bad_type_oids)
+
+    return safe_rchildren, bad_type_oids, bad_fsmeta_records, bad_pathmeta_blob_index, updated_cache_transitive
 
 
 def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False,
@@ -1855,17 +1976,16 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     and sparcur.paths.PathHelper._transitive_metadata
     """
     if time_now is None:  # FIXME this should be required?
-        time_now = GetTimeNow()
+        time_now = utcnowtz()
 
     dataset_id = dataset_path.cache_identifier
     #rfiles = transitive_files(dataset_path)  # XXX sadly can't use this becaues we have to review the symlinks
     # but in a sense that is ok because we also want to pull the path metadata here as well since it will end up
     # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
-    safe_rchildren, bad_fsmeta_records, bad_updated_cache_transitive = multibads(dataset_id, rchildren, force=force)
+    safe_rchildren, bad_type_oids, bad_fsmeta_records, bad_pathmeta_blob_index, bad_updated_cache_transitive = multibads(
+        dataset_id, rchildren, time_now, debug=debug, force=force)
     del rchildren
-
-    #assert len(rchildren) == len(set(rchildren)), 'shit'
 
     # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
     # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
@@ -1900,10 +2020,10 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     bads = []
     _type_oids = defaultdict(list)
     good_fsmeta_records = []
-    pathmeta_blob_index = {}
+    good_pathmeta_blob_index = {}
     parent_index = {}
     id_drp = {}
-    for path, id, expex_type, ok, updated, pathmeta_blob in results:
+    for path, id, expex_type, ok, updated, pathmeta_blob, objmeta_blob, blob, status in results:
         if id.type == 'dataset':
             # do not include dataset when calculating updated transitive
             pass
@@ -1940,14 +2060,22 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         fsmeta_safe_id = RemoteId(id.curie) if id.type == 'package' else id
         good_fsmeta_records.append((fsmeta_safe_id, parent, updated, path.name))
 
-        _type_oids[expex_type].append(id)
+        _type_oids[expex_type].append((id, False))
         #object_id_type.append((id, expex_type))
-        pathmeta_blob_index[id] = pathmeta_blob
+        good_pathmeta_blob_index[id] = pathmeta_blob
         parent_index[id] = parent
         id_drp[id] = pathmeta_blob['dataset_relative_path']
 
+    for k, v in bad_type_oids.items():
+        # have to do this while still in default dict mode
+        # in the event good type oids didn't incalud a particular type
+        # if you wawnt to know good vs bad just check if v[1] is true
+        # because multibad ^_^
+        _type_oids[k].extend(v)
+
+    type_oids = {**_type_oids}
     fsmeta_records = good_fsmeta_records + bad_fsmeta_records
-    type_oids = dict(_type_oids)
+    pathmeta_blob_index = {**good_pathmeta_blob_index, **bad_pathmeta_blob_index}
     indicies = type_oids, pathmeta_blob_index, parent_index, id_drp
     in_updated_cache_transitive = updated_cache_transitive  # fsmeta may modify uct due to lud cases
     updated_cache_transitive, fsmeta_blob = fsmeta(dataset_id, records=fsmeta_records, updated_cache_transitive=updated_cache_transitive, debug=debug)
@@ -2020,7 +2148,7 @@ def pex_manifests(dataset_id, oids, name_drp_index=None, **inds):
     # we don't use .utils.fromJson here, I don't think we need it? or at least don't need it yet?
     id_drp = {}
     drp_manifest_record_index = {}
-    for object_id in oids:
+    for object_id, multi in oids:
         extract_path = extract_export_path(dataset_id, object_id)
         if not extract_path.exists():
             # TODO logging ?
@@ -2100,11 +2228,11 @@ def add_to_ind(dataset_id, drp, ind, key, value):
 
 
 def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
-    id_drp = {}
+    #id_drp = {}
     unmapped = {}
     drp_xml_ref_index = {}
 
-    for object_id in oids:
+    for object_id, multi in oids:
 
         extract_path = extract_export_path(dataset_id, object_id)
 
@@ -2242,10 +2370,12 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
                             #breakpoint()
                             pass
 
-    return id_drp, drp_xml_ref_index, unmapped  # the keys here are going to have to be matched or something
+    #return id_drp, drp_xml_ref_index, unmapped  # the keys here are going to have to be matched or something
+    return {}, drp_xml_ref_index, unmapped  # the keys here are going to have to be matched or something
 
 
 def pex_dirs(dataset_id, oids, **inds):
+    raise NotImplementedError('now unused')
     # TODO build the parent lookup index to replace parent_drp
     # i think what we want to do is embed all the parents up to
     # the one just before primary/derivative etc. since we have
@@ -2256,7 +2386,7 @@ def pex_dirs(dataset_id, oids, **inds):
     id_drp = {}
     did_index = {}  # FIXME unused
     parent_index = {}
-    for object_id in oids:
+    for object_id, multi in oids:
         blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
         drp = pathlib.PurePath(blob['dataset_relative_path'])
         #dirs[drp] = blob  # FIXME check on memory sizes here
@@ -2273,11 +2403,17 @@ def pex_default(dataset_id, oids, did_index=None, **inds):
     # at this stage the other inds are not populated so sadly
     # we have to read from disk twice, in service of reduced memory usage
     id_drp = {}
-    for object_id in oids:
+    for object_id, multi in oids:
         blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
         drp = pathlib.PurePath(blob['dataset_relative_path'])
         #other[drp] = blob  # FIXME check on memory sizes here
         id_drp[object_id] = drp
+        if multi:
+            mid = RemoteId(object_id.curie)
+            if mid not in id_drp:
+                id_drp[mid] = []
+
+            id_drp[mid].append(drp)
 
     return id_drp, None
 
@@ -2286,11 +2422,11 @@ def combine_at_updated():
     """ TODO historical version """
 
 
-def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=None, updated_cache_transitive=None):
+def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=None, updated_cache_transitive=None, do_write=True):
     blob = {}
     blob['type'] = 'combine-object-metadata'  #'combined-metadata'
     blob['__combine_version__'] = __combine_version__
-    blob['dataset_updated_transitive'] = updated_cache_transitive
+    blob['dataset_updated_transitive'] = updated_cache_transitive  # TODO ensure never None
 
     #objmeta_blob = path_json(objmeta_version_export_path(dataset_id, object_id))
     # XXX I have this sense that we really only want objmeta and fsmeta for historical
@@ -2305,7 +2441,7 @@ def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=
         raise NotImplementedError('TODO')
         pathmeta_blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
 
-    blob['path_metadata'] = pathmeta_blob
+    blob['path_metadata'] = pathmeta_blob  # FIXME check key name?
 
     # embed the parent ids so that they can be used without
     # having to deconstruct dataset_relative_path and reconstruct
@@ -2352,9 +2488,10 @@ def combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob=
         # TODO log an error once or something ... ?
         log.log(9, msg)  # TODO embed error
 
-    obj_combine_temp_path = dump_combine_temp_path(dataset_id, object_id, blob)
-    msg = f'combine object metadata written to {obj_combine_temp_path}'
-    log.log(9, msg)
+    if do_write:
+        obj_combine_temp_path = dump_combine_temp_path(dataset_id, object_id, blob)
+        msg = f'combine object metadata written to {obj_combine_temp_path}'
+        log.log(9, msg)
 
     return drp, has_recs, blob
 
@@ -2811,7 +2948,7 @@ def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
                 parent_index[object_id] = parent_index.pop(_temp_object_id)
 
         expex_type = expex_type_from_pathmeta_blob(ir)
-        _type_oids[expex_type].append(object_id)
+        _type_oids[expex_type].append((object_id, multi))
 
     for _temp_object_id, parent_id, updated, name in recs:
         # FIXME issue with {dataset_id}/{dataset_id} case not having objmeta ... which it should? just for closure?
@@ -2973,7 +3110,12 @@ def from_dataset_id_fsmeta_indicies_combine(
             assert cvdp.resolve() != ds_combine_temp_path.resolve()
             oip = cvdp / 'object-index'
             assert oip.exists(), 'sigh'
-            did, uct, tn = path_objind_header(oip)
+            #did, uct, tn = path_objind_header(oip)
+            gen = path_objind(oip)
+            header = next(gen)
+            did = next(gen)
+            uct = header['u']
+            tn = header['e']
             assert did == dataset_id, 'wat dataset'
             assert uct <= updated_cache_transitive, 'wat uct'
             if test_combine:
@@ -3001,13 +3143,53 @@ def from_dataset_id_fsmeta_indicies_combine(
             (cvp / 'test').touch()
             (cvp / 'test').rmdir()
 
-        intermediates = []
+        intermediates = []  # this must contain already deduplicated cases so multis need to have converged
+        multis = {}
         for expex_type, oids in type_oids.items():  # TODO sort these in reverse order so that errors can be added to e.g. manifests
-            for object_id in oids:
+            for object_id, multi in oids:
                 pathmeta_blob = pathmeta_blob_index[object_id]
-                drp, has_recs, blob = combine(dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob, updated_cache_transitive)
-                next(iter(range(1)))  # give async a chance if it needs it
-                intermediates.append((object_id, drp, has_recs, type, (blob if keep_in_mem else None)))
+                do_write = not multi
+                drp, has_recs, blob = combine(
+                    dataset_id, object_id, type, drp_index, parent_index, pathmeta_blob, updated_cache_transitive, do_write)
+                if multi:
+                    mid = RemoteId(object_id.curie)
+                    if mid not in multis:
+                        multis[mid] = []
+
+                    multis[mid].append((drp, has_recs, type, blob))
+
+                else:
+                    intermediates.append((object_id, multi, drp, has_recs, type, (blob if keep_in_mem else None)))
+
+        # we write multis at the end
+        for object_id, dhtbs in multis.items():
+            # match objmeta/fsmeta order
+            multi_things = sorted(dhtbs, key=(lambda dhtb:dhtb[-1]['path_metadata']['remote_inode_id']))
+
+            drps = []
+            has_recss = []
+            types = []
+            blobs = []
+            for drp, has_recs, type, blob in multi_things:
+                drps.append(drp)
+                has_recss.append(has_recs)
+                types.append(type)
+                blobs.append(blob)
+
+            multi = blobs
+            blob = {
+                'type': 'multi-combine-object-metadata',
+                'dataset_updated_transitive': updated_cache_transitive,  # TODO ensure never None
+                'remote_id': object_id,
+                'multi': multi,
+            }
+
+            obj_combine_temp_path = dump_combine_temp_path(dataset_id, object_id, blob)
+            msg = f'combine object metadata written to {obj_combine_temp_path}'
+            log.log(9, msg)
+
+            intermediates.append((object_id, True, drps, has_recss, types, (blob if keep_in_mem else None)))
+
     except Exception as e:
         if ds_combine_temp_path.exists():
             ds_combine_temp_path.rmtree()
@@ -3028,25 +3210,30 @@ def objind_write(dataset_id, fsmeta_blob, time_now):
     objind_path = combine_temp_objind_path(dataset_id)
     objind = objind_from_fsmeta(fsmeta_blob, time_now)
     objind_string = string_from_objind(objind)
-    objind_rtt = list(objind_from_string(objind_string))
+    objind_rtt = tuple(objind_from_string(objind_string))
     assert objind == objind_rtt, ('sigh', breakpoint())[0]
+    expect_recs = [p for p in objind_path.parent.rchildren if p.is_file()]
+    assert len(expect_recs) == len(objind) - 1
     assert not objind_path.exists(), 'wat'
-    assert objind_path != cvdp / 'object-index', 'sigh'
+    assert objind_path != combine_version_dataset_path(dataset_id) / 'object-index', 'sigh'
     with open(objind_path, 'wt') as f:
         f.write(objind_string)
 
+    # there is no circumstance under which this should be rewritten
+    objind_path.chmod(0o0444)
 
-def path_objind_header(path):
-    return next(path_objind(path))
+
+def path_objind_header_v0(path):
+    return next(path_objind_v0(path))
 
 
-def _objind_header_from_l1(l1):
+def _objind_header_v0_from_l1(l1):
     dataset_curie, *_times = [_ for _ in l1.split() if _]
     times = updated_cache_transitive, time_now = [dateparser.parse(_) for _ in _times]
     return RemoteId(dataset_curie), *times
 
 
-def path_objind(path):
+def path_objind_v0(path):
     with open(path, 'rt') as f:
         l1 = f.readline()
         header = dataset_id, updated_cache_transitive, time_now = _objind_header_from_l1(l1)
@@ -3069,8 +3256,12 @@ def check_combine_swap(old, new):
             # you probably want to clean it up manually because something went wrong in dev
             raise FileNotFoundError(msg)
 
-        dataset_id, *times = path_objind_header(objind_path)
-        res.append((objind_path, dataset_id, *times))
+        gen = path_objind(objind_path)
+        header = next(gen)
+        dataset_id = next(gen)
+        # we don't check objind size against the directory here
+        # because we check it before we write
+        res.append((objind_path, dataset_id, header['u'], header['e']))
 
     (old_p, old_d, old_u, old_t), (new_p, new_d, new_u, new_t) = res
 
@@ -3149,11 +3340,12 @@ def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive
         # is that the old ids don't have to just 404
         drps = []
         news = 0
-        for object_id, drp, has_recs, type, blob_or_none in intermediates:
+        for object_id, multi, drp, has_recs, type, blob_or_none in intermediates:
             target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
             if new_link:
                 news += 1
-            drps.append((drp, has_recs, type, target, new_link, blob_or_none))
+
+            drps.append((object_id, multi, drp, has_recs, type, target, new_link, blob_or_none))
     except Exception as e:
         msg = f'index_obj_symlink_latest may not have completed for {dataset_id}'
         log.error(msg)
@@ -3167,7 +3359,7 @@ def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive
 
 def from_dataset_path_extract_combine(dataset_path, time_now=None, force=False, debug=False):
     if time_now is None:
-        time_now = GetTimeNow()
+        time_now = utcnowtz()
 
     create_current_version_paths()
 
