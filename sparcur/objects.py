@@ -1110,6 +1110,7 @@ for this particular use case we may want to use epoch instead of a full timestam
                 old_latest.unlink()
 
             fsmeta_blob = _header, _removes, *sorted(records, key=kupd, reverse=True)
+            typecheck_fsmeta_blob(fsmeta_blob)
             return dud, fsmeta_blob
 
         raise TypeError('updated_cache_transitive must provided if records is provided')
@@ -1327,12 +1328,12 @@ for this particular use case we may want to use epoch instead of a full timestam
             removes = f'(:remove "{uct_friendly}" :ids ())\n'  # leave it empty for regularity
 
     fsmeta_header_blob = make_fsmeta_header_blob(
-        dataset_id, updated_cache_transitive, n_removed, n_records, delta, previous_updated_cache_transitive)
+        dataset_id, updated_cache_transitive, 0, n_records, delta, previous_updated_cache_transitive)
 
     # FIXME TODO go direct from fsmeta_blob -> fsmeta_diff_blob -> out_string instead of the nonsense we do above
     # TODO we need three separate types for fsmeta internal, diff, and diff repack or at least for interna and diff-repack
     fsmeta_blob = (fsmeta_header_blob,
-                   {'remove': updated_cache_transitive, 'ids': sorted(removed)},
+                   {'remove': updated_cache_transitive, 'ids': []},
                    *sorted(records, key=kupd, reverse=True))
     typecheck_fsmeta_blob(fsmeta_blob)
     header = fsmeta_header(dataset_id, uct_friendly, n_removed, n_records, delta, puct_friendly=puct_friendly)
@@ -1415,7 +1416,8 @@ for this particular use case we may want to use epoch instead of a full timestam
             latest.swap(old_latest)
             old_latest.unlink()
 
-         # we always fsmeta_blob records because we need that to write the latest package-index file which doesn't care about history
+        # we always fsmeta_blob records because we need that to write the latest package-index file which doesn't care about history
+        typecheck_fsmeta_blob(fsmeta_blob)
         return updated_cache_transitive, fsmeta_blob
     except Exception as e:
         # if we don't symlink to latest cleanup after
@@ -1478,17 +1480,25 @@ def object_index_from_fsmeta(fsmeta_blob, time_now):
     # final check
     header, rems, *records  = fsmeta_blob
 
-    if lrem := len(rems['ids']):
-        f'fsmeta is not fully resolved: {lrem} rems present'
+    if (lrem := len(rems['ids'])):
+        msg = f'fsmeta is not fully resolved: {lrem} rems present'
         raise TypeError(msg)  # FIXME error type
 
     if (erec := header['records']) != (lrec := len(records)):
-        f'fsmeta is not fully resolved: expected number of records {erec} not present! {lrec} != {erec}'
+        msg = f'fsmeta is not fully resolved: expected number of records {erec} not present! {lrec} != {erec}'
         raise TypeError(msg)  # FIXME error type
 
     dataset_id = header['dataset']
     updated_cache_transitive = header['updated-transitive']  # this number should also be what is embedded in blobs
-    ids = [r[0] for r in records if r[0].type != 'dataset']  # don't double write it
+    # FIXME one of the sources on the way in is not sorted by updated
+    srecords = sorted(records, key=kupd, reverse=True)
+    if srecords != records:
+        # this should be resolved at this point
+        breakpoint()
+        msg = 'fix this already'
+        raise Exception(msg)
+
+    ids = [r[0] for r in srecords if r[0].type != 'dataset']  # don't double write it
     return (dataset_id, updated_cache_transitive, time_now), *ids
 
 
@@ -2528,9 +2538,12 @@ def fsmeta_from_prevs_header(prevs, _header, return_index=False):
         if k in _header:
             _header[k] = t(_header[k])
 
+    _header['removes'] = 0  # fully resolved should always be zero
     header = _header
     removed = {'remove': header['updated-transitive'], 'ids': []}
-    records = list(old_recs.values()) if True else sorted(old_recs.values(), key=kupdt, reverse=True)
+    # when we reconstruct there is no gurantee that the
+    # values show up in kupd order so we have to sort
+    records = sorted(old_recs.values(), key=kupd, reverse=True)
     if len(records) != header['records']:
         msg = f'number of records does not match expected {len(records)} {header["records"]}'
         raise ValueError(msg)
@@ -2663,7 +2676,8 @@ def _typecheck_fsmeta_blob(blob):
 
     # combined invariant checks
     assert header['records'] == len(recs)
-    assert header['removes'] == len(rem['ids'])  # XXX FIXME when this particular function sees these rems should always be zero ...
+    assert header['removes'] == 0  # enforce this, the other one is for the stuff we read and write
+    #assert header['removes'] == len(rem['ids'])  # XXX FIXME when this particular function sees these rems should always be zero ...
 
 
 def indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob):
