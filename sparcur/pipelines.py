@@ -310,7 +310,7 @@ class PathPipeline(PrePipeline):
     def _transformer(self):
         try:
             return self.data_transformer_class(self.path, template_schema_version=self.template_schema_version)
-        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
+        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError, exc.WrongFileExtensionError) as e:
             # sigh code duplication
             class NoData:  # FIXME
                 data = {}
@@ -341,7 +341,7 @@ class PathPipeline(PrePipeline):
     def transformed(self):
         try:
             return self._transformer.data
-        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError) as e:
+        except (exc.FileTypeError, exc.NoDataError, exc.BadDataError, exc.WrongFileExtensionError) as e:
             # these errors mostly happen after __init__ now
             # since they are properly pipelined
             data = {}
@@ -1187,7 +1187,7 @@ class SDSPipeline(JSONPipeline):
         #]
     #)
 
-    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file']]
+    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file'], ['performances_file'], ['code_description_file']]
 
     updates = [
         # normalize integer ids to strings to avoid errors comparing str to int
