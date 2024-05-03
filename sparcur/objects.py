@@ -1085,6 +1085,8 @@ for this particular use case we may want to use epoch instead of a full timestam
         if len(records) == 1:
             dud = records[0][2]
             dud_friendly = timeformat_friendly(dud)
+            _header = make_fsmeta_header_blob(dataset_id, dud, 0, 1, 0)
+            _removes = {'remove': dud, 'ids': []}
             header = fsmeta_header(dataset_id, dud_friendly, 0, 1, 0)
             removes = f'(:remove "{dud_friendly}" :ids ())\n'  # leave it empty for regularity
             recs = mrecs(records)
@@ -1107,7 +1109,8 @@ for this particular use case we may want to use epoch instead of a full timestam
                 latest.swap(old_latest)
                 old_latest.unlink()
 
-            return dud, records
+            fsmeta_blob = _header, _removes, *sorted(records, key=kupd, reverse=True)
+            return dud, fsmeta_blob
 
         raise TypeError('updated_cache_transitive must provided if records is provided')
 
@@ -1323,21 +1326,12 @@ for this particular use case we may want to use epoch instead of a full timestam
         else:
             removes = f'(:remove "{uct_friendly}" :ids ())\n'  # leave it empty for regularity
 
-    fsmeta_blob_header = {
-        'type': 'fsmeta',
-        'version': __fsmeta_version__,
-        'dataset': dataset_id,
-        'updated-transitive': updated_cache_transitive,
-        'removes': n_removed,
-        'records': n_records,
-        'delta': delta,
-    }
-    if previous_updated_cache_transitive is not None:
-        fsmeta_blob_header['from'] = previous_updated_cache_transitive
+    fsmeta_header_blob = make_fsmeta_header_blob(
+        dataset_id, updated_cache_transitive, n_removed, n_records, delta, previous_updated_cache_transitive)
 
     # FIXME TODO go direct from fsmeta_blob -> fsmeta_diff_blob -> out_string instead of the nonsense we do above
     # TODO we need three separate types for fsmeta internal, diff, and diff repack or at least for interna and diff-repack
-    fsmeta_blob = (fsmeta_blob_header,
+    fsmeta_blob = (fsmeta_header_blob,
                    {'remove': updated_cache_transitive, 'ids': sorted(removed)},
                    *sorted(records, key=kupd, reverse=True))
     typecheck_fsmeta_blob(fsmeta_blob)
@@ -1794,7 +1788,8 @@ def multibads(dataset_id, rchildren, force=False):
     return safe_rchildren, bad_fsmeta_records, updated_cache_transitive
 
 
-def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False, _Async=Async, _deferred=deferred):
+def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force=False, debug=False,
+                                              debug_async=False, _Async=Async, _deferred=deferred):
     """ given a dataset_path extract path-metadata and extract-object-metadata
 
     this is a braindead implementation that ignores the existing way
@@ -1823,7 +1818,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
     # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
     # combine level ... yes, I think we are ok to skip dataset and org at this point and deal with them at combine
 
-    if debug:
+    if debug_async:# or True:# or True:# and False:
         # breakpoint and Async still not cooperating
         def deferred(f): return f
         def Async(**kwargs):
@@ -2389,6 +2384,26 @@ def path_sxpr(path):
 def kupd(t):
     o, p, u, n = t
     return u
+
+
+def make_fsmeta_header_blob(
+        dataset_id, updated_cache_transitive, n_removed, n_records, delta,
+        previous_updated_cache_transitive=None):
+
+    fsmeta_blob_header = {
+        'type': 'fsmeta',
+        'version': __fsmeta_version__,
+        'dataset': dataset_id,
+        'updated-transitive': updated_cache_transitive,
+        'removes': n_removed,
+        'records': n_records,
+        'delta': delta,
+    }
+
+    if previous_updated_cache_transitive is not None:
+        fsmeta_blob_header['from'] = previous_updated_cache_transitive
+
+    return fsmeta_blob_header
 
 
 def fsmeta_header(dataset_id, uct_friendly, n_removed, n_records, delta, puct_friendly=None):
@@ -3002,6 +3017,10 @@ def check_combine_swap(old, new):
 
 
 def check_test_combine(source_path, target_path):
+    if not target_path.exists():
+        # there are no differences from nothing!
+        return
+
     import filecmp
     def _do_cmp(a, b):
         c = Path(a)
