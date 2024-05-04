@@ -276,7 +276,7 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
     xml_sources = [b for b in blobs if not b['type'].startswith('multi-') and
                    'extracted' in b and 'xml' == b['extracted']['object_type']]
     apparent_targets = [x['external_records']['manifest']['input']['description'][26:] for x in xml_sources
-                        if not b['type'].startswith('multi-') and
+                        if not x['type'].startswith('multi-') and
                         'external_records' in x and
                         'manifest' in x['external_records'] and
                         'description' in x['external_records']['manifest']['input']]
@@ -397,13 +397,20 @@ def _dataset_path_obj_path(dataset_id, object_id):
     return dataset_path, obj_path
 
 
-def _dump_path(dataset_id, object_id, blob, get_export_path, read_only=False):
+def _dump_path(dataset_id, object_id, blob, get_export_path, read_only=False, force=False):
     # this intentionally does not accept a version kwarg because
     # should always happen to the latests version when using this
     # use something else for testing this fun is made to be safe
     path = get_export_path(dataset_id, object_id)
     if not path.parent.exists():
         path.parent.mkdir(exist_ok=True, parents=True)
+
+    if read_only and force and path.exists():
+        # force should only be True in cases when
+        # read_only is always True, if you much about with
+        # that invariant you will hit permissions errors
+        # and they will be your fault for not reading this
+        path.chmod(0o0644)
 
     try:
         with open(path, 'wt') as f:
@@ -445,8 +452,8 @@ def objmeta_version_export_path(dataset_id, object_id, objmeta_version=None):
     return base_path / dataset_path / obj_path
 
 
-def dump_objmeta_version_path(dataset_id, object_id, blob):
-    return _dump_path(dataset_id, object_id, blob, objmeta_version_export_path)
+def dump_objmeta_version_path(dataset_id, object_id, blob, force=False):
+    return _dump_path(dataset_id, object_id, blob, objmeta_version_export_path, read_only=True, force=force)
 
 
 #def pathmeta_version_path(pathmeta_version=None):
@@ -471,8 +478,8 @@ def extract_export_path(dataset_id, object_id, extract_version=None):
     return base_path / dataset_path / obj_path
 
 
-def dump_extract_path(dataset_id, object_id, blob):
-    return _dump_path(dataset_id, object_id, blob, extract_export_path)
+def dump_extract_path(dataset_id, object_id, blob, force=False):
+    return _dump_path(dataset_id, object_id, blob, extract_export_path, read_only=True, force=force)
 
 
 #def objerr_version_path(objerr_version=None):  # always the latest but put version there for consistency
@@ -535,6 +542,7 @@ def combine_temp_export_path(dataset_id, object_id):
 
 
 def dump_combine_temp_path(dataset_id, object_id, blob):
+    # no force option is provided here because this path should be cleared every time
     return _dump_path(dataset_id, object_id, blob, combine_temp_export_path, read_only=True)
 
 
@@ -797,7 +805,7 @@ def expex_type_from_pathmeta_blob(pathmeta_blob):  # FIXME naming
 
 
 register_type(None, 'extract-object-metadata')  # currently unmapped
-def extract(dataset_uuid, path_string, expex_type, extract_fun=None, do_write=True):
+def extract(dataset_uuid, path_string, expex_type, extract_fun=None, force=False, do_write=True):
     """ actually run extraction for a single path
     see also sparcur.pipelines.XmlFilePipeline._do_xml_metadata
 
@@ -873,7 +881,7 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None, do_write=Tr
         # differ, but if they do it means that the version update did not
         # affect that file ...
         if do_write:
-            return write_extract(dataset_id, object_id, blob)
+            return write_extract(dataset_id, object_id, blob, force=force)
         else:
             return blob, None, None
 
@@ -886,7 +894,7 @@ def extract(dataset_uuid, path_string, expex_type, extract_fun=None, do_write=Tr
         return None, 'no-data', None
 
 
-def write_extract(dataset_id, object_id, blob, do_write=True):
+def write_extract(dataset_id, object_id, blob, force=False):
     previous_version = __extract_version__ - 1
     if previous_version >= 0:
         previous_path = extract_export_path(dataset_id, object_id, extract_version=previous_version)
@@ -928,7 +936,7 @@ def write_extract(dataset_id, object_id, blob, do_write=True):
             else:
                 breakpoint()
 
-    export_path = dump_extract_path(dataset_id, object_id, blob)
+    export_path = dump_extract_path(dataset_id, object_id, blob, force=force)
     # if we succeed in writing a blob unlink any previous
     # error blob to keep things tidy
     errors_path = errors_version_export_path(dataset_id, object_id)
@@ -1726,10 +1734,12 @@ def subprocess_extract(dataset_id, path, time_now, objkeep=tuple(), force=False,
     elif debug or not subprocess:
         # TODO or raw expex_type in IMPORTANT i.e. stuff that should be in memory ... but that is and optimization
         try:
-            blob, status, _e_path = extract(dataset_id.uuid, path.as_posix(), expex_type, extract_fun=extract_fun, do_write=do_write)
+            blob, status, _e_path = extract(dataset_id.uuid, path.as_posix(), expex_type, extract_fun=extract_fun, force=force, do_write=do_write)
             success = True
         except Exception as e:
             success = False
+            blob = None
+            status = None
             log.exception(e)
 
         return path, object_id, expex_type, success, updated, pathmeta_blob, objmeta_blob, blob, status
@@ -1927,7 +1937,7 @@ def multibads(dataset_id, rchildren, time_now, debug=False, force=False):
                         # FIXME package updated ...
                         'multi': o_multi,
                     }
-                    obj_dump_path = dump_objmeta_version_path(dataset_id, o, blob)
+                    obj_dump_path = dump_objmeta_version_path(dataset_id, o, blob, force=force)
 
                 if not exdone or force:
                     blob = {
@@ -1942,7 +1952,7 @@ def multibads(dataset_id, rchildren, time_now, debug=False, force=False):
                         blob['error_status'] = ex_errors
                         err_dumped_path = dump_error_path(dataset_id, o, blob)
                     else:
-                        _blob, multi_status, ex_dumped_path = write_extract(dataset_id, o, blob)
+                        _blob, multi_status, ex_dumped_path = write_extract(dataset_id, o, blob, force=force)
 
             if updated_cache_transitive is None or u > updated_cache_transitive:
                 updated_cache_transitive = u
