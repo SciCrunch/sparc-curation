@@ -2702,7 +2702,7 @@ def main(id=None,
     fetch_metadata_files(path=path, **kwargs)  # FIXME symlink_to
     # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX fetch_metadata_files does NOT USE the extensions kwarg!
     # fetch additional files
-    fetch_files(path=path)
+    fetch_files(path=path, **kwargs)
 
     return path
 

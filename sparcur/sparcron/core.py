@@ -221,7 +221,7 @@ def populate_existing_redis(conn):
             updated = blob['meta']['timestamp_updated']
             #prov_commit = blob['prov']['commit']  # TODO need to be able to detect software changes and rerun
             internal_version = (int(blob['prov']['sparcur_internal_version'])
-                                if 'sparcur_internal_version' in blob['prov']
+                                if not dev_hack and 'sparcur_internal_version' in blob['prov']
                                 else 0)
             fs_version = (int(blob['prov']['sparcur_fs_translation_version'])
                           if 'sparcur_fs_translation_version' in blob['prov']
@@ -691,14 +691,14 @@ def mget_all(dataset_id):
                   if _rd_version is not None
                   else 0)  # FIXME new dataset case?
     sheet_changed = int(_sheet_changed) if _sheet_changed is not None else None
-    ivc = internal_version < sparcur.__internal_version__ or dev_hack
+    ivc = internal_version < sparcur.__internal_version__
     fvc = fs_version < Remote._translation_version
     rvc = rd_version < RemoteDatasetData._translation_version
     log.log(9, (
         ivc,
         fvc,
         rvc,
-        internal_version, sparcur.__internal_version__, ('ivc-tampered-for-dev' if dev_hack else ''),
+        internal_version, sparcur.__internal_version__,
         fs_version, Remote._translation_version,
         rd_version, RemoteDatasetData._translation_version,
     ))

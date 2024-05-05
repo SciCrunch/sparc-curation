@@ -826,12 +826,18 @@ class TestObjects(_ChangesHelper, _TestOperation, unittest.TestCase):
         dataset_path = self.dataset
 
         will_fails = []
-        for stage, path, fun in scs:
+        for i, (stage, path, fun) in enumerate(scs):
             log.debug((stage, path, fun))
+
             if stage > 1.1:
                 will_fails.append(fun)
             else:
                 fun()
+
+                if self._local_only and i == 0:
+                    dataset_path.cache._set_fs_version(
+                        PennsieveCache._remote_class._translation_version)
+
                 try:
                     if stage in self._skip_inds:
                         # don't run immediately after these

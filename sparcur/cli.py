@@ -1525,9 +1525,14 @@ done"""
                 limit = self.options.limit
                 fetch = self.options.fetch
                 if self.options.refresh:
-                    Async(rate=hz)(deferred(path.remote.refresh)(
-                        update_cache=True, update_data=fetch, size_limit_mb=limit)
-                                   for path in paths)
+                    if self.options.jobs <= 1:
+                        [path.remote.refresh(
+                            update_cache=True, update_data=fetch, size_limit_mb=limit)
+                         for path in paths]
+                    else:
+                        Async(rate=hz)(deferred(path.remote.refresh)(
+                            update_cache=True, update_data=fetch, size_limit_mb=limit)
+                                       for path in paths)
                 elif fetch:
                     def wrap(path):
                         def inner(*args, **kwargs):
@@ -1541,9 +1546,12 @@ done"""
 
                         return inner
 
-                    Async(rate=hz)(deferred(wrap(path))(
-                        size_limit_mb=limit)
-                                   for path in paths)
+                    if self.options.jobs <= 1:
+                        [wrap(path)(size_limit_mb=limit) for path in paths]
+                    else:
+                        Async(rate=hz)(deferred(wrap(path))(
+                            size_limit_mb=limit)
+                                    for path in paths)
 
             else:
                 self._print_paths(paths)

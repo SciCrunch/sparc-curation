@@ -414,10 +414,10 @@ def bind_packages_File(File):
                         if isinstance(bfobject, self._dp_class):
                             bfobject.fake_files = []
                             bfobject._has_multiple_files = False
+                            max_updated = _tsnorm(bfobject._json['content']['updatedAt'])
                             if 'objects' not in bfobject._json:
                                 log.error(f'{bfobject} has no files!??!')
                             else:
-                                max_updated = _tsnorm(bfobject._json['content']['updatedAt'])
                                 for i, source in enumerate(
                                         bfobject._json['objects']['source']):
                                     # TODO package id?

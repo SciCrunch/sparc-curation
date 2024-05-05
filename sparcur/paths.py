@@ -119,8 +119,8 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             type = 'package'
 
         if update:
-            meta.__dict__['id'] = existing[b'bf.id'].decode()
-            meta.__dict__['parent_id'] = existing[b'bf.parent_id'].decode()
+            meta.__dict__['id'] = existing[f'{cls.xattr_prefix}.id'.encode()].decode()
+            meta.__dict__['parent_id'] = existing[f'{cls.xattr_prefix}.parent_id'.encode()].decode()
         else:
             meta.__dict__['id'] = f'N:{type}:' + uuid.uuid4().urn[9:]
             meta.__dict__['parent_id'] = path.parent.cache_id
@@ -128,8 +128,8 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         if update:
             # do this as close in time as possible
             # to minimize error risk
-            [path.delxattr(k) for k in existing]
-            if path.xattrs():
+            [path.delxattr(k) for k in existing if k.startswith(f'{cls.xattr_prefix}.'.encode())]
+            if [k for k in path.xattrs() if k.startswith(f'{cls.xattr_prefix}.'.encode())]:
                 # something has gone very wrong
                 breakpoint()
 
@@ -173,15 +173,18 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         self.setxattr(self._xattr_fs_version, str(version).encode())
 
     def _fs_version(self):
-        try:
-            _fs_version = self.getxattr(self._xattr_fs_version)
-            fs_version = int(_fs_version)
-            return fs_version
-        except exc.NoStreamError as e:
-            if self == self.anchor:
-                return 0
-            else:
-                return self.parent._fs_version()
+        if not hasattr(self, '_cache_fs_version'):
+            try:
+                _fs_version = self.getxattr(self._xattr_fs_version)
+                fs_version = int(_fs_version)
+                return fs_version
+            except exc.NoStreamError as e:
+                if self == self.anchor:
+                    self._cache_fs_version = 0
+                else:
+                    self._cache_fs_version = self.parent._fs_version()
+
+        return self._cache_fs_version
 
     @property
     def anchor(self):
@@ -872,7 +875,7 @@ class PathHelper:
             # inversion of control here
             blob['errors'] = [{'message': msg,
                                'blame': 'submissions',  # FIXME maybe should be pipeline?
-                               'pipeline_stage': 'sparcur.path._jm_common',
+                               'pipeline_stage': 'sparcur.paths.Path._jm_common',
                                'candidates': cands,}]
 
         return blob, project_path, dsid
@@ -997,6 +1000,19 @@ class PathHelper:
             blob['size_bytes'] = meta.size
 
         if (self.is_file() or self.is_broken_symlink()):
+            #if hasattr(remote_id, 'file_id') and remote.file_id is not None:
+                # handle discover case where there aren't file_ids
+            if meta.multi is not None:
+                # XXX NOTE because we leave multi out of xattrs if it is not multi
+                # there are some cases where old forms can sneek through, but nearly
+                # all of those cases will only happen in dev because in prod there will
+                # be a bump in Remote._internal_version from 0 to 1 which will force
+                # everything to refetch and the absense of multi will be accurate
+                # the reason for this tradoff is because multi is something that simply
+                # should not exist at all so if it isn't there we don't want to keep any
+                # metadata about it at all
+                blob['multi'] = meta.multi
+
             blob['remote_inode_id'] = remote_id.file_id
             if meta.checksum is not None:
                 # FIXME known checksum failures !!!!!!!
@@ -1005,6 +1021,18 @@ class PathHelper:
                                     # not be implicit and based on the implementation
                                     'cypher': self._cache_class.cypher.__name__.replace('openssl_', ''),
                                     'hex': meta.checksum.hex(),}]
+
+        if meta.errors:
+            # propagate errors caused by issues with remote
+            errors = [
+                {'message': error,
+                 'blame': 'remote',
+                 'pipeline_stage': 'sparcur.paths.Path._cache_jsonMetadata',}
+                for error in meta.errors]
+            if 'errors' not in blob:
+                blob['errors'] = errors
+            else:
+                blob['errors'].extend(errors)
 
         return blob
 
@@ -1999,6 +2027,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 elif md_version in ('mdv4', 'mdv5'):
                     _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
                         10, 5, 2, 3, 6, 7, 15,)
+                elif md_version in ('mdv6',):
+                    _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
+                        11, 5, 2, 3, 6, 7, 16,)
                 else:
                     msg = f'unknown metadata version {md_version}'
                     raise NotImplementedError(msg)
