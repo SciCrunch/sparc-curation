@@ -372,26 +372,32 @@ note of course that you don't get dynamic binding with version since it is not t
     (define ac (oa-read-auth-config))
     (path-config (build-path (expand-user-path (user-config-path "sparcur")) "viewer.rktd"))
     ; FIXME sppsspps stupidity
-    (path-source-dir (or (oa-get-path ac 'data-path #:exists? #f)
-                         (build-path (find-system-path 'home-dir) "files" "sparc-datasets")))
+    (path-source-dir (expand-user-path ; redundant but avoids #f contract violation
+                      (or (oa-get-path ac 'data-path #:exists? #f)
+                          (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))))
     (path-log-dir (build-path
-                   (or (oa-get-path ac 'log-path #:exists? #f)
-                       (expand-user-path (user-log-path "sparcur")))
+                   (expand-user-path
+                    (or (oa-get-path ac 'log-path #:exists? #f)
+                        (user-log-path "sparcur")))
                    "datasets"))
     (path-cache-dir (build-path
-                     (or (oa-get-path ac 'cache-path #:exists? #f)
-                         (expand-user-path (user-cache-path "sparcur")))
+                     (expand-user-path
+                      (or (oa-get-path ac 'cache-path #:exists? #f)
+                          (user-cache-path "sparcur")))
                      "racket"))
     (path-cache-push
      (build-path ; must match python or sparcur.simple.utils won't be able to find {push-id}/paths.sxpr
-      (or (oa-get-path ac 'cache-path #:exists? #f)
-          (expand-user-path (user-cache-path "sparcur")))
+      (expand-user-path
+       (or (oa-get-path ac 'cache-path #:exists? #f)
+           (user-cache-path "sparcur")))
       "push"))
     (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
-    (path-cleaned-dir (or (oa-get-path ac 'cleaned-path #:exists? #f)
-                          (expand-user-path (user-data-path "sparcur" "cleaned"))))
-    (path-export-dir (or (oa-get-path ac 'export-path #:exists? #f)
-                         (expand-user-path (user-data-path "sparcur" "export"))))
+    (path-cleaned-dir (expand-user-path
+                       (or (oa-get-path ac 'cleaned-path #:exists? #f)
+                           (user-data-path "sparcur" "cleaned"))))
+    (path-export-dir (expand-user-path
+                      (or (oa-get-path ac 'export-path #:exists? #f)
+                          (user-data-path "sparcur" "export"))))
     (path-export-datasets (build-path (path-export-dir) "datasets"))))
 
 (define (save-config!)
@@ -474,7 +480,8 @@ note of course that you don't get dynamic binding with version since it is not t
                 (power-user? (not power-user))
                 ; cb does the toggle interinally so we set the opposite of what we want first
                 (cb-power-user check-box-power-user #f))
-              (set-current-mode-panel! panel-validate-mode)))))))
+              (set-current-mode-panel! panel-validate-mode)))
+        (send frame-preferences refresh)))))
 
 (define refresh-dataset-metadata-semaphore (make-semaphore 1))
 (define (refresh-dataset-metadata text-search-box)
@@ -1348,6 +1355,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (cb-toggle-prefs o e)
   (let ([do-show? (not (send frame-preferences is-shown?))])
     (when do-show? ; resync with any external changes
+      (init-paths!)
       (load-config!))
     (send frame-preferences show do-show?)
     (for ([sigh (list text-prefs-api-key text-prefs-api-sec)])
@@ -1651,7 +1659,9 @@ switch to that"
     (save-config!)))
 
 (define (cb-reload-config o e)
-  (load-config!))
+  (init-paths!)
+  (load-config!)
+  )
 
 (define viewer-mode-state #f)
 (define (cb-viewer-mode o e)
