@@ -206,7 +206,7 @@ def test():
         inner_test(tds, parent_parent_path=parent_parent_path)
 
 
-def inner_test(tds, force=True, debug=True, parent_parent_path=None):
+def inner_test(tds, force=True, debug=True, parent_parent_path=None, do_index=False):
     log.info(f'running {tds}')
 
     dataset_path = (parent_parent_path / tds / 'dataset').resolve()
@@ -239,10 +239,12 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
 
     if debug:
         # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare results
-        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive, keep_in_mem=True, debug=debug)
+        _d_drps, _d_drp_index = from_dataset_id_combine(
+            dataset_id, time_now, updated_cache_transitive, keep_in_mem=True, do_index=do_index, debug=debug)
 
     drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True, test_combine=debug, debug=debug)
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True,
+        do_index=do_index, test_combine=debug, debug=debug)
 
     missing_from_inds = [d for o, m, d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
@@ -2588,14 +2590,16 @@ def indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=None
     return fsmeta_blob, type_oids, pathmeta_blob_index, parent_index, id_drp
 
 
-def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None, keep_in_mem=False, debug=False):
+def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None, keep_in_mem=False, do_index=False, debug=False):
     fsmeta_blob, *indicies = indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=updated_cache_transitive)
     return from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=updated_cache_transitive, keep_in_mem=keep_in_mem, debug=debug)
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=updated_cache_transitive,
+        keep_in_mem=keep_in_mem, do_index=do_index, debug=debug)
 
 
 def from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, test_combine=False, debug=False):
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, do_index=False,
+        test_combine=False, debug=False):
     type_oids, pathmeta_blob_index, parent_index, id_drp_all = indicies
     _name_drps_index = defaultdict(list)
     for drp in id_drp_all.values():
@@ -2776,7 +2780,7 @@ def from_dataset_id_fsmeta_indicies_combine(
     sanity(1)
     objind_write(dataset_id, fsmeta_blob, time_now)
     sanity(2)
-    drps = combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=test_combine)
+    drps = combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=test_combine, do_index=do_index)
 
     return drps, drp_index
 
@@ -2885,7 +2889,7 @@ def check_test_combine(source_path, target_path):
         raise exc.CombineTestMismatchError(oops)
 
 
-def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=False):
+def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive, test_combine=False, do_index=False):
     # TODO it should be fairly striaght forward to switch these out for path function that will
     # work with a specific historical updated cache transitive, will also need a way to pass
     # such a function to combine itself, but should be pretty straight forward
@@ -2919,11 +2923,17 @@ def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive
         drps = []
         news = 0
         for object_id, multi, drp, has_recs, type, blob_or_none in intermediates:
-            target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
-            if new_link:
-                news += 1
+            if do_index:
+                target, new_link = index_obj_symlink_latest(dataset_id, object_id, do_link=True)
+                if new_link:
+                    news += 1
+
+            else:
+                target = None
+                new_link = False
 
             drps.append((object_id, multi, drp, has_recs, type, target, new_link, blob_or_none))
+
     except Exception as e:
         msg = f'index_obj_symlink_latest may not have completed for {dataset_id}'
         log.error(msg)
@@ -2935,7 +2945,7 @@ def combine_do_swap_and_post(dataset_id, intermediates, updated_cache_transitive
     return drps
 
 
-def from_dataset_path_extract_combine(dataset_path, time_now=None, force=False, debug=False):
+def from_dataset_path_extract_combine(dataset_path, time_now=None, do_index=False, force=False, debug=False):
     if time_now is None:
         time_now = utcnowtz()
 
@@ -2958,10 +2968,12 @@ def from_dataset_path_extract_combine(dataset_path, time_now=None, force=False, 
         assert latest.exists(), 'uh'
         assert uct_p.exists(), 'wat'
         assert uct_p == latest.resolve(), 'argh?!'
-        _drps, _drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive)
+        _drps, _drp_index = from_dataset_id_combine(
+            dataset_id, time_now, updated_cache_transitive, do_index=do_index, debug=debug)
 
     drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, test_combine=debug)
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive,
+        do_index=do_index, test_combine=debug, debug=debug)
 
 
 def watch_combine():
