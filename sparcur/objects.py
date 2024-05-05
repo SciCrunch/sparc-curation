@@ -81,7 +81,6 @@ inh = None  # variable for watching filesystem changes
 # TODO HAH, with the addition of errors aka failed we can reuse the
 # sparcron run logic for whole datasets on individual objects now ...
 __objmeta_version__ = 0
-#__objerr_version__ = 0  # this one should probably never change
 __fsmeta_version__ = 0  # fsmeta is a bit different and will have version embedded because fsmeta is the part that can change and is like a wal, but on a very rare occasion fsmeta might require a forced global update and this way we can avoid having to read every single file? probably embedded not in the path
 __objind_version__ = 0
 __pathmeta_version__ = 0
@@ -94,21 +93,17 @@ sf_dir_name = 'objs'  # this really is more of an objects index ...
 sf_export_base = Path(auth.get_path('export-path')) / sf_dir_name  # TODO ensure configable for testing switching versions
 
 objmeta_dir_name = 'objmeta'
-#objerr_dir_name = 'objerr'
 fsmeta_dir_name = 'fsmeta'
-#pathmeta_dir_name = 'pathmeta'
 extract_dir_name = 'extract'
 errors_dir_name = 'errors'
 combine_dir_name = 'combine'
 
 # this approach requires
 combine_latest_dir_name = 'L'  # short to keep symlinks small enough to fit in inodes
-#combine_archive_dir_name = 'A'  # XXX this is no longer relevant as old are swapped out
 
 index_dir_name = 'index'
 
 latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
-#archive_dir_name = 'A'  # short to keep symlinks small enough to fit in inodes
 
 _expex_types = (  # aka expex_type
     None,
@@ -131,30 +126,19 @@ _metadata_file_types = (
 )
 
 
-# sigh, but apparently not actually an issue
-# https://github.com/dateutil/dateutil/issues/1205
-# Difference in behavior between dateutil.tz.utc() and datetime.timezone.utc
-#def utcnowtzutc():
-    #return datetime.now(tz=tzutc())
-
-
 def test():
     # make sure we have the basics right
     # sourcing of the uuids will ultimately be different
     top_paths = [
         [
             objmeta_version_path(),
-            #objerr_version_path(),
             fsmeta_version_path(),
-            #pathmeta_version_path(),
             extract_path(),  # FIXME these are really x_version_path ...
             errors_version_path(),
             combine_version_path(),
             index_path(),
 
             index_combine_latest_path(),
-            #index_combine_archive_path(),
-
          ]
     ]
     [log.debug(p) for p in top_paths[0]]
@@ -236,11 +220,9 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
 
             combine_version_export_path(dataset_id, c.cache_identifier),
             index_combine_latest_export_path(dataset_id, c.cache_identifier),
-            #index_combine_archive_export_path(dataset_id, c.cache_identifier),
 
             index_obj_path(c.cache_identifier),
             index_obj_symlink_latest(dataset_id, c.cache_identifier),
-            #index_obj_symlink_archive(dataset_id, c.cache_identifier),
         ]
 
     aps = [all_paths(c) for c in cs]
@@ -256,13 +238,8 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
          dataset_path, time_now=time_now, force=force, debug=debug)
 
     if debug:
-        # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare to
-        #object_id_types = [(o, t) for o, t, b in object_id_type_pathmeta_blobs]
-        #_time_now = utcnowtz()  # have to pass a different time now otherwise invariant checks on combine objects-index will be violated
-        # XXX OR we actually have a perfect situation where we have two file system trees that should be exactly identical and we test
-        # before swap ... yes, that seems better
-        _time_now = time_now
-        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, _time_now, updated_cache_transitive, keep_in_mem=True)
+        # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare results
+        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive, keep_in_mem=True)
 
     drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
         dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True, test_combine=debug)
@@ -306,21 +283,15 @@ def object_source_cache_path(datset_id, object_id, parent_parent_path=None):  # 
 
 def create_current_version_paths():
     obj_path = objmeta_version_path()
-    #oer_path = objerr_version_path()
     fsm_path = fsmeta_version_path()
-    #pm_path = pathmeta_version_path()
     ext_path = extract_path()
     err_path = errors_version_path()
     cot_path = combine_temp_path()
     com_path = combine_version_path()
     idx_path = index_path()
-    #archive_path = index_combine_archive_path()
 
     if not obj_path.exists():
         obj_path.mkdir(parents=True)
-
-    #if not oer_path.exists():
-        #oer_path.mkdir(parents=True)
 
     if not fsm_path.exists():
         fsm_path.mkdir(parents=True)
@@ -339,9 +310,6 @@ def create_current_version_paths():
 
     if not idx_path.exists():
         idx_path.mkdir(parents=True)
-
-    #if not archive_path.exists():
-        #archive_path.mkdir()
 
     resymlink_index_combine_latest()
 
@@ -372,31 +340,6 @@ def resymlink_index_combine_latest(index_version=None):
     # previous version otherwise there will be a bunch of 404s
     # of course this is a bit harder to implement because you
     # have to know what is done
-
-
-def index_move_and_resymlink_archive(index_version=None):
-    # XXX there is no reason to resymlink the archive because there
-    # is only ever one archive and it will always be on the latest version of the index
-    # older versions of the index will symlink there
-
-    # TODO
-    # iterate over all index versions
-    # find the archive that is a directory
-    # move it to the latest version
-    # relink all other versions to point directly
-    pass
-
-
-#def archive_symlink_to_combine():
-    # when objects are removed we will only have and old
-    # version so it will have to be moved to archive and
-    # better to symlink so that we can retrieve prov if needed
-    # anything not linked into latest or archive can then be culled
-    #cap = combine_archive_path()  # index latest should always be the real directory
-
-
-#def index_resymlink_archive(object_uuid):
-    #pass
 
 
 def _dataset_path(dataset_id):
@@ -468,17 +411,6 @@ def dump_objmeta_version_path(dataset_id, object_id, blob, force=False):
     return _dump_path(dataset_id, object_id, blob, objmeta_version_export_path, read_only=True, force=force)
 
 
-#def pathmeta_version_path(pathmeta_version=None):
-    #pathmeta_version = str(__pathmeta_version__ if pathmeta_version is None else pathmeta_version)
-    #return sf_export_base / pathmeta_dir_name / pathmeta_version
-
-
-#def pathmeta_version_export_path(dataset_id, object_id, pathmeta_version=None):
-    #base_path = pathmeta_version_path(pathmeta_version=pathmeta_version)
-    #dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
-    #return base_path / dataset_path / obj_path
-
-
 def extract_path(extract_version=None):
     extract_version = str(__extract_version__ if extract_version is None else extract_version)
     return sf_export_base / extract_dir_name / extract_version
@@ -492,17 +424,6 @@ def extract_export_path(dataset_id, object_id, extract_version=None):
 
 def dump_extract_path(dataset_id, object_id, blob, force=False):
     return _dump_path(dataset_id, object_id, blob, extract_export_path, read_only=True, force=force)
-
-
-#def objerr_version_path(objerr_version=None):  # always the latest but put version there for consistency
-#    objerr_version = str(__objerr_version__ if objerr_version is None else objerr_version)
-#    return sf_export_base / objerr_dir_name / objerr_version
-
-
-#def objerr_version_export_path(dataset_id, object_id, objerr_version=None):
-#    base_path = objerr_version_path(objerr_version=objerr_version)
-#    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
-#    return base_path / dataset_path / obj_path
 
 
 def errors_version_path(errors_version=None):  # always the latest but put version there for consistency
@@ -594,23 +515,11 @@ def index_combine_latest_path(index_version=None):
     return base_path / combine_latest_dir_name
 
 
-#def index_combine_archive_path(index_version=None):
-#    base_path = index_path(index_version=index_version)
-#    return base_path / combine_archive_dir_name
-
-
 def index_combine_latest_export_path(dataset_id, object_id, index_version=None):
     # we keep this in the index dir to save 3 bytes of ../
     base_path = index_combine_latest_path(index_version=index_version)
     dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
     return base_path / dataset_path / obj_path
-
-
-#def index_combine_archive_export_path(dataset_id, object_id, index_version=None):
-#    # we keep this in the index dir to save 3 bytes of ../
-#    base_path = index_combine_archive_path(index_version=index_version)
-#    dataset_path, obj_path = _dataset_path_obj_path(dataset_id, object_id)
-#    return base_path / dataset_path / obj_path
 
 
 def index_path(index_version=None):
@@ -643,23 +552,6 @@ def index_obj_symlink_latest(dataset_id, object_id, index_version=None, do_link=
             new = True
 
     return target, new
-
-
-#def index_obj_symlink_archive(dataset_id, object_id, index_version=None, do_link=False):
-#    caep = index_combine_archive_export_path(dataset_id, object_id)
-#    iop = index_obj_path(object_id, index_version=index_version)
-#    target = caep.relative_path_from(iop)
-#    new = False
-#    if do_link:
-#        if not iop.parent.exists():
-#            iop.parent.mkdir(exist_ok=True, parents=True)
-#
-#        if not iop.exists() and not iop.is_symlink():
-#            # can fail if we didn't also symlink the combine latest
-#            iop.symlink_to(target)
-#            new = True
-#
-#    return target
 
 
 def extract_fun_manifest(path):
@@ -780,17 +672,13 @@ def expex_type_from_pathmeta_blob(pathmeta_blob):  # FIXME naming
     # fetch_fun and extract_fun are separate so that we can
     # run the fetch funs together outside the network sandbox
 
-    #fetch_fun = None
-
     path = pathmeta_blob['dataset_relative_path']
 
     if 'mimetype' in pathmeta_blob and pathmeta_blob['mimetype'] == 'inode/directory':
         expex_type = 'inode/directory'
-        #extract_fun = None
 
     elif path.stem == 'manifest':  # FIXME do a proper match, XXX reminder that any change here _WILL_ require reextraction unless we split path_metadata only blobs from the rest, which we probably should to avoid exact this kind of issue
         expex_type = 'manifest'
-        #extract_fun = extract_fun_manifest
         # FIXME need to match more name patterns
         # see sc.metadata_filename_pattern
 
@@ -802,12 +690,9 @@ def expex_type_from_pathmeta_blob(pathmeta_blob):  # FIXME naming
 
     elif path.suffix == '.xml':
         expex_type = 'xml'
-        #extract_fun = extract_fun_xml_debug
-        #extract_fun = extract_fun_xml
 
     else:
         expex_type = None
-        #extract_fun = None
 
     if expex_type not in _expex_types:
         msg = f'expex_type {expex_type} not in {_expex_types}'
@@ -1041,24 +926,6 @@ register_type(_pathmeta_ir, 'objmeta')
 register_type(_pathmeta_ir, 'pathmeta')
 
 
-#def objmeta(dataset_id, object_id, path, force=False):
-#    """ the invariant portion of pathmeta """
-#    export_path = pathmeta_version_export_path(dataset_id, object_id)
-#    if export_path.exists() and not force:  # objmeta is invariant so if we have it we have it
-#        return
-#
-#    # FIXME this could be sourced from the packages endpoint directly in many cases
-#    # so going through the filesystem is wasted step
-#    pathmeta_blob = path._cache_jsonMetadata(with_created=True)
-#    blob = objmeta_from_pathmeta(pathmeta_blob)
-#    export_path.parent.mkdir(exist_ok=True, parents=True)
-#
-#    with open(export_path, 'wt') as f:
-#        json.dump(blob, f, sort_keys=True, cls=JEncode)
-#
-#    return blob
-
-
 def mrecs(inrecs):
     def escn(n):
         # cannot use json.dumps because it escapes all unicode in a way that breaks sxpr
@@ -1263,12 +1130,6 @@ for this particular use case we may want to use epoch instead of a full timestam
         # directly because I think they have modified time for deleted files
         # which of course we don't track here
 
-        # this is always true because it is literally how we define
-        # the remove time so we have to check to see if there are removes
-        #ru = previous_remove['remove']
-        #if previous_updated_cache_transitive == ru:
-            #log.info('You hit the slud double lottery!')
-        #else:
         for nth, (o, p, u, n) in enumerate(previous_records):
             # FIXME there is another edge case where somehow this happens
             # twice in a row where you get last updated delete and then
@@ -1292,30 +1153,14 @@ for this particular use case we may want to use epoch instead of a full timestam
                 # last updated delete case we though we were in
                 raise Exception('ut oh')
 
-        # another thing we could check is that
-        # previous_records[1] == current uct bearer (non-dataset) aka sorted_records[2]
-        # the issue is that we don't know where the dataset itself falls and the behavior
-        # of unix is different, but I think missing from new_recs is probably sufficient
         log.info('You hit the last updated delete lottery!')
         dr = do, dp, du, dn = new_recs[dataset_id]
-        #dt_1us = timedelta(microseconds=1)
-        #new_ucts = {v[2]: v for v in records}
-        #old_puct = previous_updated_cache_transitive
-        #previous_updated_cache_transitive = updated_cache_transitive  # XXX no ... puct is puct
         old_uct = updated_cache_transitive
-        updated_cache_transitive = du  #- dt_1us  # so we already use dud
-        # for the empty dataset case, so this is ok and doesn't create a
-        # fake time that could break stuff if it went to the remote system
+        updated_cache_transitive = du
         if updated_cache_transitive <= previous_updated_cache_transitive:
             # believe your own error messages people, we weren't setting
             # dataset updated correctly in the test witness the dataset
             # appearing second in old records
-
-            #owat = sorted(old_recs.values(), key=kupd, reverse=True)
-            #nwat = sorted(new_recs.values(), key=kupd, reverse=True)
-            #assert previous_updated_cache_transitive not in new_ucts, 'sigh'
-            #ur = new_ucts[old_uct]
-            #breakpoint()
             msg = ('wow that was a really fast delete ... '
                    'or somehow dataset updated did not get set properly?\n'
                    f'{updated_cache_transitive} <= {previous_updated_cache_transitive}')
@@ -1358,43 +1203,6 @@ for this particular use case we may want to use epoch instead of a full timestam
         assert n_records == alt_n_records, f'{n_records} != {alt_n_records}'
         n_removed = len(removed)
         recs = mrecs(diff_records)
-
-        """
-        if False:
-            # XXXXXXXXXXXXXXXXX
-            previousxz = previous.with_suffix('.xz')
-            if previousxz.exists():
-                previous = previousxz
-
-            raw_ph, raw_prem, *raw_precs = path_sxpr(previous)
-            precs = [ir_from_fsmeta_rec(r) for r in raw_precs]
-            if precs[-1] == (sigh := sorted(diff_records, key=kupd, reverse=True))[-1]:
-                # WAT
-                # ok, so it looks like my logic for reconstructing is off
-                previous_records
-                latest_not_in = []
-                for pr in precs:
-                    if pr not in previous_records:
-                        latest_not_in.append((pr, old_recs[pr[0]]))
-
-                assert not latest_not_in, (breakpoint(), 'sigh')[1]
-
-                diff = [(a, b) for a, b in zip(precs[::-1], sigh[::-1]) if a != b]
-                prevs, _header = path_prevs(previous)
-                ir_prevs = [(*prev[:2], *[ir_from_fsmeta_rec(r) for r in prev[2:]]) for prev in prevs]
-                breakpoint()
-
-            # XXXXXXXXXXXXXXXXX
-        """
-
-        #if not rerun and not (removed or diff_records):
-            # FIXME nothing happened so why are were here at all?
-            #old_asdf = sorted(old_recs.values(), key=kupd, reverse=True)
-            #asdf = sorted(records, key=kupd, reverse=True)  # dataset invariably shows up top
-            #wat = [p for p in records if p[2] == updated_cache_transitive]
-            #assert wat[0] == asdf[0]  # XXX likely won't work when using remote updated/created
-            #breakpoint()
-            #raise NotImplementedError('wat')
 
         if removed:
             remids = ' '.join(_.curie for _ in sorted(removed))
@@ -1674,54 +1482,6 @@ def pathmeta_objmeta(dataset_id, object_id, path, objkeep=tuple(), force=False, 
     return multi, blob, objmeta_blob
 
 
-#def pathmeta_refresh(dataset_id, object_id, path, force=False):
-#
-#    blob = path._cache_jsonMetadata()
-#
-#    if object_id.type == 'dataset':
-#        # cut off the organization level at this point
-#        # otherwise we have to deal with it in multiple other locations
-#        # organization is retained but renamed FIXME TODO move this into _cache_jsonMetadata probably
-#        blob['access_control_group_id'] = blob['parent_id']
-#        blob['parent_id'] = object_id
-#
-#    blob['type'] = 'pathmeta'  # you can't actually invert everything back to Path because Path is only the name
-#    blob['__pathmeta_version__'] = __pathmeta_version__
-#
-#    # XXX note that the inclusion of dataset_relative_path means that
-#    # any moves or renames that happen up the hierarchy will cause
-#    # pathmeta to change this is probably ok since it avoids the many
-#    # network calls that would otherwise be required to reconstruct
-#    # the drp
-#
-#    export_path = pathmeta_version_export_path(dataset_id, object_id)
-#    # FIXME TODO we have to remove anything that might change in here, name, drp, modified, etc. that goes in our updated_transitive index files
-#    changed = True  # default true so nothing -> something is changed
-#    if export_path.exists():
-#        blob_existing = path_json(export_path)
-#        ir_existing = fromJson(blob_existing)
-#        # FIXME ir vs raw json, easier to parse the raw I think?
-#        changed = blob != ir_existing
-#        #changed_keys = set(blob) != set(ir_existing)
-#        #if not changed_keys:
-#        #    changed_values = False
-#        #    for k, ev in ir_existing.items():
-#        #        if (nv := blob[k]) != ev:
-#        #            changed_values = True
-#        #            breakpoint()
-#
-#        #    changed = changed_values
-#
-#    if changed or force:
-#        if not export_path.parent.exists():
-#            export_path.parent.mkdir(exist_ok=True, parents=True)
-#
-#        with open(export_path, 'wt') as f:
-#            json.dump(blob, f, sort_keys=True, cls=JEncode)
-#
-#    return blob, changed
-
-
 def subprocess_extract(dataset_id, path, time_now, objkeep=tuple(), force=False, debug=False, subprocess=False, do_write=True, mdv_check=tuple()):
     # FIXME TODO probably wire this into sparcron more directly
     # to avoid calling this via Async deferred
@@ -1789,45 +1549,6 @@ def subprocess_extract(dataset_id, path, time_now, objkeep=tuple(), force=False,
     # from inside python if you want all processes to write to
     # the same log file, have to log to socket or something
     raise NotImplementedError(msg)
-    # XXX start the subprocess variant which we likely do not want
-    # since it is usually the wrong cut point
-    timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
-    logdir = object_logdir(object_id)
-    logfile = logdir / timestamp / 'stdout.log'
-    latest = logdir / 'LATEST'
-    if not logfile.parent.exists():
-        logfile.parent.mkdir(parents=True)
-
-    if latest.exists():
-        latest.unlink()
-
-    latest.symlink_to(timestamp)
-
-    argv = argv_extract(dataset_id.uuid, path)
-    try:
-        with open(logfile, 'wt') as logfd:
-            try:
-                p = subprocess.Popen(argv, stderr=subprocess.STDOUT, stdout=logfd)
-                out = p.communicate()
-                if p.returncode != 0:
-                    raise exc.SubprocessException(f'oops objs return code was {p.returncode}')
-
-                success = True
-            except KeyboardInterrupt as e:
-                p.send_signal(signal.SIGINT)
-                raise e
-
-        # FIXME the boundary for this needs to happend only when there is an actual
-        # extract going on, not if we are just dumping path meta, and i think we aren't
-        # going to subprocess this at all, so the logging will be in the parent dataset export log
-
-        log.info(f'DONE: {object_id}')
-    except exc.SubprocessException as e:
-        log.critical(f'FAIL: {dataset_id} {object_id} | {dataset_id.base64uuid()} {object_id.base64uuid()}')
-        log.exception(e)
-        success = False
-
-    return path, object_id, expex_type, success, updated, multi, pathmeta_blob, None, None, None  # FIXME include pathmeta in the return ...
 
 
 def from_dataset_path_get_path_to_fetch_and_extract():
@@ -1871,14 +1592,7 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
         mdv_check = [True]
 
     dataset_id = dataset_path.cache_identifier
-    #rfiles = transitive_files(dataset_path)  # XXX sadly can't use this becaues we have to review the symlinks
-    # but in a sense that is ok because we also want to pull the path metadata here as well since it will end up
-    # being more efficient to start from here
     rchildren = transitive_paths(dataset_path)
-    #safe_rchildren, bad_type_oids, bad_fsmeta_records, bad_pathmeta_blob_index, bad_updated_cache_transitive = multibads(
-        #dataset_id, rchildren, time_now, debug=debug, force=force)
-    #del rchildren
-
     # TODO need to sort out the right way to do this when running in sparcron ... especially wrt when the step is actually "done"
     # how do we handle the dataset itself (it would be nice to just put the metadata there ...)
     # also, how do we deal with organizations, there is nothing to extract so to speak ... maybe they are dealt with at the
@@ -2025,13 +1739,6 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
                     if do_write:
                         _blob, multi_status, ex_dumped_path = write_extract(dataset_id, fsmeta_safe_id, blob, force=force)
 
-    #for k, v in bad_type_oids.items():
-        # have to do this while still in default dict mode
-        # in the event good type oids didn't incalud a particular type
-        # if you wawnt to know good vs bad just check if v[1] is true
-        # because multibad ^_^
-        #_type_oids[k].extend(v)
-
     type_oids = {**_type_oids}
     fsmeta_records = good_fsmeta_records
     pathmeta_blob_index = good_pathmeta_blob_index
@@ -2057,7 +1764,6 @@ def from_dataset_path_extract_object_metadata(dataset_path, time_now=None, force
 
 
 # these variants imply a certain amount of rework
-#def from_dataset_id_combine(dataset_id): pass
 def from_dataset_path_combine(dataset_id): pass
 def from_dataset_id_object_ids_combine(dataset_id): pass
 
@@ -2172,20 +1878,6 @@ def add_to_ind(dataset_id, drp, ind, key, value):
     ind[key].append(value)
 
     return
-
-    """
-    if key in ind:
-        asdf = a, f = drp, ind[key]["prov"]["source_drp"]
-        breakpoint()
-        msg = 'NotImplementedError TODO multiple seg files per images is possible'
-        log.info(msg)
-        msg = (
-            f'multiple xml refs for {dataset_id}:{key} '  # lol
-            f'from {drp} and {ind[key]["prov"]["source_drp"]}')
-        log.error(msg)
-    else:
-        ind[key] = value
-    """
 
 
 def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
@@ -2335,50 +2027,8 @@ def pex_xmls(dataset_id, oids, drp_index=None, name_drps_index=None, **inds):
     return {}, drp_xml_ref_index, unmapped  # the keys here are going to have to be matched or something
 
 
-#def pex_dirs(dataset_id, oids, **inds):
-#    raise NotImplementedError('now unused')
-#    # TODO build the parent lookup index to replace parent_drp
-#    # i think what we want to do is embed all the parents up to
-#    # the one just before primary/derivative etc. since we have
-#    # the sub- and sam- prefixes that can make it a single
-#    # lookup to pull full subject metadata, because the id
-#    # will literally be in the parents ... that turns out to
-#    # be quite useful
-#    id_drp = {}
-#    did_index = {}  # FIXME unused
-#    parent_index = {}
-#    for object_id, multi in oids:
-#        blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
-#        drp = pathlib.PurePath(blob['dataset_relative_path'])
-#        #dirs[drp] = blob  # FIXME check on memory sizes here
-#        #id_drp[object_id] = drp
-#        did_index[drp] = object_id
-#        parent_index[object_id] = RemoteId(blob['parent_id'])
-#
-#    return id_drp, did_index, parent_index
-
-
 def pex_default(dataset_id, oids, did_index=None, **inds):
     return None, None
-
-    """
-    # at this stage the other inds are not populated so sadly
-    # we have to read from disk twice, in service of reduced memory usage
-    id_drp = {}
-    for object_id, multi in oids:
-        blob = path_json(pathmeta_version_export_path(dataset_id, object_id))
-        drp = pathlib.PurePath(blob['dataset_relative_path'])
-        #other[drp] = blob  # FIXME check on memory sizes here
-        id_drp[object_id] = drp
-        if multi:
-            mid = RemoteId(object_id.curie)
-            if mid not in id_drp:
-                id_drp[mid] = []
-
-            id_drp[mid].append(drp)
-
-    return id_drp, None
-    """
 
 
 def combine_at_updated():
@@ -2737,14 +2387,6 @@ def _typecheck_fsmeta_records(recs):
     for rec in recs:
         o, p, u, n = rec
         to = (type(o) is RemoteId and o.file_id is None)  # this is what we want, drop the file id, we need the type to match for operational reasons
-            #type(o) == RemoteId and o.type != 'package')
-            #type(o) == str and o.startswith('package:') or
-              # XXX ARHG the bad design continues to permeate everything it touches
-              # let this be a reminder for any future person who thinks it is a good idea
-              # to have "files" with multiple internal things that are actually folders
-              # and then not give them the full folder abstraction >_<
-              #(or type(o.file_id)== int)  # can't do this, fsmeta doesn't know about file_id at all
-              # so if there is a file_id it literally cannot be fsmeta
         tp = type(p) is RemoteId
         tu = type(u) is datetime
         tn = type(n) is str
@@ -2790,12 +2432,10 @@ def _typecheck_fsmeta_blob(blob):
              ('version', int),
              ('dataset', RemoteId),
              ('updated-transitive', datetime),  # parse don't validate
-             #('updated-transitive', str),  # FIXME uct_friendly is needed in both places, keeping str here seems less work? but risk of inconsistency?
              ('removes', int),
              ('records', int),
              ('delta', int),
              ('from', datetime),
-             #('from', str),  # XXX same issue as with uct_friendly
              )
     hcond = {'from': lambda h: h['delta'] > 0}
     assert not (hbads := [k for k, t in hkeys if (k not in hcond
@@ -2942,21 +2582,9 @@ def indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=None
             fsmeta_path = fsmeta_pathxz
 
     # FIXME need a good warning here for case where the file does not exist
-    # e.g. because something go messed up and no fsmeta was written
+    # e.g. because something got messed up and no fsmeta was written
     fsmeta_blob = path_fsmeta(fsmeta_path)
     type_oids, pathmeta_blob_index, parent_index, id_drp = indicies_from_dataset_id_fsmeta_blob(dataset_id, fsmeta_blob)
-
-    # FIXME type_oids is hard to come by due to lack of indirection ? no, because we derive the expex_type from the real fs right now
-    # which is bad for this workflow
-
-    #for oid, t in object_id_types:
-        #if oid not in pathmeta_blob_index:
-            #breakpoint()
-
-    #object_id_type_pathmeta_blobs = [
-        #(object_id, type, pathmeta_blob_index[object_id]) for object_id, type in object_id_types
-    #]
-    #return object_id_type_pathmeta_blobs
     return fsmeta_blob, type_oids, pathmeta_blob_index, parent_index, id_drp
 
 
@@ -2969,22 +2597,6 @@ def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None,
 def from_dataset_id_fsmeta_indicies_combine(
         dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, test_combine=False):
     type_oids, pathmeta_blob_index, parent_index, id_drp_all = indicies
-    #for oid, type, pathmeta_blob in object_id_type_pathmeta_blobs:
-        # FIXME why do oids for packages have a file_id associated when we go to put them in source_id ???
-        # we have to load all in the first past to populate the info we need
-
-        #if type not in types:
-            #type_oids[type] = []
-
-        #type_oids[type].append(oid)
-
-    # we _have_ to load this first for everything, we can optimize out fs reads in the future as needed
-    # use for trying to find potential matches from fuzzy data in manifests and xmls
-    # XXX might not actually need this because I was being a dumb, but it does enable
-    # intra-type references to be found and resolved immediately ...
-    #if pathmeta_blobs is None:
-        #id_drp_all, _ = pex_default(dataset_id, [o for os in types.values() for o in os])
-
     _name_drps_index = defaultdict(list)
     for drp in id_drp_all.values():
         # TODO see if we need prefix_drps_index using e.g.
@@ -3005,8 +2617,6 @@ def from_dataset_id_fsmeta_indicies_combine(
     # but we can do better than that because for non-manifest stuff
     # we realy only care about additions and deletions, and maybe moves
 
-    #did_index = None
-    #parent_index = None  # can remain None if there are only files at the top level
     xml_index = None
     xml_unmapped = None
     drp_index = {}
@@ -3019,9 +2629,8 @@ def from_dataset_id_fsmeta_indicies_combine(
         oids = type_oids[type]
         process_extracted = pex_funs[type]
         inds = dict(
-            #did_index=did_index,
             id_drp_all=id_drp_all,
-            parent_index=parent_index,  # parent_index is only over dirs since files already have parent_id
+            parent_index=parent_index,
             name_drps_index=name_drps_index,
             drp_index=drp_index,
             xml_index=xml_index,
@@ -3030,8 +2639,6 @@ def from_dataset_id_fsmeta_indicies_combine(
         id_drp, index, *rest = process_extracted(dataset_id, oids, **inds)
         if index is not None:
             if type == 'inode/directory':
-                #did_index = index
-                #parent_index, = rest
                 continue
             if type == 'xml':
                 xml_index = index  # TODO figure out how we can get to the point where this can be included in drp index
@@ -3245,7 +2852,7 @@ def check_test_combine(source_path, target_path):
         d = Path(b)
         return c.checksum() == d.checksum()
 
-    #filecmp._do_cmp = _do_cmp  # no point, faster to compare the bytes directly for things this small
+    #filecmp._do_cmp = _do_cmp  # no point, faster to compare the bytes when both on the same system
     class dircmp(filecmp.dircmp):
         def phase3(self):
             xx = filecmp.cmpfiles(self.left, self.right, self.common_files, shallow=False)
@@ -3348,75 +2955,6 @@ def from_dataset_path_extract_combine(dataset_path, time_now=None, force=False, 
 
     drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
         dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, test_combine=debug)
-
-
-def single_file_extract(
-        dataset_id=None,
-        dataset_path=None,
-        path_metadata_path=None,
-        path_metadata_blob=None,
-):
-    # needs
-    # dataset
-    # dataset_path
-    # cloned dataset
-    # cloned dataset matches
-    # path-metadata
-    # path-metadata updated-cache-transitive matches dataset_path updated-cache-transitive
-
-    # OOOO! we can just use the index files? no, super slow unfortunately
-    # but the logic there is sound for updated_cache_transitive
-    # single-file/extract/{duuid}/packages/{extract-version}/{puuid[0:2]}/{puuid}
-    # the file id will be inside, if there are multiple files in a package we skip for now
-    # single-file/c/{duuid}/packages/{combine-version}/{puuid[0:2]}{puuid}
-
-    # XXX {updated-cache-transitive}/ doesn't fit in here, we technically already
-    # have that information in the path-metadata file and it will be embedded at
-    # the top so that we have it for reference, and if we really need it we can
-    # recover which paths were present at a given updated cache transitive
-
-    # get list of already extracted files at the current extract version
-    # identify all files that could be extracted
-    # generate list of files that need to be extracted
-
-    # parallelization happens in here as we do with the xml extraction right now
-    pass
-
-
-def single_file_combine(
-        dataset_id=None,
-        path_metadata_path=None,
-        path_metadata_blob=None,
-        updated_cache_transitive=None,  # if known in advance can be used to triple check
-        path_single_file_extract=None,
-):
-
-    # TODO outward reference index in addition to just extracted I think? or do we do it in memory?
-
-    # TODO do we check whether the data contents have changed for a specific referenced file
-    # or just rerun everything? I think that is an optimization, but a single manifest change
-    # will hit every file unless we diff against the previously extracted info, so I think we
-    # probably keep 1 existing file
-
-    # if we land below 60bytes for the symlink length it will be stored in the inode
-    # FIXME we're missing a level of indirection because we don't rerun every time
-    # symlink single-file/c/{duuid}/{updated-cache-transitive}/packages/{combine-version}/{puuid[0:2]}/{puuid}
-
-    # if there is only an old version this means that it was removed from the latest version of the dataset
-    # some time since the version bump, what we can do is provide an ARCHIVE endpoint where removed packages
-    # can be found at their last version
-    # single-file/c/{duuid}/packages/A/{puuid[0:2]}/{puuid}
-    # is populated by comparing /L/ to /L-1/ and packages that are not in L get moved to /A/
-    # so the meta version needs to be embedded for archived blobs
-    # and updated cache transitive is maintained in the blob OR we could use updated extracted latest to target only files
-    # that might affect other files, or better updated extracted making references latest ... that is more complicated
-    # but in a sense more accurate for most files only the manifest and their own modified date will matter
-
-    # single-file/c/{duuid}/packages/{combine-version}/{puuid[0:2]}/{puuid}
-
-    # single-file/index/{puuid[0:2]}/{puuid[2:4]}/{puuid[4:6]}/{puuid}
-    # ../../../c/{duuid}/L/packages/L/{puuid[0:2]}/{puuid}
-    pass
 
 
 def watch_combine():
