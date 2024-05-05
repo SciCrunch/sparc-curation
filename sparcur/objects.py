@@ -239,10 +239,10 @@ def inner_test(tds, force=True, debug=True, parent_parent_path=None):
 
     if debug:
         # force loading from fsmeta + objmeta store to ensure that we got those codepaths right and compare results
-        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive, keep_in_mem=True)
+        _d_drps, _d_drp_index = from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive, keep_in_mem=True, debug=debug)
 
     drps, drp_index = from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True, test_combine=debug)
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive, keep_in_mem=True, test_combine=debug, debug=debug)
 
     missing_from_inds = [d for o, m, d, h, ty, ta, ne, mb in drps if not h and
                          # we don't usually expect manifest entires for themselves
@@ -370,6 +370,7 @@ def _dump_path(dataset_id, object_id, blob, get_export_path, read_only=False, fo
     try:
         with open(path, 'wt') as f:
             json.dump(blob, f, sort_keys=True, cls=JEncode)
+            f.write('\n')
     except Exception as e:
         breakpoint()
         raise e
@@ -1033,15 +1034,13 @@ for this particular use case we may want to use epoch instead of a full timestam
             removes = f'(:remove "{dud_friendly}" :ids ())\n'  # leave it empty for regularity
             recs = mrecs(records)
             derp = fsmeta_version_export_path(dataset_id, dud_friendly)
+            out_string = header + removes + recs + '\n'
             if not derp.parent.exists():
                 derp.parent.mkdir(exist_ok=True, parents=True)
 
             # FIXME bad code duplication
             with open(derp, 'wt') as f:
-                f.write(header)
-                if removes:
-                    f.write(removes)
-                f.write(recs)
+                f.write(out_string)
 
             if not latest.exists():
                 # XXX I'm sure a race could happen here ...
@@ -1459,6 +1458,7 @@ def objmeta_write_from_pathmeta(dataset_id, object_id, pathmeta_blob, keep=tuple
     if do_write:
         with open(export_path, 'wt') as f:
             json.dump(blob, f, sort_keys=True, cls=JEncode)
+            f.write('\n')
 
     return blob
 
@@ -2588,14 +2588,14 @@ def indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=None
     return fsmeta_blob, type_oids, pathmeta_blob_index, parent_index, id_drp
 
 
-def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None, keep_in_mem=False):
+def from_dataset_id_combine(dataset_id, time_now, updated_cache_transitive=None, keep_in_mem=False, debug=False):
     fsmeta_blob, *indicies = indicies_from_dataset_id(dataset_id, time_now, updated_cache_transitive=updated_cache_transitive)
     return from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=updated_cache_transitive, keep_in_mem=keep_in_mem)
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=updated_cache_transitive, keep_in_mem=keep_in_mem, debug=debug)
 
 
 def from_dataset_id_fsmeta_indicies_combine(
-        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, test_combine=False):
+        dataset_id, fsmeta_blob, indicies, time_now, updated_cache_transitive=None, keep_in_mem=False, test_combine=False, debug=False):
     type_oids, pathmeta_blob_index, parent_index, id_drp_all = indicies
     _name_drps_index = defaultdict(list)
     for drp in id_drp_all.values():
@@ -2667,7 +2667,14 @@ def from_dataset_id_fsmeta_indicies_combine(
     # TODO processing of dataset and organization level ids
 
     cvdp = combine_version_dataset_path(dataset_id)
-    def sanity(n):
+    def sanity(n, _debug=debug):
+        if not _debug:
+            # these are extremely pedantic checks
+            # and are mostly present to make sure
+            # that the rest of the code is behaving
+            # correctly
+            return
+
         # this is violated when running debug because this
         # function is called twice, once sourcing from disk
         # once from memory with the exact same time_now
