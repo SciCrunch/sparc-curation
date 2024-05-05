@@ -28,7 +28,24 @@ it does implement them in the extract step
 e.g. we could have a file in each dataset
 folder in combine that holds the latest
 updated cache transitive or something
+
+the object uuids are encoded in paths using
+base64url encoding two pipelines for converting
+between that and the standard uuid representation
+are listed below, on using xxd (needs vim) and
+the other needs only coreutils and findutils
+both need sed, uuidparse is just for validation
+
+echo 5942f61b-03f0-4fd6-a116-1de400af7422 | tr -d '-' | xxd -r -p | basenc --base64url | cut -c-22 | \
+sed -r 's/^(.+)$/\1==/' | basenc --base64url --decode | xxd -p | \
+sed -r 's/^([0-f]{8})([0-f]{4})([0-f]{4})([0-f]{4})([0-f]{12})$/\1-\2-\3-\4-\5/' | uuidparse
+
+echo 5942f61b-03f0-4fd6-a116-1de400af7422 | tr -d '-' | sed 's/../\\x&/g' | xargs -0 printf | basenc --base64url | cut -c-22 | \
+sed -r 's/^(.+)$/\1==/' | basenc --base64url --decode | od -A n -t x1 | tr -d ' ' | \
+sed -r 's/^([0-f]{8})([0-f]{4})([0-f]{4})([0-f]{4})([0-f]{12})$/\1-\2-\3-\4-\5/' | uuidparse
+
 """
+
 import os
 import sys
 import json
@@ -1080,6 +1097,20 @@ def fsmeta(dataset_id, dataset_path=None, force=True, records=None, updated_cach
 ;(id parent updated name) ...
 
 for this particular use case we may want to use epoch instead of a full timestamp, though it will reduce debugability
+
+; :from points to the most recent keyframe and delta is thus 1
+; because :type is fsmeta-repack we know when we go to load that we have
+; to scan for the symlink datetime and that we don't dereference any of
+; of the internal fsmeta :from fields because they point back to the same file
+; in principle we could include an index mapping the updated-transitive to the
+; repack index, but it would literally just be a list of updated transitives
+; which only allows us to avoid a fsmeta[0]['updated-transitive'] == symlink_name
+; and instead do utindex.index(symlink_name) which has the same overall cost
+; on read because we don't read directly into a dict we have to traverse the
+; whole thing at least once, in theory we can cache a repacked file though
+; since users will probably want clustered versions e.g. for diffs
+(:type fsmeta-repack :version 0 :dataset uuid :updated-transitive ut :repacks n :delta 1 :from previous-ut)
+(fsmeta ...)
     """
     # as it exists this would slot into from_dataset_path_extract_object_metadata
 

@@ -207,7 +207,7 @@ def bind_packages_File(File):
 
 
     def _packages(self,
-                  pageSize=1000,
+                  pageSize=1000,  # XXX > 1000 -> silent error and no results
                   includeSourceFiles=True,
                   raw=False,
                   latest_only=False,
@@ -294,7 +294,12 @@ def bind_packages_File(File):
                     if latest_only:
                         break
                     else:
-                        continue
+                        if 'cursor' in j:
+                            cursor = j['cursor']
+                            cursor_args = f'&cursor={cursor}'
+                            continue
+                        else:
+                            break
 
                 if out_of_order:
                     packages += out_of_order
@@ -344,6 +349,15 @@ def bind_packages_File(File):
                             bfobject = package
 
                         to_yield = None
+                        # FIXME TODO tweak updated time of parents when a file
+                        # is deleteing to match posix ctime/mtime behavior ???
+                        # we may not need this for the most part though? no
+                        # FIXME we are missing a test case where an older file
+                        # gets deleted and updated cache transitive remains the
+                        # same but the file list is different, that should error
+                        # right now, the problem with this packages endpoint is
+                        # that if you miss the delete window for some reason
+                        # you wouldn't get the intervening dates
                         if (isinstance(bfobject.parent, str)
                             and bfobject.parent in index):
 
@@ -403,6 +417,7 @@ def bind_packages_File(File):
                             if 'objects' not in bfobject._json:
                                 log.error(f'{bfobject} has no files!??!')
                             else:
+                                max_updated = _tsnorm(bfobject._json['content']['updatedAt'])
                                 for i, source in enumerate(
                                         bfobject._json['objects']['source']):
                                     # TODO package id?
@@ -410,6 +425,11 @@ def bind_packages_File(File):
                                         # normally source has a single key "content"
                                         log.info('more than one key in source '
                                                  f'{sorted(source)}')
+
+                                    updated = _tsnorm(source['content']['updatedAt'])
+                                    if max_updated < updated:
+                                        # see ../docs/file-time-metadata.org
+                                        max_updated = updated
 
                                     ff = FakeBFile(
                                         bfobject, **source['content'])
@@ -420,7 +440,17 @@ def bind_packages_File(File):
                                         bfobject._has_multiple_files = True  # this needs to be detected BEFORE we yield the package
                                         msg = ('MORE THAN ONE FILE IN PACKAGE '
                                                f'{bfobject.id}')
-                                        log.critical(msg)
+                                        log.debug(msg)
+
+                                # end for
+                                if bfobject._has_multiple_files:
+                                    bfobject._has_multiple_files = i + 1
+
+                            # end else
+                            bfobject._max_updated = max_updated
+                            for ff in bfobject.fake_files:
+                                ff._max_updated = max_updated
+                                ff._has_multiple_files = bfobject._has_multiple_files
 
                         if to_yield is not None:
                             yield to_yield
@@ -437,6 +467,16 @@ def bind_packages_File(File):
                 break
 
     return FakeBFile, _packages
+
+
+def _tsnorm(timestring):
+    if len(timestring) == 27:
+        return timestring
+    elif len(timestring) < 27:
+        return f'{timestring[:-1]:0<26}Z'
+    else:
+        msg = f'unhandled timestring length {len(timestring)} for {timestring!r}'
+        raise ValueError(msg)
 
 
 @property
@@ -460,6 +500,14 @@ def packagesByName(self,
         yield from self._packages(
             pageSize=pageSize,
             includeSourceFiles=includeSourceFiles)
+
+
+@property
+def packages_raw(self, pageSize=1000, includeSourceFiles=True):
+    yield from self._packages(
+        raw=True,
+        pageSize=pageSize,
+        includeSourceFiles=includeSourceFiles)
 
 
 @property

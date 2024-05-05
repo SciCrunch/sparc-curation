@@ -64,6 +64,11 @@ from sparcur.sparcron import _none, _qed, _run, _qed_run
 
 log = _log.getChild('cron')
 
+dev_hack = False
+
+if dev_hack:
+    log.debug('dev_hack enabled: fetch will always happen')
+
 # we set only cache here to avoid hitting rate limits the cache should
 # be updated in another process to keep things simple
 Sheet._only_cache = True
@@ -529,7 +534,8 @@ def export_single_dataset(dataset_id, qupdated_when_called):
     # immediately before a data change and fetch is based on all events
     # that trigger a run, not just the first
     # < can be false if only the sheet changed
-    fetch = ((updated < qupdated if updated is not None else True) or
+    fetch = (((updated < qupdated) if updated is not None else True) or
+             dev_hack or
              (fs_version < Remote._translation_version))
 
     rdd = RemoteDatasetData(dataset_id)
@@ -685,14 +691,14 @@ def mget_all(dataset_id):
                   if _rd_version is not None
                   else 0)  # FIXME new dataset case?
     sheet_changed = int(_sheet_changed) if _sheet_changed is not None else None
-    ivc = internal_version < sparcur.__internal_version__
+    ivc = internal_version < sparcur.__internal_version__ or dev_hack
     fvc = fs_version < Remote._translation_version
     rvc = rd_version < RemoteDatasetData._translation_version
     log.log(9, (
         ivc,
         fvc,
         rvc,
-        internal_version, sparcur.__internal_version__,
+        internal_version, sparcur.__internal_version__, ('ivc-tampered-for-dev' if dev_hack else ''),
         fs_version, Remote._translation_version,
         rd_version, RemoteDatasetData._translation_version,
     ))

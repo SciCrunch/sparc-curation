@@ -1,0 +1,32 @@
+* Report
+:PROPERTIES:
+:CREATED:  [2024-05-04 Sat 12:23]
+:END:
+The following is an account of the behavior of the remote with regard to the behavior for changes to updated and created timestamps for packages.
+
+| single  | rename | reparent | ???   |
+|---------+--------+----------+-------|
+| package | u 1st  | u        | not u |
+| file    | u 2nd  | not u    | u     |
+
+For renaming updated times for package vs file are extremely close in
+time and even though the file updated is later than the package it on
+the order of milliseconds. It also appears that there is some other
+process that can cause the file updated time to bump, possibly the
+checksum process immediately after upload?
+
+For reparenting only the package updated time changes.
+
+In conclusion, because there are cases where each can be updated
+without the other the only sane solution to match something
+approaching posix behavior is to take the maximum updated time.
+
+Given that this is true for single files we don't actually need
+to care about the exact behavior for the multi-file case because
+the way we handle this for single files also works for multi-file.
+
+| multi   | rename | reparent | ??? |
+|---------+--------+----------+-----|
+| package | ?      | ?        | ?   |
+| file    | ?      | ?        | ?   |
+

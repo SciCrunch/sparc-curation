@@ -606,14 +606,20 @@ class BlackfynnRemote(aug.RemotePath):
     def updated(self):
         if not isinstance(self.bfobject, self._Organization):
             if not hasattr(self, '_cache_updated'):
+                if hasattr(self.bfobject, '_max_updated'):
+                    # sane increasing modified dates for packages
+                    updated_at = self.bfobject._max_updated
+                else:
+                    updated_at = self.bfobject.updated_at
+
                 # string comparison of dates fails if the padding
                 # is different, how extremely unfortunate :/
-                if '.' in self.bfobject.updated_at:
-                    dt, sZ = self.bfobject.updated_at.rsplit('.', 1)
+                if '.' in updated_at:
+                    dt, sZ = updated_at.rsplit('.', 1)
                 else:
                     # when someone hits the jackpot aka why you should
                     # never truncate your iso8601 timestamps :/
-                    dt = self.bfobject.updated_at[:-1]
+                    dt = updated_at[:-1]
                     sZ = 'Z'
 
                 if len(sZ) < 7:
@@ -662,33 +668,6 @@ class BlackfynnRemote(aug.RemotePath):
         # a data package is if something is in error in which
         # case it it definitely not a file
         return isinstance(bfo, self._File)
-
-    def _has_a_single_remote_file(self):
-        """ this will fetch """
-        bfobject = self.bfobject
-        if not isinstance(bfobject, self._DataPackage):
-            return False
-
-        log.log(9, 'going to network for files')
-        files = bfobject.files  # FIXME this is NOT the right place to do this because packages with multiple files become a massive problem especailly for determining the actual name we give the file, I have cases where there seem to be two identical files added to the same package, they have the same name ...
-        if not files:
-            return False
-
-        if len(files) > 1:
-            log.critical(f'{self} has more than one file! Not switching bfobject!')
-            return False  # would need to be a folder or unpack individual files
-
-        file, = files
-        file.parent = bfobject.parent
-        file.dataset = bfobject.dataset
-        file.package = bfobject
-        if bfobject.name != file.name and not hasattr(self, '_ni_logged_0'):
-            msg = f'package-missing-files-name-issue {bfobject.name} != {file.name}'
-            log.log(9, msg)
-            self._ni_logged_0 = True
-
-        self._bfobject = file
-        return True
 
     @property
     def checksum(self):  # FIXME using a property is inconsistent with LocalPath
@@ -1149,6 +1128,33 @@ class BlackfynnRemote(aug.RemotePath):
         else:
             raise error
 
+    def _has_a_single_remote_file(self):
+        """ this will fetch """
+        bfobject = self.bfobject
+        if not isinstance(bfobject, self._DataPackage):
+            return False
+
+        log.log(9, 'going to network for files')
+        files = bfobject.files  # FIXME this is NOT the right place to do this because packages with multiple files become a massive problem especailly for determining the actual name we give the file, I have cases where there seem to be two identical files added to the same package, they have the same name ...
+        if not files:
+            return False
+
+        if len(files) > 1:
+            log.critical(f'{self} has more than one file! Not switching bfobject!')
+            return False  # would need to be a folder or unpack individual files
+
+        file, = files
+        file.parent = bfobject.parent
+        file.dataset = bfobject.dataset
+        file.package = bfobject
+        if bfobject.name != file.name and not hasattr(self, '_ni_logged_0'):
+            msg = f'package-missing-files-name-issue {bfobject.name} != {file.name}'
+            log.log(9, msg)
+            self._ni_logged_0 = True
+
+        self._bfobject = file
+        return True
+
     def _single_file(self):
         if isinstance(self.bfobject, self._DataPackage):
             files = list(self.bfobject.files)
@@ -1162,6 +1168,14 @@ class BlackfynnRemote(aug.RemotePath):
             file = None
 
         return file
+
+    def _multi(self):
+        if (multi_file_number := (hasattr(self.bfobject, '_has_multiple_files') and self.bfobject._has_multiple_files)):
+            return multi_file_number
+        elif not self.from_packages and self.is_file():
+            # if for some reason we hit this codepath instead of doing
+            # a full resync then we will implement this until then ...
+            raise NotImplementedError('TODO')
 
     def _uri_file(self):
         file = self._single_file()
@@ -1428,6 +1442,8 @@ class BlackfynnRemote(aug.RemotePath):
         self._bfobject = bfobject
 
     def rmdir(self, force=False):
+        # XXX NOTE force= is bfpn specific and does not match normal pathlib behavior
+        # but it is here because there are extra protections on certain dir types
         if self.is_organization():
             raise exc.SparCurError("can't remove organizations right now")
 
@@ -1700,6 +1716,7 @@ class BlackfynnRemote(aug.RemotePath):
                         gid=None,  # needed to determine local writability
                         user_id=self.owner_id,
                         mode=None,
+                        multi=self._multi(),
                         # XXX WARNING these errors can leak out and can break
                         # get_errors via extract_errors, see DatasetStructure.data_dir_structure
                         # for the fix
@@ -1798,6 +1815,9 @@ class RemoteDatasetData:
         self()
 
     def __call__(self):
+        # XXX to debug run python -m sparcur.simple.fetch_remote_metadata
+        # in a dataset folder
+
         # FIXME TODO switch to use dict transformers
         # self.bfobject.relationships()
 
