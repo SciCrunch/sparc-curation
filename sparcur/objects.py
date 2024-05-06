@@ -1240,23 +1240,10 @@ for this particular use case we may want to use epoch instead of a full timestam
 
     try:
         if xz:
-            # FIXME internal error on pypy3 ??? it is specific to athena ???
             out_bytes = out_string.encode()
-            #if hasattr(sys, 'pypy_version_info'):
-                # whenever I try to use lzma.compress on pypy3 I get an internal error
-                #pass
-            #else:
-
-            filters = [{'id': lzma.FILTER_LZMA2, 'preset': 9 | lzma.PRESET_EXTREME}]
-            try:
-                with lzma.open(newxz, 'wb', filters=filters) as f:
-                    f.write(out_bytes)
-            except lzma.LZMAError as e:
-                log.exception(e)
-                log.critical('lzma internal error issue')
-                # I have an insane system specific lzma internal error bug
-                # I have no idea how to track it down right now, but since
-                # it doesn't appear on either of my other systems work around it for now
+            if hasattr(sys, 'pypy_version_info'):
+                # https://github.com/pypy/pypy/issues/3527
+                # pypy3 -c 'import lzma; lzma.compress(b"ok"); lzma.compress(b"not ok", filters=[{"id": lzma.FILTER_LZMA2, "preset": 6}])'
                 with open(new, 'wb') as f:
                     f.write(out_bytes)
 
@@ -1266,9 +1253,10 @@ for this particular use case we may want to use epoch instead of a full timestam
                 if p.returncode != 0:
                     raise exc.SubprocessException(f'xz compress failed objs return code was {p.returncode}')
 
-                if not debug:
-                    # if this happens anywhere but in dev/debug we need to know and raise
-                    raise e
+            else:
+                filters = [{'id': lzma.FILTER_LZMA2, 'preset': 9 | lzma.PRESET_EXTREME}]
+                with lzma.open(newxz, 'wb', filters=filters) as f:
+                    f.write(out_bytes)
 
             if test_xz:
                 with lzma.open(newxz, 'rb') as f:
