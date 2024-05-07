@@ -12,10 +12,15 @@
 - ApiNATOMY publication metadata
 
 - NPO connections from composer
+- NPO connections from sweat glands, muscles
 - NPO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* PLAN 2024-06-?? :future:
+- NPO add populations from NLP kidney, liver
+* RC 2024-03-26
+- Other updated sparc community termset with corrections for REVA terms
 * RC 2024-03-05
 - ApiNATOMY splen fixed layer ordering issue for neruon 1
 - ApiNATOMY aacar added new populations updated existing populations
