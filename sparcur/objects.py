@@ -103,8 +103,6 @@ combine_latest_dir_name = 'L'  # short to keep symlinks small enough to fit in i
 
 index_dir_name = 'index'
 
-latest_link_name = 'L'  # short to keep symlinks small enough to fit in inodes
-
 _expex_types = (  # aka expex_type
     None,
     'inode/directory',
@@ -291,6 +289,7 @@ def create_current_version_paths():
     cot_path = combine_temp_path()
     com_path = combine_version_path()
     idx_path = index_path()
+    clp_path = index_combine_latest_path()
 
     if not obj_path.exists():
         obj_path.mkdir(parents=True)
@@ -313,7 +312,10 @@ def create_current_version_paths():
     if not idx_path.exists():
         idx_path.mkdir(parents=True)
 
-    resymlink_index_combine_latest()
+    if not clp_path.exists():
+        # only link the first time and only relink after full export
+        # of the new combine version path finishes
+        resymlink_index_combine_latest()
 
 
 def resymlink_index_combine_latest(index_version=None):
@@ -1369,11 +1371,6 @@ def objind_header_from_string(string):
 def string_from_objind(objind):
     header, dataset_id, *ids = objind
     # FIXME ... shouldn't the embedded times be isoformat instead of timeformat?
-    # FIXME this is almost certainly not the actual on-disk format we want
-    # TODO need to validate that the index matches disk
-    # 1. it needs a real header with a record count and version (record count maybe ok to skip since we have the actual folders)
-    # 2. we very likely want the compact version of everything, the urlsafe base64 and single letter types
-    # 3. heck why not go binary, everything's a uuid anyway (only sort of kidding)
     header = f'(:t {header["t"]} :v {header["v"]} :r {header["r"]} :u "{timeformat_friendly(header["u"])}" :e "{timeformat_friendly(header["e"])}")'
     return '\n'.join((
         header, f'd:{dataset_id.base64uuid()}',
