@@ -2101,14 +2101,29 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
 def main(id=None,
          project_id=None,
          project_id_auth_var='remote-organization',  # FIXME move to clifun
+         all_projects=False,
          n_jobs=12,
          ,**kwargs):
 
+    if all_projects:
+        from sparcur.utils import PennsieveId as RemoteId
+        from sparcur.config import auth
+        project_ids = [
+            RemoteId(p) for p in auth.get_list('remote-organizations')]
+        for project_id in project_ids:
+            main(id=project_id, project_id=project_id, all_projects=False,
+                 n_jobs=n_jobs, **kwargs)
+        return
+
     if project_id is None:
-        from sparcur.utils import PennsieveId
+        if id is not None:
+            msg = 'id must be passed with project id'
+            raise TypeError(msg)
+
+        from sparcur.utils import PennsieveId as RemoteId
         from sparcur.config import auth
         project_id = auth.get(project_id_auth_var)
-        project_id = PennsieveId(project_id)  # FIXME abstract the hardcoded backend
+        project_id = RemoteId(project_id)  # FIXME abstract the hardcoded backend
 
     if id is None:
         id = project_id
@@ -3759,6 +3774,7 @@ Options:
     --project-id=ID                 the project id
     --dataset-id=<ID>...            one or more datset ids
     --project-id-auth-var=VAR       name of the auth variable holding the project-id
+    --all-projects                  run for all projects listed in config remote-organizations
 
     --project-path=PATH             the project path, will be path if <path>... is empty
     --parent-path=PATH              the parent path where the project will be cloned to
