@@ -518,8 +518,10 @@ def packageTypeCounts(self):
 @property
 def publishedMetadata(self):
     session = self._api.session
-    resp = session.get(
-        f'{self._api._host}/discover/search/datasets?query={self.int_id}')
+    limit = 200  # for low dataset int_id values many results can be returned
+    resp = session.get((
+        f'{self._api._host}/discover/search/datasets?query={self.int_id}'
+        f'&limit={limit}'))
     if resp.ok:
         try:
             j = resp.json()
@@ -540,6 +542,9 @@ def publishedMetadata(self):
             if lc == 1:
                 return cands[0]
             elif lc == 0:
+                if j['totalCount'] > j['limit']:
+                    raise NotImplementedError('TODO')
+
                 return
             else:
                 return sorted(cands, key=lambda d:d['version'], reverse=True)[0]
