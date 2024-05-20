@@ -518,43 +518,53 @@ def packageTypeCounts(self):
 @property
 def publishedMetadata(self):
     session = self._api.session
+    offset = 0
     limit = 200  # for low dataset int_id values many results can be returned
-    resp = session.get((
-        f'{self._api._host}/discover/search/datasets?query={self.int_id}'
-        f'&limit={limit}'))
-    if resp.ok:
-        try:
-            j = resp.json()
-        except requests.exceptions.JSONDecodeError as e:
-            log.critical(f'resp.ok but json malformed???\n{resp.text}')
-            raise e  # FIXME retry
+    for i in range(100):
+        resp = session.get((
+            f'{self._api._host}/discover/search/datasets?query={self.int_id}'
+            f'&limit={limit}&offset={offset}'))
+        if resp.ok:
+            try:
+                j = resp.json()
+            except requests.exceptions.JSONDecodeError as e:
+                log.critical(f'resp.ok but json malformed???\n{resp.text}')
+                raise e  # FIXME retry
 
-        if j['totalCount'] == 1:
-            return j['datasets'][0]
-        elif j['totalCount'] == 0:
-            return
-        else:
-            org_int_id = self._api._context.int_id
-            cands = [d for d in j['datasets'] if
-                     d['sourceDatasetId'] == self.int_id and
-                     d['organizationId'] == org_int_id]
-            lc = len(cands)
-            if lc == 1:
-                return cands[0]
-            elif lc == 0:
-                if j['totalCount'] > j['limit']:
-                    raise NotImplementedError('TODO')
-
+            if j['totalCount'] == 1:
+                return j['datasets'][0]
+            elif j['totalCount'] == 0:
                 return
             else:
-                return sorted(cands, key=lambda d:d['version'], reverse=True)[0]
+                # FIXME this will fail to find datasets not published from sparc I think ???
+                org_int_id = self._api._context.int_id
+                cands = [d for d in j['datasets'] if
+                        d['sourceDatasetId'] == self.int_id and
+                        d['organizationId'] == org_int_id]
+                lc = len(cands)
+                if lc == 1:
+                    return cands[0]
+                elif lc == 0:
+                    if j['totalCount'] > (j['limit'] + offset):
+                        # yes - 1 leads to overlap but that's ok
+                        offset += (j['limit'] - 1)
+                        continue
 
-        return j
+                    return
+                else:
+                    return sorted(cands, key=lambda d:d['version'], reverse=True)[0]
+
+            return j
+        else:
+            resp.raise_for_status()
+
     else:
-        resp.raise_for_status()
+        msg = 'that is a lot of results {j["totalCount"]}'
+        raise ValueError(msg)
 
 
 def publishedVersionMetadata(self, id_published, published_version):
+    # TODO cache this because technically it is static
     session = self._api.session
     return _get_json(self, (
         f'{self._api._host}/discover/datasets/'
