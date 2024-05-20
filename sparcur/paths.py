@@ -138,7 +138,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
         return self
 
     def meta_from_local(self):
-        value = self.getxattr(self._local_xattr)
+        value = self.getxattr(self._local_xattr.decode())
         return bool(value)
 
     @classmethod
@@ -175,7 +175,7 @@ class BFPNCacheBase(PrimaryCache, EatCache):
     def _fs_version(self):
         if not hasattr(self, '_cache_fs_version'):
             try:
-                _fs_version = self.getxattr(self._xattr_fs_version)
+                _fs_version = self.getxattr(self._xattr_fs_version.decode())
                 fs_version = int(_fs_version)
                 return fs_version
             except exc.NoStreamError as e:
