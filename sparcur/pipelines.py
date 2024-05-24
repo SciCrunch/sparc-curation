@@ -1496,7 +1496,7 @@ class PipelineExtras(JSONPipeline):
         [['meta', 'model_of_species'], OntTerm._loc_to_lot],
         [['meta', 'model_of_organ'], OntTerm._loc_to_lot],
 
-        [['meta', 'model_of_species'], mapping.species],
+        #[['meta', 'model_of_species'], mapping.species],  # this is incorrect, for manifest 99% of time should be curie
         [['meta', 'collected_from_species'], mapping.species],
         [['samples', int, 'species'], mapping.species],
         [['samples', int, 'sex'], mapping.sex],
