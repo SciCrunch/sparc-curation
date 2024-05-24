@@ -928,6 +928,7 @@ class DatasetStructureSchema(JSONSchema):
                                       'pattern': metadata_filename_pattern},
                     'samples_file': {'type': 'string',
                                      'pattern': metadata_filename_pattern},
+                    # FIXME TODO performances, sites, etc.
                     'manifest_file': {'type': 'array',
                                       'minItems': 1,
                                       'items': {
@@ -945,10 +946,13 @@ class DatasetStructureSchema(JSONSchema):
                              'minimum': 0},
                     'errors': ErrorSchema.schema,
                 }}
-    schema = {'allOf': [__schema,
-                        {'anyOf': [
-                            {'required': ['subjects_file']},
-                            {'required': ['samples_file']}]}]}
+    schema = __schema
+    # subjects and samples required can only be checked once we look inside dataset_description
+    # because they are only required if it is an experimental datasets
+    #schema = {'allOf': [__schema,
+                        #{'anyOf': [
+                            #{'required': ['subjects_file']},
+                            #{'required': ['samples_file']}]}]}
 
 
 class FutureValidPaths:
@@ -2165,12 +2169,18 @@ class MetaOutExportSchema(JSONSchema):
     schema = {
         'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
         'allOf': [__schema,
-                  {'anyOf': [
-                      #{'required': ['number_of_subjects']},
-                      #{'required': ['number_of_samples']},
-                            {'required': ['subject_count']},  # FIXME extract subjects from samples ?
-                      {'required': ['sample_count']}
-                  ]}]}
+                  {'oneOf': [
+                      {'properties': {
+                          'dataset_type': {
+                              'type': 'string',
+                              'enum': ['computational'],
+                          }}},
+                      {'anyOf': [
+                          #{'required': ['number_of_subjects']},
+                          #{'required': ['number_of_samples']},
+                          {'required': ['subject_count']},  # FIXME extract subjects from samples ?
+                          {'required': ['sample_count']}
+                      ]}]}]}
 
 
 class MetaOutSchema(JSONSchema):
@@ -2184,7 +2194,7 @@ class DatasetOutExportSchema(JSONSchema):
         the id to check the integrity of their data. We need it because that is
         a key piece of information that we use to link everything together. """
 
-    __schema = copy.deepcopy(DatasetStructureSchema.schema['allOf'][0])
+    __schema = copy.deepcopy(DatasetStructureSchema.schema)
     __schema['required'] = [
         'id',
         'meta',
