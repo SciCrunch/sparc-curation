@@ -1,0 +1,464 @@
+* changelog 2.2.0
+this is 3.0.0 without backward incompatible changes
+
+update the template version to indicate that a backward compatible subset of 3.0.0 validation features should be run on this dataset, features that are not backward compatible are the file naming restrictions, basically this is 3.0.0
+* changelog 3.0.0
+# this goes in the commit message as well
+** Overview
+This change log provides a summary of the changes in SDS 3.0.0.
+See commit message x for the full change log that includes a full explication.
+** Validation changes added for SDS 3.0.0 datasets
+These are changes that are not literal changes to the template itself,
+but are validation changes that will be enforced for any datasets
+using the templates greater than 3.0.0.
+
+- samples and subjects cannot share the same pool-id (this remains
+  confusing), a given pool-id can only appear in one of samples or
+  subjects file
+
+- TODO consider removing pools altogether, replace with participant
+  type or similar where the options are, subject, sample, pop-sub, pop-sam,
+  and the virtual variant for all of those
+
+- Add naming restrictions for all paths =[0-9A-Za-z,.-_ ]=.
+
+  FIXME TODO do we require alphanumeric for first char in name? (probably yes?)
+
+  The following characters are no longer allowed in file names and no
+  longer allowed in folder names (they were already technically banned
+  from folders mapping to SDS entities). =@#$%^&*()+=/\|"'~;:<>{}[]?=
+  The only whitespace character allowed is =space= however the use of
+  spaces in file and folder names is discouraged. Further, all forms
+  of whitespace (including =space=) are banned from appearing at the
+  start or end of file and folder names. All non-printing characters
+  are banned. This leaves us with following regex for allowed file and
+  folder names =[A-Za-z0-9.,-_ ]=. Folders mapped to SDS entity ids
+  still must follow the more restrictive rule =[A-Za-z0-9-]=.
+
+  By default SDS 3.0.0 explicitly excludes the larger unicode
+  categories for letter and number. See
+  https://en.wikipedia.org/wiki/Unicode_character_property#General_Category.
+  An option extension of the standard to support those categories
+  could be implemented, in which case an explicit field must be
+  provided in the dataset description file indicating that the dataset
+  makes use of extended file naming rules. Such extension is intended
+  for internal use in organizations where non-ascii file names are
+  unavoidable due to the presence of existing processes. Platforms
+  that use and exchange SDS formatted datasets publicly may always
+  reject such datasets as not conforming to the requirements for
+  public sharing and publication. If such an extension is implemented
+  NO OTHER unicode general categories shall be allowed, that is no
+  mark, punctuation, symbol, separator, or other. The only extra
+  characters allowed outside letter and number categories shall be
+  =[.,-_ ]=.
+
+- Add advisory naming restrictions on use of =.= for all paths.
+
+  SDS validators shall warn in the following cases.
+  - =.= appears in a directory name.
+  - =.= appears at the start of a file name outside the top level and =code=.
+  - =.= appears more than once in a file name.
+
+  It is not easy to create a general rule that limits the usage of
+  period (=.=) in paths without accidentally banning legitimate usage
+  patterns. In general we discourage the use of warnings since they
+  are either ignored entirely or treated as errors, however in this
+  case we do not see an easy solution at this time.
+
+  A slightly less restrictive approach could be implementing by maintaining
+  a list of known valid multi-suffix formats, such as =.tar.gz=, however the
+  standard does not require this.
+
+- Additional restrictions related to banned whole file names follow
+  the answers given in https://stackoverflow.com/q/1976007.
+
+  =CON|PRN|AUX|NUL|((COM|LPT)[0-9])=
+  An additional (incomplete) list of banned file names includes
+  =Thumbs.db|.DS_Store=
+- File types restrictions are now enforced by modality when modality is provided.
+  - modality to file type mapping
+*** COMMENT old thinking
+- COMMENT ::
+  Directory names should not contain =.=.
+  File names should not start with a =.=. Nearly every instance
+
+  A final restriction is that =.= may appear at most once for
+  non-compressed files, and at most twice for files with a recognized
+  compressed extension such as =.tar.gz=.
+- COMMENT ::
+  SDS attempts to provide maximum compatibility and minimize implementation complexity in the file system layer. Therefore SDS enforces naming conventions that are simpler than
+  # closes #100 file name restrictions, XXX only partially since check not implemented
+  - COMMENT :: ... TODO consider: a field has been added to the dataset description file that can be used to indicate that support for unicode characters in file names, since we are aware that certain internal processes that might like to use SDS may need to support cases where computer input systems default to non-ascii, however publishing platforms for scientific data should almost always produce an error of that field is set since scientific publication is conducted in english and thus scientific data supporting it needs to have all metadata and structure in english as well, enforcing ascii is one way to achieve this which also has the added benefit of reducing the overall complexity required to implement an SDS validator. No such restrictions are placed on the contents of data files inside an SDS structure, they may be placed on metadata files that are of a particular type, such as csv or tsv, where we e.g. would disallow latin-1 encodings and require utf-8. We also seriously need to consider stripping example columns and converting to tsv or csv after initial submission/curation prior to publication
+- NO ::
+  Paths starting with period =.= are not allowed in =source=,
+  =primary=, =derivative=, =docs=, and =protocol= folders.
+
+  The apparent exception for the =.dss= file is more accurately
+  interpreted as indicating that =.dss= files indicates that the
+  subtree either marks the start of another SDS dataset or that the
+  subtree follows some other data standard and thus that SDS
+  validation will not proceed inside of that folder. A SDS validator
+  should be implemented in such a way that the file name validation
+  pass would never see a =.dss= file as anything but the top level of
+  an SDS dataset.
+
+  # Consider whether source should allow more flexible names? No, it should not.
+
+  FIXME TODO names shall not start with =.= aside from those
+  explicitly enumerated by ... FIXME .git folders? what to do about
+  these ... there is pretty much never a case where it is valid to
+  have a file that starts with a =.= those should include a =.dss=
+  file if they are zarr, git, etc. and usually should not be in an sds
+  context? or what ... yeah, operations should not be going inside the
+  usual top level folders, aux is different though? how about code?
+  There is almost never a valid reason for a file starting with =.= to
+  appear in ={source,primary,derivative}= most of the time it is clear
+  that there are some garbage files that were uploaded by mistake or
+  there is and alternate data structure standard (e.g. git, hg, zarr).
+  #+begin_example
+  .imaris_cache
+  ._echem_data_processing_60hz.m
+  .DS_Store
+  ._fmri_sess_1.nii.gz
+  ._manifest.csv
+  segmentations.zarr/.zattrs
+  segmentations.zarr/.zgroup
+  segmentations.zarr/muse/.zgroup
+  segmentations.zarr/muse/segmentations/.zarray
+  .mbftmp_~20180709-PB-025-1.jpx
+  ._vu8_duo_r3.TGGTCTC
+  code/.fonts
+  docs/build/.doctrees
+  eeglab14_1_2b/plugins/Biosig3.3.0/NaN/.hgignore
+  eeglab14_1_2b/plugins/Biosig3.3.0/NaN/.hg
+  eeglab14_1_2b/plugins/Biosig3.3.0/NaN/.hgtags
+  1_Laser_Calibration/.ipynb_checkpoints
+  shinyApp_fibroblasts/.Rhistory
+  shinyApp_allcells/.RData
+  shinyApp_allcells/.Rhistory
+  primary/mapclient workflow/.map-client-workflow.rdf
+  #+end_example
+  The rationale is as follows. Code repositories should not be inside
+  an SDS dataset, they need to be published along with the rest of the
+  code, SDS could itself be used inside a version control system, and
+  that is enabled by only banning files that start with =.= inside
+  source, primary, derived, and protocols folders, aux and code and the
+  top level can have files/folders that start with =.=. In code, aux, and
+  top level, the presence of paths starting with =.= that are not known
+  can raise a warning.
+
+  Further rationale is as follows. Nearly all instances of paths
+  starting with =.= that we see in existing SDS datasets are accidents.
+  It would be the equivalent of someone submitting a paper with track
+  changes still enabled. Versioning of a whole or a part of a dataset
+  using some version control system can leverage the =.dss= functionality.
+  That said, we do need to figure out how to avoid git-submodule-like
+  issues. Providing a spec for how to dereference another remote
+  resource to combine automatically with an SDS dataset is something
+  that is currently well beyond the scope of the standard. The restrictions
+  as proposed leave room for SDS to work cooperatively with version control
+  systems such as git and git-annex.
+** File system structure changes
+- Add =.dss= file. Data Structure Standard.
+  # Add =.{ffs}= file. File Format Standard file. =.dss= or =.fss= data structure standard, file structure standard, ...
+  Contents are =(standard-abbrev standard-version)= e.g. =(SDS 3.0.0)=.
+  Should appear at the top level of the dataset and may also appear in
+  other folders if they conform to a different data structure standard
+  such as BIDS. If =standard-abbrev= does not match the current parent
+  then validation will not be run using the parent validator. At this
+  time =standard-version= is purely an informative field and carries
+  no semantics of any kind for validation. The default contents of the
+  file result in =standard-version= matching =dataset-template-version=,
+  HOWEVER IT SHOULD NOT BE ASSUMED THAT THEY WILL ALWAYS BE THE SAME.
+  In general contents of this file will always be an s-expression that
+  contains only atoms or nest s-expressions which themselves contain
+  only atoms (i.e., no strings). The format is chosen to avoid the
+  creation of a custom surface syntax for the =.dss= file. The index
+  of known values for =standard-abbrev= is case-insensitive, so e.g.
+  both =SDS= and =sds= refer to the same expanded data structure
+  standard to avoid collisions and confusion. At this time the only
+  semantics for =standard-abbrev= are that a mismatch between
+  case-insensitive =standard-abbrev= fields means that the
+  subdirectory will not be validated using the parent validator, no
+  central registry mapping abbrevs to specific data structure standard
+  validators is required.  This leaves room for cooperative
+  development between standards in the future. I used =(sds 3)=
+  as the default value to reinforce the note above.
+  # - COMMENT :: I swear I had a full worked example of this somewhere but I cannot find it, however an initial spec isn't that hard
+  - COMMENT :: Effectively this makes it possible to add a type
+    annotation to a directory tree so that e.g. MRI data can be
+    published according to the BIDS standard in a repository that uses
+    SDS at the top level. This is needed to avoid the use of
+    hueristics to try to determine if a subfolder conforms to an
+    alternate standard and thus should not be expected to pass
+    validation using the default (parent) validator. Work toward
+    mutual support for mutual nesting across data standards is a
+    future objective, but for now top level still needs to find all
+    =.ffs= files in order to simulate full nesting support by removing
+    multiply nested structures. It seems unlikely that such recursive
+    nesting will be a common pattern, but it is better to avoid the
+    issue from the start since encountering such issues later means
+    that it becomes extremely difficult to do such things at all when
+    there is a legitimate use case that we did not anticipat
+- Add =LICENSE= file. This file is not required.
+  If a data platform does not include functionality for specifying a
+  license then this file can be used to provide the full text of a
+  license.  See also, =license-identifier= added to
+  =dataset_description=
+  closes #109 license file
+- Add file =sites.{csv,tsv,json,xlsx}= for metadata about sites.
+  Examples of sites are electrode locations, physical locations
+  on subjects or samples that were not further derived, such as
+  left eye and right eye.
+  closes #86 sites file
+- Add file =specimens.{csv,tsv,json,xlsx}= for metadata about specimens.
+  FIXME we should almost certainly call this =participants= despite possible confusion. See [[file:~/git/sparc-curation/docs/participants.org]]
+  This file is an alternative unified view of subjects and samples. It is
+  useful in cases where the serialization format has better support for
+  sparse schemas (i.e. json). The file is not included in the default
+  template. All three of samples, subjects, and specimens may be provided
+  in a single dataset but any overlapping data must be consistent.
+  TODO if this is called =participants= then it could in principle also include resources.
+- Add file =curation.{csv,tsv,json,xlsx}= for metadata from curation.
+  This file is not required, and if provided by a data submitter may
+  be completely overwritten as part of curation since it is designed
+  to hold information from a controlled curation process that happens
+  after submission.
+  closes #106 curation notes
+  closes #103 ensure that submission metadata and organs sheet are in combo of dataset description and curation notes
+- Delete file =code_parameters.{csv,tsv,json,xlsx}=.
+  The functionality is now implemented in =code_description=.
+- Add folder =aux= to top level.
+  This folder is not required and can be used to store auxillary files
+  that may be needed as part of a publication process to support the
+  needs of a particular publication platform. The manifest in this
+  folder can reference out to other folders, but no manifest from
+  outside this folder may reference anything in the aux folder. This
+  is because the =aux= folder may be removed for external publication
+  and only be visible to internal systems. Example use cases would be
+  for storing pre-computed thumbnails for video files.
+  closes #108 aux folder
+
+** Changes from 2.1.0 to 3.0.0 for all
+- The first row and first column of all sheets are now frozen by default where relevant.
+  closes #105 freeze first row and column
+- All entity metadata files now include a =metadata-only= column.
+  closes #90 metadata-only column for all sds-entity metadata files
+** Changes from 2.1.0 to 3.0.0 for manifest
+- Add =entity= column.
+  More granular variants of this column may also be used, but are not
+  included in the default template =specimen=, =subject=, =sample=,
+  =site=, and =performance=.
+
+  These columns can be used to map individual files to an SDS entity,
+  this can be used instead of or as a way to enhance the granularity
+  of the mapping of files to SDS entities by their containing folders.
+  Only the most granular mapping should be provided since all entities
+  should be upwardly contextualized (i.e., perf references sam, etc.).
+- Add =data-dictionary-path= column. Reference the relative path to the data dictionary used to validate this file.
+- Add =alsoInDataset=.
+  Provide a dataset id where a copy of this file is also present.
+- Add =alsoInDatasetPath=.
+  Provide the dataset relative path to the copy of this file in =alsoInDataset=.
+  closes #97
+  # TODO files from other datasets for example when nikki's team pulls a single
+  # file from another dataset ... alsoLocatedInDataset alsoLocatedInDatasetPath
+  # for cases where the file was identical not fully derived
+- Add =data-modality= column.
+  Allowed values are TBD.
+  closes #99 manifest modality column
+  # This column is intended for use with rows that refer to folders but can also be used for files. It provides a level of indirection between the folder name and the modality of the data that is being provided. It is similar to the BIDS file naming fragments, and might at some point accept them as well. Folders can also be named after controlled modalities, however if those change for some reason in a future version of sds then this field can be used to make corrections after the fact.
+  - COMMENT :: XXX this also suggests that an SDS 2.2.0 template can be released as well to make it possible to add data modalities to an existing 2.0.0 without forcing compliance with
+- Add =no-transitive= column. TODO maybe =transitive= to force instead? Depends on default.
+  Use to prevent an SDS entity id folder from preventing a check on subfolders.
+  Default behavior is to warn for nested folders with no entity metadata and no modality.
+  # TODO naming
+*** COMMENT old thinking
+- NO :: Add =is-data-dictionary= column.
+  - XXX FIXME a boolean column for this is bad, we need something that is top
+    down to ensure that we can warn if there is a file specified as a data dictionary
+    that is not being used to validate anything ... a single top level data_dictionary
+    file is not a good solution either because there may be more than one, putting
+    something in dataset description is one option, basically =data-dictionary-path=
+    and allow multiple values?
+- NO :: Add =data-dictionary-for= column. Implies that a file is a data dictionary. # XXX this doesn't work since not 1:1
+- COMMENT :: FIXME TODO protocol-type vs data-modality, I vastly prever protocol-type
+  since it is closer to what we want to enforce over, data modality is far
+  more technical in the BIDS sense, however there is an issue that these
+  need to be controlled, they aren't quite technique superclasses, they aren't
+  quite experimental approaches, and they aren't quite data modalities
+  however they will be used to enforce modality specific standards, such as
+  which file types are allowed for what we currently call modality ... they
+  seem to be closest to data acquisition technique or recording technique
+  - microscopy
+    - yep different internal standards for required metadata here too
+    - immunohistochemistry
+    - brightfield
+    - electron
+  - macroscopy
+  - bioimaging
+    - microCT
+    - CT
+    - MRI
+      - fMRI
+      - structural MRI
+    - PET
+  - physiology
+  - electrophysiology
+    - from a data modality perspective ephys by itself is probably sufficient for now for raising warnings about proprietary/unsupported filetypes, these are almost always going to be used to exclude file types, we would need a hierarchy over the bids data modalities to enable specific kinds of processing, and I'm betting that bids doesn't even actually solve the high granularity problem of being able to generalize pipelines, that's what we have protocols for
+    - from a required metadata standard point of view however we would need significantly more granularity to be able to enforce those, to the point where you basically need (consortium modality) pairs in order to enforce standards where consortium might even be individual labs ... more to the point, on the required side you need more than the data acquisition technique, you need the approach and all the other techniques, because e.g. tract tracing or rabies tracing definitely has different standards even though it uses microscopy at the end, so in point of fact, requirements for exclusion are significantly simpler in that they can use higher levels of the tree and obtain the desire result, requirements for inclusion are vastly more complex because they need lower levels of the tree inorder to avoid false positives AND false negatives, unrecognized modality is different though
+    - eeg
+    - meg
+    - ecog
+    - intra/extra cellular
+      - patch
+      - shank
+      - array
+  - nucleic acid sequencing
+** Changes from 2.1.0 to 3.0.0 for submission
+# closes #116 submission validation # XXX this one is a bit more complex
+** Changes from 2.1.0 to 3.0.0 for dataset_description
+- Add
+- Add something about funding and submission stuff.
+  closes #103
+- Change =Type= to also accept =device= as a value.
+- Add =Device information= section
+  # TODO https://docs.google.com/spreadsheets/d/1ioes3NqVjJZXTZnA1MbxPb26WnHxOdPX/edit
+  Columns correspond to individual processes, e.g. an approved clinical process, an animal research process, etc.
+  - =Device intented use=
+  - =Device current use=
+    Includes modifications required e.g. for rodent vs large animal
+  - =Device type=
+  - =Device application=
+  - =Device target anatomy=
+  - =Device target species=
+  - =Device target sex=
+  - =Device target age category=
+  - =Device target disease or disorder=
+  - notes or free text caveat field goes in the description field
+- TODO add number_of_performances
+- TODO add number_of_sites
+- Add new relationType to support dataset to dataset relations.
+  closes #114 dataset_description "also-in-dataset" relation assertion for all subjects, specimens, etc.
+  closes #13 more details underlying #114
+  - =sharesEntitiesWithDataset= this is the 99% use case, any use case
+    requiring more granularity should specify the exact relation in
+    the appropriate metadata file so that e.g. it is possible to have
+    a dataset where the subjects are the same as another dataset, but
+    the samples are different and/or the performances are different
+    etc. Trying to provide more granular relations via things like
+    =sharesSpecimensWithDataset=, =sharesSamplesWithDataset=, or
+    =sharesSubjectsWithDataset= adds too much complexity when there is
+    already functionality that makes that possible.
+- Add =data-dictionary= section.
+  - path
+  - type
+  - description
+- Add =data-dictionary-path=. Not required.
+  Top down path to one or more data dictionaries that are used in the
+  dataset.  Needed to make it possible to detect cases where a data
+  dictionary has been specified but is not being used to validate
+  anything, e.g. can happen if someone mistypes a path in a manifest
+  and can't figure out what is wrong.  This alternative is preferred
+  to adding a boolean column to the manifest spec because it mirrors
+  the type that is provided in the manifest. Also preferred to
+  specifying a single top level data dictionary file, because there
+  could be multiple data dictionary files. The internal structure of
+  SDS data dictionaries is not being specified as part of SDS 3.0.0,
+  however the changes in dataset_description and manifest are the
+  foundation that will make it possible to wire up the schema defined
+  in a data dictionary to the files it constrains for validation in
+  the future.
+  closes #117 data dictionary
+- Add =data-dictionary-type=. Required for columns where =data-dictionary-path= is non null.
+  This field is controlled and is used to specify a schema type and a structure type.
+  The valid values for =data-dictionary-type= have not yet been decided and are currently
+  implementation defined. A future version of SDS will likely provide more structure.
+  | type          | status |
+  |---------------+--------|
+  | =json-schema= | yes    |
+  | =linkml=      | could  |
+  | =redcap=      | maybe? |
+  |               |        |
+  If the files being constrained are json files then one could use =json-schema=, another
+  option would be =linkml=, etc.
+- Add =description=. Restored following removal in 2.x.
+  Irony that dataset_description was missing a description field.
+  closes #84 restore description field
+- Add =license-identifier= field. Controlled to SPDX short identifiers. XXX probably put this in related identifiers?
+- Delete
+- Change
+- Rename
+- Fix contributor roles list for ...
+
+** Changes from 2.1.0 to 3.0.0 for subjects
+- Add
+- Add =metadata-only= column. XXX also needed for =perf-= and =site-=. Yes because this allows the metadata files to capture higher level performance structure.
+** Changes from 2.1.0 to 3.0.0 for samples
+- Add =metadata-only= column.
+** Changes from 2.1.0 to 3.0.0 for code_description
+Extensive changes.
+** Changes from 2.1.0 to 3.0.0 for resources
+- Add =resource type=
+  software, antibody, viral vector, organism, cell line
+- Add =name=
+- Add =id-in-protocol=
+  use if this resources fills in missing information in a protocol
+  vs is a record of some measurements about the inputs that becomes data
+** Changes from 2.1.0 to 3.0.0 for performances
+- Add =participants= column.
+  A whitespace delimited list of participant ids =sub-= =sam-= that were involved in the performance.
+
+General modelling change notice.
+If provided, performances must explicitly list the specimens that were
+involved. This is because in the general case a performance might involve
+multiple participants (read: specimens).
+
+Given that performances remains mostly a niche use case (despite)
+being the fundamental entity into which all specimen and participant
+metadata is actually transformed ... we are not considering alternate
+ways to handle the combinations. With bids2.0 in the design phase, the
+idea that we might provide an alternative id type, e.g. =run-= that
+DOES allow nesting and uses composite primary keys seems like it might
+be attractive for some use cases, however I have a sense that it really
+just adds complexity or shuffles it around. Materialized ids should be
+unique independent of level so that integrity can be checked to avoid
+misplacement errors that are nearly impossible to catch without deep
+checking, and sometimes impossible altogether, showing up as an outlier
+if one is lucky.
+
+*** COMMENT trust but verify requires the ability to verify, preventing not-even-wrong
+:PROPERTIES:
+:CREATED:  [2024-04-17 Wed 14:17]
+:END:
+If you're using a file system and spreadsheets to organize your data, then be prepared for some redundancy, because it is the only way to ensure there is enough information present to check your work. The objective of SDS is to make it possible to validate that the data provided is well structured and referentially correct. There are _many_ ways of structuring data that make it difficult or virtually impossible to detect whole classes of errors (e.g. the accidental incorrect placement of a file or folder if any rearrangement is done) as it has been repeatedly demonstrated that it is impossible for humans to always correctly carry out manual processes executed using the standard tools provided by modern consumer operating systems. We believe and indeed trust that users are doing their absolute best to ensure that their processes are regular and executed correctly, however the vast majority of those processes are currently impossible to verify externally, thus, SDS attempts to make it possible to actually verify in the context of trust of verify.
+** Changes from 2.1.0 to 3.0.0 for sites
+This is a new file as of this version.
+As with all metadata files, additional metadata columns can always be added by users as needed.
+- Add =site-id=. Values must be unique and must match =site-[0-9A-Za-z-]+=.
+- Add =specimen-id=. References the id for the subject or sample on which the site is located.
+- Add =site-type=. Example values are point, line, volume, etc.
+- Add =laboratory-internal-id=. Optional.
+- Add =coordinate-system=. Optional.
+- Add =coordinate-system-position=. Optional.
+
+** Changes from 2.1.0 to 3.0.0 for curation
+This is a new file as of this version. It is not included in the default template.
+
+- Add =Controlled fields= section
+- Add =Organ=
+- Add =Experimental approach=
+- Add =Experimental technique=
+- Add =Curator notes= section
+- Add =Experimental design=
+- Add =Completeness=
+- Add =Subjects and samples=
+- Add =Primary vs derivative data=
+- Add =Code availability=
+- exclude
+  - +award+ maybe to supplement dataset description? probably not?
+  - +study purpose+ DUPE
+  - +study data collection+ DUPE
+  - +study primary conclusions+ DUPE
+
+** Changes from 2.1.0 to 3.0.0 for
