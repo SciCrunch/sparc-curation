@@ -11,7 +11,7 @@ from pysercomb.pyr.types import Quantity
 from . import exceptions as exc
 from .core import log, logd, HasErrors
 from .core import OntId
-from .utils import is_list_or_tuple, levenshteinDistance
+from .utils import is_list_or_tuple, levenshteinDistance, PennsieveId as RemoteId
 
 
 BLANK_VALUE = object()
@@ -838,6 +838,9 @@ class NormSubjectsFile(NormValues):
             return str(value)
         else:
             return value
+
+    def also_in_dataset(self, value):
+        return RemoteId(value)
 
     def software_url(self, value):
         value, _j = self._deatag(value)
