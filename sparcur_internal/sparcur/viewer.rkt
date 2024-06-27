@@ -1335,7 +1335,12 @@ note of course that you don't get dynamic binding with version since it is not t
             (with-output-to-string (λ () (set! status (apply py-system* argv)))))]
          [string-port (open-input-string result-string)]
          [result (read string-port)]
-         [projects (read string-port)])
+         [-projects (read string-port)]
+         [projects (if (eq? eof -projects)
+                       (begin
+                         (displayln "detected old output format from argv-simple-for-racket, please retangle sparcur.simple from dev notes")
+                         '())
+                       -projects)])
     (unless status
       (error "Failed to get dataset list! ~a" (string-join argv-simple-for-racket " ")))
     (list result projects)))
