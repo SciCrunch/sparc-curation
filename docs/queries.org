@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0b25345344550a87b026e431b3f5a4d3537e88221acec42bc2ac097eea946f20; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 67b953f938c98b111bd3685941cb2bf9c3ae7e90cd057bca2ff9ddbc4041bcd5; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -6693,6 +6693,7 @@ RETURN p1, p2, p3, p4, p5, p6
       :mode ("\\.org\\'" . org-mode)
       :bind ("<f5>" . ow-babel-eval-closest-block)
       :init
+      (defvar org-babel-tangle-lang-exts nil) ; XXX temp fix for bad init in ob-python.el and others
       (org-babel-do-load-languages
        'org-babel-load-languages
        `((cypher . t)
@@ -6948,9 +6949,9 @@ matched strings in man buffer."
 
 (let ((ghost "https://raw.githubusercontent.com/tgbugs/orgstrap/"))
   (unless (featurep 'ow)
-    (reval 'sha256 '902b5a906755df46c658f5eec9f107dc9ee816861be5b8f936b2da0a836dfe3e
-           ;; "~/git/orgstrap/ow.el"
-           (concat ghost "e8b37d1225862f46b6e7785fb1da2c69efd6e9f4" "/ow.el")))
+    (reval 'sha256 'b5f27e2ca406874307debdd311cd47f73b2ade2fd73b8c8f9834e1c724dc7053
+           ;;"~/git/orgstrap/ow.el"
+           (concat ghost "b9fcad308e10ab2a0d4bf752dc510bb278bba689" "/ow.el")))
   (unless (featurep 'blazegraph)
     (reval 'sha256 '8f54a319227ee6d9ca457ad77be955ba6b1a98a36564dbda61fa6892192afd51
            ;;"~/git/orgstrap/services/blazegraph.el"
