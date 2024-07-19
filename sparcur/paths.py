@@ -2021,6 +2021,11 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 #breakpoint()
                 fields = rest.split('.')
                 md_version = fields[1]
+                if md_version >= 'mdv5':
+                    fieldsep_esc = aug.meta._PathMetaAsSymlink.fieldsep_esc
+                else:
+                    fieldsep_esc = '|'
+
                 if md_version == 'mdv3':
                     _i_parent_id, _i_updated, _i_file_id, _i_size, _i_checksum, _i_checksum_cypher, _i_name = (
                         9, 5, 2, 3, 6, None, 14,)
@@ -2048,7 +2053,7 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 cache_checksum = fields[_i_checksum]
                 cache_checksum_cypher = (
                     None if _i_checksum_cypher is None else fields[_i_checksum_cypher])
-                cache_name = fields[_i_name].replace('|', '.')
+                cache_name = fields[_i_name].replace(fieldsep_esc, aug.meta._PathMetaAsSymlink.fieldsep)
                 if local_name != cache_name:
                     ops.append(rename)
                     renames.append(c)
