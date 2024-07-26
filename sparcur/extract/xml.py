@@ -232,6 +232,7 @@ class ExtractMBF(XmlSource):
     top_tags = (
         '{http://www.mbfbioscience.com}mbf',
         '{http://www.mbfbioscience.com/2007/neurolucida}mbf',
+        '{https://www.mbfbioscience.com/filespecification}mbf',
         'mbf',
     )
     mimetype = 'application/x.vnd.mbfbioscience.metadata+xml'
