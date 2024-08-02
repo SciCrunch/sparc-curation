@@ -17,8 +17,11 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
-* PLAN 2024-06-?? :future:
-- NPO add populations from NLP kidney, liver
+* RC 2024-08-02
+- NPO add populations from NLP kidney, liver, sensory motor
+  Populations for kidney and liver contain temporary identifiers in this RC prefixed by =TEMP:MISSING_=.
+- NPO femrep populations updated
+- NPO aacar fixes 14 soma location, add missing labels for 14, 15
 * RC 2024-03-26
 - Other updated sparc community termset with corrections for REVA terms
 * RC 2024-03-05
