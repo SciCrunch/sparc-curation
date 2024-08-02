@@ -73,7 +73,7 @@ note of course that you don't get dynamic binding with version since it is not t
 
 ; true global variables that should not be thread local
 (define current-projects (make-lexical-parameter)) ; FIXME check that default value ???
-(define current-blob (make-lexical-parameter))
+(define (current-blob) (hash-ref uuid-json-hash (id-uuid (current-dataset))))
 (define current-dataset (make-lexical-parameter))
 (define current-datasets (make-lexical-parameter)) ; FIXME check that default value ???
 (define current-datasets-view (make-lexical-parameter))
@@ -577,7 +577,8 @@ note of course that you don't get dynamic binding with version since it is not t
                   '()))))
 
 (define (current-json-view-text)
-  (display (jsexpr->string (send (current-jview) get-json) #:indent 2)))
+  ; TODO consider jsexpr->pretty-json
+  (display (jsexpr->string (current-blob) #:indent 2)))
 
 ;; update viewer
 
@@ -722,16 +723,16 @@ note of course that you don't get dynamic binding with version since it is not t
                        (send per open)))))))
            ritems))))
 
+; reminder, use uuids as keys because the struct hash changes when the dataset list is refreshed
 (define jviews (make-hash))
+(define uuid-json-hash (make-hash))
 
-(define (dataset-jview! dataset #:update [update #f] #:background [background #f])
-  ; FIXME #:background is bad design forced by having (current-blob) decoupled
+(define (dataset-jview! dataset #:update [update #f])
   (let* ([uuid (id-uuid dataset)]
          [hr-jview (hash-ref jviews uuid #f)]
          [jview
           (if (and hr-jview (not update))
               (begin
-                (current-blob #f)
                 hr-jview)
               (letrec ([hier-class json-hierlist%
                         #; ; too slow when doing recursive opens
@@ -774,10 +775,10 @@ note of course that you don't get dynamic binding with version since it is not t
                                          ; XXX false, there are still performance issues
                                          #:when (member k include-keys))
                                 (values k v))])
-                  (unless (or background (not (is-current? dataset)))
-                    (current-blob json)) ; FIXME this will go stale
-                  (set-jview-json! jview-inner jhash)
                   (hash-set! jviews uuid jview-inner)
+                  (when lp
+                    (hash-set! uuid-json-hash uuid json))
+                  (set-jview-json! jview-inner jhash)
                   jview-inner)))])
     jview))
 
@@ -832,7 +833,14 @@ note of course that you don't get dynamic binding with version since it is not t
               ; this one was working so we unset the current jview again here otherwise we periodically get two jviews
               (unset-current-jview)
               (send jview reparent panel-right)
-              (current-jview jview))))))))))
+              (current-jview jview)
+              ; we call set-button-status-for-dataset in the jview thread after dataset-jview!
+              ; returns because setting buttons correctly depends uuid-json-hash having been
+              ; populated which happens in dataset-jview! thus if set-button-status-for-dataset
+              ; is called in the main thread uuid-json-hash may not have been populated and we
+              ; get unexpected results
+              (set-button-status-for-dataset dataset)))))))
+      )))
 
 ;; dataset struct and generic functions
 
@@ -959,7 +967,7 @@ note of course that you don't get dynamic binding with version since it is not t
                ))
            (if status-3
                (begin
-                 (dataset-jview! ds #:update #t #:background #t)
+                 (dataset-jview! ds #:update #t)
                  (println (format "dataset export completed for ~a" (dataset-id ds))))
                (println (format "dataset export FAILED for ~a" (dataset-id ds)))))))))
    (define (fetch-export-dataset ds)
@@ -1024,7 +1032,7 @@ note of course that you don't get dynamic binding with version since it is not t
                          (send button-export-dataset enable #t)
                          (send button-open-dataset-shell enable #t)
                          (send button-clean-metadata-files enable #t))
-                       (dataset-jview! ds #:update #t #:background #t)
+                       (dataset-jview! ds #:update #t)
                        (println (format "dataset fetch and export completed for ~a" (dataset-id ds))))
                      (format "dataset ~a FAILED for ~a"
                              (cond ((nor status-2 status-3) "fetch and export")
@@ -1076,9 +1084,10 @@ note of course that you don't get dynamic binding with version since it is not t
                               ; XXX false, there are still performance issues
                               #:when (member k include-keys))
                      (values k v))])
-       (current-blob json) ; FIXME this will go stale
-       (set-jview-json! jview-inner jhash)
        (hash-set! jviews uuid jview-inner)
+       (hash-set! uuid-json-hash uuid json)
+       (set-jview-json! jview-inner jhash)
+       (set-button-status-for-dataset ds)
        jview-inner))
    (define (set-lview-item-color lview ds)
      ; find the current row based on data ??? and then change color ?
@@ -1279,8 +1288,9 @@ note of course that you don't get dynamic binding with version since it is not t
        (thunk
         (if (is-current? ds)
             (let ([enable? (link-exists? symlink)]
-                  [logs-enable? (dataset-latest-log-path (current-dataset))]
-                  [export-enable? (dataset-export-latest-path (current-dataset))])
+                  [logs-enable? (dataset-latest-log-path ds)]
+                  [export-enable? (dataset-export-latest-path ds)]
+                  [cached-json? (hash-ref uuid-json-hash (id-uuid ds) #f)])
               ; source data folder
               (for ([button (in-list all-button-open-dataset-folder)]) (send button enable enable?))
               (send button-export-dataset enable enable?)
@@ -1291,8 +1301,9 @@ note of course that you don't get dynamic binding with version since it is not t
               (send button-open-export-json-file enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
               ; export dependent reports
-              (send button-paths-report enable export-enable?)
-              (send button-manifest-report enable export-enable?)
+              (send button-paths-report enable cached-json?)
+              (send button-manifest-report enable cached-json?)
+              (send button-open-export-json-view enable cached-json?)
               ; logs
               (send button-open-dataset-latest-log enable logs-enable?)
               )
@@ -1317,8 +1328,7 @@ note of course that you don't get dynamic binding with version since it is not t
       [else
        (let ([dataset (get-selected-dataset obj)])
          (unless (or (not dataset) (is-current? dataset))
-           (set-jview! dataset)
-           (set-button-status-for-dataset dataset)))])))
+           (set-jview! dataset)))])))
 
 (define (result->dataset-list result)
   (let ([nargs (procedure-arity dataset)])
@@ -1528,17 +1538,6 @@ note of course that you don't get dynamic binding with version since it is not t
   (cb-x-report o e 'manifest #:show show))
 
 (define (cb-x-report obj event type #:show [show #t])
-  (let ([lp (dataset-export-latest-path (current-dataset))])
-    ; this was moved from the fast branch of dataset-jview!
-    ; to avoid calls to disk for current-blob
-    (when lp ; FIXME performance is BAD when going rapidly through list
-      ; maybe wait for a short time and if the current jview is this
-      ; jview then do the set? pretty sure we don't want to add a cache
-      ; to path->json at all, we would want a managed hash table
-      (current-blob (path->json lp))
-      #;
-      (when (send frame-manifest-report is-shown?)
-        (cb-manifest-report 'dataset-jview! 'called #:show #f))))
   ; TODO populate the editor
   ; TODO implement this as a method on edcanv-man-rep ?
   (let-values ([(report-function
@@ -1949,8 +1948,7 @@ switch to that"
                  (if released-this-time
                      (let ([dataset (current-dataset)]) ; we do not use cb-dataset-selection here because it assumes that
                        ; current-dataset will be set inside the call it itself instead of before
-                       (set-jview! dataset)
-                       (set-button-status-for-dataset dataset))
+                       (set-jview! dataset))
                      (super-on-subwindow-char receiver event))))))
        [label ""]
        [font (make-object font% 10 'modern)]
@@ -2682,7 +2680,7 @@ switch to that"
       ; FIXME check on interactions with cb-refresh-dataset-metadata
       ; I think it is ok because everything runs in the dataset-id
       (when running?
-        (dataset-jview! dataset #:background #t)
+        (dataset-jview! dataset)
         #; ; debug
         (when running?
           (println (format "dataset view expanded for ~a" (dataset-id dataset))))))
@@ -2701,11 +2699,11 @@ switch to that"
   (load-config!)
   (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
-  (send lview select 0) ; first time to ensure current-dataset always has a value
   (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
-  (cb-dataset-selection lview #f)
+  (send lview select 0) ; first time to ensure current-dataset always has a value XXX callback is NOT invoked using select so we call it manually here
+  (void (cb-dataset-selection lview #f))
   (void (thread (thunk (refresh-dataset-metadata text-search-box)))) ; refresh datasets in a separate thread to avoid delaying startup
   (unless (eq? (system-type) 'unix)
     ; do NOT run this when gtk is the windowing toolkit it will eat up
