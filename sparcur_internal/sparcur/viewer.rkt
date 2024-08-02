@@ -576,6 +576,9 @@ note of course that you don't get dynamic binding with version since it is not t
                   (hash-ref (hash-ref ihr '|#/path_metadata/-1| #hash((messages . ()))) 'messages)
                   '()))))
 
+(define (current-json-view-text)
+  (display (jsexpr->string (send (current-jview) get-json) #:indent 2)))
+
 ;; update viewer
 
 (define (update-viewer)
@@ -1285,7 +1288,7 @@ note of course that you don't get dynamic binding with version since it is not t
               (send button-clean-metadata-files enable enable?)
               (for ([button (in-list all-button-upload-changes)]) (send button enable enable?))
               ; export
-              (send button-open-export-json enable export-enable?)
+              (send button-open-export-json-file enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
               ; export dependent reports
               (send button-paths-report enable export-enable?)
@@ -1440,9 +1443,12 @@ note of course that you don't get dynamic binding with version since it is not t
                 [(parent name dir?) (split-path path)])
     (xopen-path parent)))
 
-(define (cb-open-export-json obj event)
+(define (cb-open-export-json-file obj event)
   (let*-values ([(path) (dataset-export-latest-path (current-dataset))])
     (xopen-path path)))
+
+(define (cb-open-export-json-view obj event #:show [show #t])
+  (cb-x-report obj event 'json-view #:show show))
 
 (define (xopen-path path)
   (let* ([is-win? #f]
@@ -1541,6 +1547,7 @@ note of course that you don't get dynamic binding with version since it is not t
                 (case type
                   [(paths) (values paths-report frame-paths-report edcanv-path-rep)]
                   [(manifest) (values manifest-report frame-manifest-report edcanv-man-rep)]
+                  [(json-view) (values current-json-view-text frame-json-view edcanv-json-view)]
                   [else (error 'cb-x-report "unknown report type ~s" type)])])
     (let ([ed (send report-edcanv get-editor)])
       ; select-all clear does not work if the cursor is moved manually, locking
@@ -1755,7 +1762,7 @@ switch to that"
   (add-function "open-dataset-folder" cb-open-dataset-folder)
   (add-function "open-export-folder" cb-open-export-folder)
   (add-function "toggle-power-user" cb-power-user)
-  (add-function "open-export-json" cb-open-export-json)
+  (add-function "open-export-json-file" cb-open-export-json-file)
   (add-function "open-export-ipython" cb-open-export-ipython)
   (add-function "open-dataset-shell" cb-open-dataset-shell)
   (add-function "open-dataset-latest-log" cb-open-dataset-lastest-log)
@@ -1796,7 +1803,7 @@ switch to that"
   #;
   (map-function "c:p" "open-export-folder") ; FIXME these are bad bindings
   (map-function "c:p" "toggle-power-user")
-  (map-function "c:j" "open-export-json")
+  (map-function "c:j" "open-export-json-file")
   (map-function "c:i" "open-export-ipython")
   (map-function "c:b" "open-dataset-shell")
   (map-function "c:l" "open-dataset-latest-log")
@@ -2123,12 +2130,19 @@ switch to that"
        [parent panel-power-user]
        ))
 
-(define button-open-export-json (new (tooltip-mixin button%)
-                                     [label "JSON"]
-                                     [tooltip "Shortcut C-j"]
-                                     [tooltip-delay 100]
-                                     [callback cb-open-export-json]
-                                     [parent panel-power-user]))
+(define button-open-export-json-file
+  (new (tooltip-mixin button%)
+       [label "JSON"]
+       [tooltip "Shortcut C-j"]
+       [tooltip-delay 100]
+       [callback cb-open-export-json-file]
+       [parent panel-power-user]))
+
+(define button-open-export-json-view
+  (new button%
+       [label "JVIEW"]
+       [callback cb-open-export-json-view]
+       [parent panel-power-user]))
 
 (define button-open-export-ipython (new (tooltip-mixin button%)
                                          [label "IPython"]
@@ -2517,7 +2531,14 @@ switch to that"
 
 (define (make-frame-report label)
   (new
-   (class frame% (super-new)
+   (class
+     (frame:searchable-text-mixin
+      (frame:searchable-mixin
+       (frame:text-mixin
+        (frame:editor-mixin
+         (frame:standard-menus-mixin
+          (frame:basic-mixin frame%))))))
+     (super-new)
      (rename-super [super-on-subwindow-char on-subwindow-char])
      (define/override (on-subwindow-char receiver event)
        (super-on-subwindow-char receiver event)
@@ -2525,7 +2546,7 @@ switch to that"
      #; ; show hide basically
      (define/augment (on-close)
        (displayln "prefs closed")))
-   [label label]
+   [filename label]
    [width 640]
    [height 480]))
 
@@ -2533,15 +2554,13 @@ switch to that"
 
 (define frame-paths-report (make-frame-report "sparcur report paths"))
 
-(define edcanv-man-rep
-  (new editor-canvas%
-       [editor (new text%)]
-       [parent frame-manifest-report]))
+(define frame-json-view (make-frame-report "sparcur json view"))
 
-(define edcanv-path-rep
-  (new editor-canvas%
-       [editor (new text%)]
-       [parent frame-paths-report]))
+(define edcanv-man-rep (send frame-manifest-report get-canvas))
+
+(define edcanv-path-rep (send frame-paths-report get-canvas))
+
+(define edcanv-json-view (send frame-json-view get-canvas))
 
 ;; preferences
 (define frame-preferences
