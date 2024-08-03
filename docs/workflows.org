@@ -18,6 +18,12 @@ python -m sparcur.simple.combine
 echo Export complete. Check results at:
 echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
 #+end_src
+** Rerun single datasets on production
+One or more values for =dataset_id= can be provided as =uuid=, =N:dataset:uuid=, or =dataset:uuid=.
+#+begin_src bash
+docker exec --user 836 -it $(docker ps -lqf ancestor=tgbugs/musl:sparcron-user) pypy3 -m sparcur.sparcron.rerun ${dataset_id}
+#+end_src
+See example in [[https://github.com/tgbugs/dockerfiles/blob/master/source.org#an-example-of-how-to-rerun-one-or-more-datasets][dockerfiles source]] for more.
 ** Report
 #+begin_src bash :eval never
 function fetch-and-run-reports () {
