@@ -61,15 +61,27 @@ bad news, don't forget to remove all the .egg-info folders first etc
 on macos (you may need to source e.g. =~/.zprofile= to get the correct python)
 #+begin_src bash
 brew install python3
+pip3 install --user --break-system-packages setuptools
 # and then manually
 things_in_the_right_order=(pyontutils/clifn sxpyr augpathlib idlib pyontutils/htmlfn pyontutils/ttlser hyputils orthauth ontquery parsercomb pyontutils protc/protcur sparc-curation)
 pushd ~/git
 for folder in ${things_in_the_right_order[@]}; do
 pushd ${folder};
-pip3 install --user --break-system-packages -e .;
+pip3 install --break-system-packages --user -e . || break;
+python3 setup.py --release;
 popd;
 done
 popd
+#+end_src
+
+To fix braindead pip behavior that somehow installs things from pypi
+and breaks git update logic run the following and then run the
+=things_in_the_right_order= loop again. Still no idea why this happens.
+#+begin_src bash
+sigh=(clifn sxpyr augpathlib idlib htmlfn ttlser hyputils orthauth ontquery pysercomb pyontutils protcur sparcur)
+for pkg in ${sigh[@]}; do
+pip3 uninstall --break-system-packages --yes ${pkg};
+done
 #+end_src
 
 ** racket
