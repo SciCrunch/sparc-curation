@@ -58,7 +58,7 @@ updating python versions is an even bigger nightmare due to the installation ord
 minimally it seems we need to install sparcur and pyontutils, but the ordering is still
 bad news, don't forget to remove all the .egg-info folders first etc
 
-on macos
+on macos (you may need to source e.g. =~/.zprofile= to get the correct python)
 #+begin_src bash
 brew install python3
 # and then manually
@@ -66,13 +66,17 @@ things_in_the_right_order=(pyontutils/clifn sxpyr augpathlib idlib pyontutils/ht
 pushd ~/git
 for folder in ${things_in_the_right_order[@]}; do
 pushd ${folder};
-pip3 install --user -e .;
+pip3 install --user --break-system-packages -e .;
 popd;
 done
 popd
 #+end_src
 
 ** racket
+There is an issue with this at the moment, see
+https://github.com/racket/racket/issues/5051 for details and
+workaround. Hopefully will be fixed in the 8.14 release.
+
 #+begin_src bash
 brew update
 brew upgrade
