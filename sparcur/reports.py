@@ -523,7 +523,7 @@ class Report:
         key = self._sort_key
         paths = self.paths if self.paths else (self.cwd,)
         paths = [c for p in paths for c in p.rchildren if not c.is_dir()]
-        rex = re.compile('^\.[0-9][0-9][0-9A-Z]$')
+        rex = re.compile('^\\.[0-9][0-9][0-9A-Z]$')
         rex_paths = [p for p in paths if re.match(rex, p.suffix)]
         paths = [p for p in paths if not re.match(rex, p.suffix)]
 
