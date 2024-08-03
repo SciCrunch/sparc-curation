@@ -217,8 +217,15 @@ def write_manifests(*args, parents=None, parents_rows=None, suffix='.csv',
 
 
 def expand_label_curie(rows_of_terms):
+    def raise_unfetched(t):
+        if not t._fetched:
+            raise ValueError(f'term has not been fetched {t}')
+
     return [[value for term in rot for value in
-             (term.label if term is not None else '',
+             (term.label if term is not None and hasattr(term, 'label') else
+              ((f'ERROR MISSING LABEL: {term.curie}', raise_unfetched(term),
+                log.error(f'missing label for {term.curie}'))[0] if
+               term is not None and not hasattr(term, 'label') else ''),
               term.curie if term is not None else '')]
             for rot in rows_of_terms]
 

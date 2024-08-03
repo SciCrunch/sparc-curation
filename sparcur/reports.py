@@ -700,9 +700,22 @@ class Report:
     def keywords(self, ext=None):
         data = self._data_ir()
         datasets = data['datasets']
-        _rows = [sorted(set(dataset_blob.get('meta', {}).get('keywords', [])),
+
+        def fix_json_list_issue(kws):
+            # processing of raw json files has a bug that turns
+            # keywords into lists of lists for some reason that will
+            # be fixed but we want to be able to generate reports even
+            # for the old malformed data
+            for k in kws:
+                if is_list_or_tuple(k):
+                    yield from k
+                else:
+                    yield k
+
+        _rows = [sorted(set(fix_json_list_issue(
+            dataset_blob.get('meta', {}).get('keywords', []))),
                         key=lambda v: -len(v))
-                    for dataset_blob in datasets]
+                 for dataset_blob in datasets]
         rows = [list(r) for r in sorted(
             set(tuple(r) for r in _rows if r),
             key = lambda r: (len(r), tuple(len(c) for c in r if c), r))]
@@ -1056,6 +1069,10 @@ class Report:
                                  ('UBERON:0003148', 'obsolete sclerite'),  # plates apparently >_<
                                 ))
         zz = defaultdict(set)
+        unfetched = [  # see export/core.py _export_protcur for an alternate approach
+            term for terms in qq.values() for term in terms
+            if not hasattr(term, 'label') and not term._fetched and hasattr(term, '_args')]
+        Async(rate=100)(deferred(t.fetch)() for t in unfetched)
         for terms in qq.values():
             spec = None
             anat = []

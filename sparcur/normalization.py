@@ -497,7 +497,16 @@ class NormValues(HasErrors):
             for i, v in enumerate(thing):
                 #o = self._normv(v, key, i, path + (list,))
                 o = self._normv(v, key, i, path + (i,))
-                out.append(o)
+                if is_list_or_tuple(o):
+                    # we don't want nested lists and this is the only point
+                    # at which we know that they would be nested and not just
+                    # a single value, XXX note that adding keywords with commas
+                    # in them in a raw json file will result in the keyword being
+                    # split into two keywords, which is something we should detect
+                    # and report an error for
+                    out.extend(o)
+                else:
+                    out.append(o)
 
             return out
 
