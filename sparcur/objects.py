@@ -44,6 +44,10 @@ echo 5942f61b-03f0-4fd6-a116-1de400af7422 | tr -d '-' | sed 's/../\\x&/g' | xarg
 sed -r 's/^(.+)$/\1==/' | basenc --base64url --decode | od -A n -t x1 | tr -d ' ' | \
 sed -r 's/^([0-f]{8})([0-f]{4})([0-f]{4})([0-f]{4})([0-f]{12})$/\1-\2-\3-\4-\5/' | uuidparse
 
+The sed version above does not work on macos as written.
+You need gnu printf which is often aliased as gprintf,
+because macos printf does not support \x escapes.
+
 """
 
 import os
