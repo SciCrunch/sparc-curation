@@ -46,7 +46,7 @@ sed -r 's/^([0-f]{8})([0-f]{4})([0-f]{4})([0-f]{4})([0-f]{12})$/\1-\2-\3-\4-\5/'
 
 The sed version above does not work on macos as written.
 You need gnu printf which is often aliased as gprintf,
-because macos printf does not support \x escapes.
+because macos printf does not support \\x escapes.
 
 """
 
