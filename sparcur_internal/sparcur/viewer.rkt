@@ -1402,6 +1402,13 @@ note of course that you don't get dynamic binding with version since it is not t
 
 
 (define iconize-hack (eq? 'unix (system-type)))
+(define (frame-to-front frame)
+  (send frame show #t)
+  ; iconize hack to get the frame to come to the front when using gtk
+  (when iconize-hack
+    (send frame iconize #t)
+    (send frame iconize #f)))
+
 (define (cb-toggle-upload o e #:show? [show? #f])
   ; TODO detect when an actual quite is run
   ; FIXME toggling this via button when the window is open is extremely confusing
@@ -1409,14 +1416,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (let*-values
       ([(new? frame-upload) (get-frame-upload! (current-dataset))]
        [(do-show?) (or show? (not (send frame-upload is-shown?)))])
-    #; ; not clear whether we actually ever want to close these even if the user hits the x on the window
-    ; it is unlikely to leak large amounts of memory and there is no reason to lose the state
-    (println (list 'cbtu: o e))
-    (send frame-upload show do-show?)
-    ; iconize hack to get the frame to come to the front when using gtk
-    (when iconize-hack
-      (send frame-upload iconize #t)
-      (send frame-upload iconize #f))
+    (frame-to-front frame-upload)
     (when (and do-show? (or new? (not (send frame-upload updated-once?))))
       (send frame-upload update))))
 
@@ -1457,8 +1457,10 @@ note of course that you don't get dynamic binding with version since it is not t
   (let*-values ([(path) (dataset-export-latest-path (current-dataset))])
     (xopen-path path)))
 
-(define (cb-open-export-json-view obj event #:show [show #t])
-  (cb-x-report obj event 'json-view #:show show))
+(define (cb-open-export-json-view obj event #:show [show? #t])
+  (define frame (cb-x-report obj event 'json-view #:show show?))
+  (when show?
+    (frame-to-front frame)))
 
 (define (xopen-path path)
   (let* ([is-win? #f]
@@ -1559,7 +1561,8 @@ note of course that you don't get dynamic binding with version since it is not t
       (send ed scroll-to-position 0)
       (send ed lock #t))
     (when show
-      (send report-frame show #t))))
+      (send report-frame show #t))
+    report-frame))
 
 (define (cb-clean-metadata-files obj event)
   ; WARNING THIS IS A DESTRUCTIVE OPERATION
