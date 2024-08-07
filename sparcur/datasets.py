@@ -1332,7 +1332,8 @@ class MetadataFile(HasErrors):
         # FIXME deeper nesting might break this?
         culled = {k:{k:v for k, v in v.items()
                      if k not in self.ignore_header}
-                  for k, v in transformed.items()}
+                  for k, v in transformed.items()
+                  if k not in self.ignore_alt}
         return culled
 
     def _transformed(self):  # FIXME this whole approach makes it very difficult to test individual stages
@@ -1696,9 +1697,72 @@ class SubmissionFilePath(ObjectPath):
 class CodeDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
     renames_header = {'description': 'description_header'}
+    renames_alt = {'annotations': 'annotations_section_header'}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
     ignore_header = 'metadata_element', 'description_header', 'example'
+    ignore_alt = (
+        ('_hyperlink_https___www_imagwiki_nibib_nih_gov_content'
+         '_10_simple_rules_conformance_rubric____ten_simple_rules_tsr_'),
+        'ten_simple_rules__tsr_',
+        'annotations_section_header',
+    )
+    groups_alt_2 = {
+        'ten_simple_rules': (
+            'tsr1__define_context_clearly_rating_0_4',
+            'tsr1__define_context_clearly_reference',
+            'tsr2__use_appropriate_data_rating_0_4',
+            'tsr2__use_appropriate_data_reference',
+            'tsr3__evaluate_within_context_rating_0_4',
+            'tsr3__evaluate_within_context_reference',
+            'tsr4__list_limitations_explicitly_rating_0_4',
+            'tsr4__list_limitations_explicitly_reference',
+            'tsr5__use_version_control_rating_0_4',
+            'tsr5__use_version_control_reference',
+            'tsr6__document_adequately_rating_0_4',
+            'tsr6__document_adequately_reference',
+            'tsr7__disseminate_broadly_rating_0_4',
+            'tsr7__disseminate_broadly_reference',
+            'tsr8__get_independent_reviews_rating_0_4',
+            'tsr8__get_independent_reviews_reference',
+            'tsr9__test_competing_implementations_rating_0_4',
+            'tsr9__test_competing_implementations_reference',
+            'tsr10a__conform_to_standards_rating_0_4',
+            'tsr10a__conform_to_standards_reference',
+            'tsr10b__relevant_standards',
+        ),
+        'annotations': (
+            'ann1__code_verification_status',
+            'ann2__code_validation_status',
+            'ann3__certification_status',
+            'ann4__onboarded_to_o_s_parc_status',
+            'ann5__testing_on_o_s_parc_status',
+
+            'ann1__reference_to_code_verification',
+            'ann2__reference_to_code_validation',
+            'ann3__reference_to_certification',
+            'ann4__reference_to_onboarded_msop_submission_on_o_s_parc',
+            'ann5__testing_on_o_s_parc_reference'
+        ),
+        'rrids': (
+            'rrid_term',
+            'rrid_identifier',
+        ),
+        'terms': (
+            'ontological_term',
+            'ontological_identifier',
+        ),
+    }
+    groups_alt_3 = {
+    }
+
+    @property
+    def groups_alt(self):
+        version_tuple = tuple(int(x) for x in  self.template_schema_version.split('.'))
+        if version_tuple < (3, 0, 0):
+            return self.groups_alt_2
+        else:
+            return self.groups_alt_3
 
 
 class CodeDescriptionFilePath(ObjectPath):
