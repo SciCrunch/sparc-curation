@@ -1,6 +1,7 @@
 import io
 import csv
 import copy
+import pathlib
 from json import dumps as jd
 from types import GeneratorType
 from itertools import chain, zip_longest
@@ -220,17 +221,36 @@ class DatasetStructure:
     _classes = {}
 
     def _newimpl(cls, path, *args, **kwargs):
-        apc = path.__class__._AugmentedPath__abstractpath
+        if aug.core.need_flavour:
+            apc = path.__class__._AugmentedPath__abstractpath
+        else:
+            cands = [
+                p for p in path.__class__.mro() if
+                issubclass(p, pathlib.PurePath) and not issubclass(p, HasErrors)]
+            if cands:
+                apc = cands[0]
+            else:
+                msg = f'not a path? {path} {type(path)}'
+                raise ValueError(msg)
+
         if apc not in cls._classes:
             # keep classes 1:1 with the types of paths so that equality works correctly
             # mro issues with specialized paths instead of the base
-            newcls = type(cls.__name__ + apc.__name__, (cls, apc),
-                          #cls.__dict__,
-                          dict(__new__=apc.__new__,
-                               __repr__=apc.__repr__,
-                               )
-                          )
-            newcls._bind_flavours(pos_helpers=(HasErrors,), win_helpers=(HasErrors,))
+            if aug.core.need_flavour:
+                newcls = type(cls.__name__ + apc.__name__, (cls, apc),
+                              dict(__new__=apc.__new__,
+                                   __repr__=apc.__repr__,
+                                )
+                            )
+                newcls._bind_flavours(pos_helpers=(HasErrors,), win_helpers=(HasErrors,))
+
+            else:
+                newcls = type(cls.__name__ + apc.__name__, (cls, HasErrors, apc),
+                              dict(__new__=apc.__new__,
+                                   __repr__=apc.__repr__,
+                                )
+                            )
+
             cls._classes[apc] = newcls
 
         nc = cls._classes[apc]
@@ -246,6 +266,11 @@ class DatasetStructure:
         DatasetStructure.__new__ = DatasetStructure._renew
 
         return cls._newimpl(cls, path)
+
+    if not aug.core.need_flavour:
+        def __init__(self, *args, **kwargs):
+            self._raw_paths = []  # FIXME wat why do we need to do this manually !??!
+            super().__init__(self, *args, **kwargs)
 
     @staticmethod
     def _setup():
