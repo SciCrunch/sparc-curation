@@ -1374,6 +1374,24 @@ class DatasetDescriptionExportSchema(JSONSchema):
                 }
             },
             'contributors': ContributorsExportSchema.schema,
+            'device': {
+                'type': 'array',
+                'minItems': 1,   # this pattern makes things self describing
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                      'device_intended_use': {'type': 'string'},
+                      'device_current_use': {'type': 'string'},
+                      'device_type': {'type': 'string'},
+                      'device_application': {'type': 'string'},
+                      'device_target_anatomy': {'type': 'string'},
+                      'device_target_species': {'type': 'string'},
+                      'device_target_sex': {'type': 'string'},
+                      'device_target_age_category': {'type': 'string'},
+                      'device_target_disease_or_disorder': {'type': 'string'},
+                    }
+                }
+            }
         }
     }
 

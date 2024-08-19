@@ -1834,6 +1834,16 @@ class DatasetDescriptionFile(MetadataFile):
                             'study_data_collection',
                             'study_primary_conclusion',
                             'study_collection_title',),
+                  'device': (
+                      'device_intended_use',
+                      'device_current_use',
+                      'device_type',
+                      'device_application',
+                      'device_target_anatomy',
+                      'device_target_species',
+                      'device_target_sex',
+                      'device_target_age_category',
+                      'device_target_disease_or_disorder',),
                   'links': ('additional_links', 'link_description'),
                   'examples': ('example_image_filename',
                                'example_image_locator',
@@ -1841,7 +1851,8 @@ class DatasetDescriptionFile(MetadataFile):
 
     ignore_header = 'metadata_element', 'example', 'description_header'
     ignore_alt = ('basic_information', 'study_information', 'contributor_information',
-                  'related_protocol__paper__dataset__etc_', 'participant_information',)
+                  'related_protocol__paper__dataset__etc_', 'participant_information',
+                  'device_information',)
     raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     normalize_mismatch_ok = 'metadata_element',
