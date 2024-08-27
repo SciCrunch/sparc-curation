@@ -12,11 +12,18 @@
 - ApiNATOMY publication metadata
 
 - NPO connections from composer
-- NPO connections from sweat glands, muscles
 - NPO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2024-08-28
+- NPO add populations from NLP sweat glands
+* RC 2024-08-27
+- NPO femrep, kidney, liver, and sensory motor populations updated
+- NPO senmot fix incorrect usage of =ilxtr:hasAnatomicalSystemPhenotype= to =ilxtr:hasCircuitRolePhenotype=
+- NPO =TEMP:MISSING_= identifiers have been replaced by InterLex =ILX:= ids.
+- ApiNATOMY aacar-14 fix incorrect reference to C1 spinal segment to be C7 spinal segment.
+- Fix issues with subClassOf and partOf hierarchies in npo.ttl.
 * RC 2024-08-02
 - NPO add populations from NLP kidney, liver, sensory motor
   Populations for kidney and liver contain temporary identifiers in this RC prefixed by =TEMP:MISSING_=.
