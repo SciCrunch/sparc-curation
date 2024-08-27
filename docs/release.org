@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 795c30d02c1668b72c6d3f446970a45a26bd621f238aecafa51e9ee4d9e2989f; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 4002eb0fecda3407acfc2dbf0d607fa20819aeccbc7fd8b18a134d60d5ad0309; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -118,13 +118,13 @@ Yes this is make."
   (or (executable-find "pypy3")
       (executable-find "python")))
 
-(defun make-prov-record (path)
+(defun make-prov-record (path &optional build-time)
   ;; reminder: because the id is always build:prov processes can
   ;; add additional prov triples independently as needed without
   ;; needing to extend the core python code
-  (run-command
-   (py-x) "-m" "pyontutils.ontload"
-   "prov" "blazegraph" path))
+  (let* ((always (list (py-x) "-m" "pyontutils.ontload" "prov" "blazegraph" path))
+         (args (if build-time (append always (list "--nowish" build-time)) always)))
+    (apply #'run-command args)))
 
 (defun get-ontology (iri merged-path)
   (run-command ;; FIXME not clear that this is the best approach here
@@ -321,9 +321,11 @@ culled.write(\"%s\")" iri merged-path)))
            "%S" ; TODO check if we can safely strip out the group at this stage
            '(FIXME TODO replace the group id with some garbage so that it doesn't leak))))
       ;; 6 FIXME TODO this requires scigraph to be running FIXME this is a very slow step
+      ;; FIXME this also requires idlib protocols.io creds sometimes SIGH which means it hits the network
+      ;; FIXME yeah, this is totally broken at this point trying to run in docker
       (run-command (py-x) "-m" "protcur.cli" "convert" "-t" "prot" hypothesis-annos protcur-path))))
 
-(defun step-load-store (path-br-bin &optional no-load)
+(defun step-load-store (path-br-bin &optional no-load build-time)
   "download latest ttl files and load into blazegraph"
   (let ((exec-path (cons path-br-bin exec-path))
         (journal-path "data/blazegraph.jnl")
@@ -364,7 +366,7 @@ culled.write(\"%s\")" iri merged-path)))
     ;; 4
     (unless-file-exists-p prov-path
       ;; note that load prov explicitly does not change on resume
-      (make-prov-record prov-path))
+      (make-prov-record prov-path build-time))
     (unless-file-exists-p p-path
       ;; FIXME decouple this location
       (url-copy-file-safe (concat cass-ont "protcur.ttl")
@@ -504,7 +506,7 @@ culled.write(\"%s\")" iri merged-path)))
 
 ;; N release
 
-(defun step-release (build-dir &optional this-release-dir release-time no-blaze no-load no-annos)
+(defun step-release (build-dir &optional this-release-dir release-time build-time no-blaze no-load no-annos)
   (step-ensure-commands)
   (step-ensure-python-modules)
   (step-ensure-services)
@@ -536,7 +538,7 @@ culled.write(\"%s\")" iri merged-path)))
           (step-arrange-blazegraph build-dir path-jar))
         (unless no-annos
           (step-annotations))
-        (step-load-store (concat path "bin") no-load)
+        (step-load-store (concat path "bin") no-load build-time)
         (step-add-prefixes-file)
         (unless no-blaze
           (step-add-query-org path-queries))
@@ -703,6 +705,8 @@ main()
        (:no-blaze)
        (:no-load)
        (:no-annos)
+       ((:release-time nil)) ; set the timestamp used to name the release dir, will be ignored for --resume FIXME is this right or should we make it possible to resume old builds in this way ??? release-time is NOT propagated to build-time by default
+       ((:build-time nil)) ; set the timestamp used for build:prov, other timestamps are not modified, will be ignored for --resume if `prov-path' already exists
        ((:path-release nil) release-dir))
     (message "%S" sckan-release)
     (when build
@@ -710,9 +714,9 @@ main()
         (if resume
             (let ((resume-dir (find-resume-dir build-dir)))
               (if resume-dir
-                  (step-release build-dir resume-dir nil no-blaze no-load no-annos)
+                  (step-release build-dir resume-dir release-time build-time no-blaze no-load no-annos)
                 (message "No build to resume.")))
-          (step-release build-dir release-dir nil no-blaze no-load no-annos))))))
+          (step-release build-dir release-dir release-time build-time no-blaze no-load no-annos))))))
 #+end_src
 
 #+name: reval-setup
