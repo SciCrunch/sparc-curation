@@ -16,6 +16,8 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2024-08-29
+- NPO swglnd fix forwardConnectionPhenotype axioms
 * RC 2024-08-28
 - NPO add populations from NLP sweat glands
 * RC 2024-08-27
