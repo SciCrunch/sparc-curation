@@ -269,9 +269,13 @@ using the templates greater than 3.0.0.
   closes #99 manifest modality column
   # This column is intended for use with rows that refer to folders but can also be used for files. It provides a level of indirection between the folder name and the modality of the data that is being provided. It is similar to the BIDS file naming fragments, and might at some point accept them as well. Folders can also be named after controlled modalities, however if those change for some reason in a future version of sds then this field can be used to make corrections after the fact.
   - COMMENT :: XXX this also suggests that an SDS 2.2.0 template can be released as well to make it possible to add data modalities to an existing 2.0.0 without forcing compliance with
-- Add =no-transitive= column. TODO maybe =transitive= to force instead? Depends on default.
-  Use to prevent an SDS entity id folder from preventing a check on subfolders.
-  Default behavior is to warn for nested folders with no entity metadata and no modality.
+- Add =entity-is-transitive= column.
+  Mark an SDS entity id folder has subfolders to indicate that those
+  folders are about that entity and not any more granular entity. that
+  are from preventing a check on subfolders.  Default behavior is to
+  warn for nested folders with no entity metadata and no modality.
+  The validator will not warn if another entity folder is nested
+  inside a folder marked transitive.
   # TODO naming
 *** COMMENT old thinking
 - NO :: Add =is-data-dictionary= column.
