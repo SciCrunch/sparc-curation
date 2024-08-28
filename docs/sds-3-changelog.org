@@ -318,9 +318,15 @@ using the templates greater than 3.0.0.
 ** Changes from 2.1.0 to 3.0.0 for submission
 # closes #116 submission validation # XXX this one is a bit more complex
 ** Changes from 2.1.0 to 3.0.0 for dataset_description
-- Add
 - Add something about funding and submission stuff.
   closes #103
+- Add =standards information= section
+  - Add =consortium data standard=
+  - Add =consortium data standard version=
+- Add =funding information= section
+  - Add =funding consortium=
+  - Add =funding agency=
+  - Add =award number=
 - Change =Type= to also accept =device= as a value.
 - Add =Device information= section
   # TODO https://docs.google.com/spreadsheets/d/1ioes3NqVjJZXTZnA1MbxPb26WnHxOdPX/edit
@@ -334,10 +340,11 @@ using the templates greater than 3.0.0.
   - =Device target species=
   - =Device target sex=
   - =Device target age category=
+    TODO in description give a list of valid fields
   - =Device target disease or disorder=
   - notes or free text caveat field goes in the description field
-- TODO add number_of_performances
-- TODO add number_of_sites
+- Add =number_of_performances=
+- Add =number_of_sites=
 - Add new relationType to support dataset to dataset relations.
   closes #114 dataset_description "also-in-dataset" relation assertion for all subjects, specimens, etc.
   closes #13 more details underlying #114
@@ -351,45 +358,42 @@ using the templates greater than 3.0.0.
     =sharesSubjectsWithDataset= adds too much complexity when there is
     already functionality that makes that possible.
 - Add =data-dictionary= section.
-  - path
-  - type
-  - description
-- Add =data-dictionary-path=. Not required.
-  Top down path to one or more data dictionaries that are used in the
-  dataset.  Needed to make it possible to detect cases where a data
-  dictionary has been specified but is not being used to validate
-  anything, e.g. can happen if someone mistypes a path in a manifest
-  and can't figure out what is wrong.  This alternative is preferred
-  to adding a boolean column to the manifest spec because it mirrors
-  the type that is provided in the manifest. Also preferred to
-  specifying a single top level data dictionary file, because there
-  could be multiple data dictionary files. The internal structure of
-  SDS data dictionaries is not being specified as part of SDS 3.0.0,
-  however the changes in dataset_description and manifest are the
-  foundation that will make it possible to wire up the schema defined
-  in a data dictionary to the files it constrains for validation in
-  the future.
-  closes #117 data dictionary
-- Add =data-dictionary-type=. Required for columns where =data-dictionary-path= is non null.
-  This field is controlled and is used to specify a schema type and a structure type.
-  The valid values for =data-dictionary-type= have not yet been decided and are currently
-  implementation defined. A future version of SDS will likely provide more structure.
-  | type          | status |
-  |---------------+--------|
-  | =json-schema= | yes    |
-  | =linkml=      | could  |
-  | =redcap=      | maybe? |
-  |               |        |
-  If the files being constrained are json files then one could use =json-schema=, another
-  option would be =linkml=, etc.
+  - Add =data-dictionary-path=. Not required.
+    Top down path to one or more data dictionaries that are used in the
+    dataset.  Needed to make it possible to detect cases where a data
+    dictionary has been specified but is not being used to validate
+    anything, e.g. can happen if someone mistypes a path in a manifest
+    and can't figure out what is wrong.  This alternative is preferred
+    to adding a boolean column to the manifest spec because it mirrors
+    the type that is provided in the manifest. Also preferred to
+    specifying a single top level data dictionary file, because there
+    could be multiple data dictionary files. The internal structure of
+    SDS data dictionaries is not being specified as part of SDS 3.0.0,
+    however the changes in dataset_description and manifest are the
+    foundation that will make it possible to wire up the schema defined
+    in a data dictionary to the files it constrains for validation in
+    the future.
+    closes #117 data dictionary
+  - Add =data-dictionary-type=. Required for columns where =data-dictionary-path= is non null.
+    This field is controlled and is used to specify a schema type and a structure type.
+    The valid values for =data-dictionary-type= have not yet been decided and are currently
+    implementation defined. A future version of SDS will likely provide more structure.
+    | type          | status |
+    |---------------+--------|
+    | =json-schema= | yes    |
+    | =linkml=      | could  |
+    | =redcap=      | maybe? |
+    |               |        |
+    If the files being constrained are json files then one could use =json-schema=, another
+    option would be =linkml=, etc.
+  - Add =data-dictionary-description=.
 - Add =description=. Restored following removal in 2.x.
   Irony that dataset_description was missing a description field.
   closes #84 restore description field
-- Add =license-identifier= field. Controlled to SPDX short identifiers. XXX probably put this in related identifiers?
-- Delete
-- Change
-- Rename
-- Fix contributor roles list for ...
+- Add =license= field. Controlled to SPDX short identifiers.
+  # XXX probably put this in related identifiers? nah, put it at the top for visilbity
+- Fix related identifiers list removing accidental merger of =IsContinuedBy= and =Continues=.
+- =contributor role= updated with new roles added in datacite 4.5.
 
 ** Changes from 2.1.0 to 3.0.0 for subjects
 - Add
