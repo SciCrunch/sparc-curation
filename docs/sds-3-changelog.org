@@ -454,15 +454,15 @@ As with all metadata files, additional metadata columns can always be added by u
 This is a new file as of this version. It is not included in the default template.
 
 - Add =Controlled fields= section
-- Add =Organ=
-- Add =Experimental approach=
-- Add =Experimental technique=
+  - Add =Organ=
+  - Add =Experimental approach=
+  - Add =Experimental technique=
 - Add =Curator notes= section
-- Add =Experimental design=
-- Add =Completeness=
-- Add =Subjects and samples=
-- Add =Primary vs derivative data=
-- Add =Code availability=
+  - Add =Experimental design=
+  - Add =Completeness=
+  - Add =Subjects and samples=
+  - Add =Primary vs derivative data=
+  - Add =Code availability=
 - exclude
   - +award+ maybe to supplement dataset description? probably not?
   - +study purpose+ DUPE
