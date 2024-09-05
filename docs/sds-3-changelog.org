@@ -38,6 +38,10 @@ using the templates greater than 3.0.0.
   By default SDS 3.0.0 explicitly excludes the larger unicode
   categories for letter and number. See
   https://en.wikipedia.org/wiki/Unicode_character_property#General_Category.
+  See also https://lamport.azurewebsites.net/tla/future.pdf =Common
+  Operators of Ordinary Math= for an account of why ascii remains a
+  sound default for scientific use cases.
+
   An option extension of the standard to support those categories
   could be implemented, in which case an explicit field must be
   provided in the dataset description file indicating that the dataset
@@ -255,21 +259,21 @@ using the templates greater than 3.0.0.
   of the mapping of files to SDS entities by their containing folders.
   Only the most granular mapping should be provided since all entities
   should be upwardly contextualized (i.e., perf references sam, etc.).
-- Add =data-dictionary-path= column. Reference the relative path to the data dictionary used to validate this file.
-- Add =alsoInDataset=.
+- Add =data dictionary path= column. Reference the relative path to the data dictionary used to validate this file.
+- Add =also in dataset=.
   Provide a dataset id where a copy of this file is also present.
-- Add =alsoInDatasetPath=.
-  Provide the dataset relative path to the copy of this file in =alsoInDataset=.
+- Add =also in dataset path=.
+  Provide the dataset relative path to the copy of this file in =also in dataset=.
   closes #97
   # TODO files from other datasets for example when nikki's team pulls a single
   # file from another dataset ... alsoLocatedInDataset alsoLocatedInDatasetPath
   # for cases where the file was identical not fully derived
-- Add =data-modality= column.
+- Add =data modality= column.
   Allowed values are TBD.
   closes #99 manifest modality column
   # This column is intended for use with rows that refer to folders but can also be used for files. It provides a level of indirection between the folder name and the modality of the data that is being provided. It is similar to the BIDS file naming fragments, and might at some point accept them as well. Folders can also be named after controlled modalities, however if those change for some reason in a future version of sds then this field can be used to make corrections after the fact.
   - COMMENT :: XXX this also suggests that an SDS 2.2.0 template can be released as well to make it possible to add data modalities to an existing 2.0.0 without forcing compliance with
-- Add =entity-is-transitive= column.
+- Add =entity is transitive= column.
   Mark an SDS entity id folder has subfolders to indicate that those
   folders are about that entity and not any more granular entity. that
   are from preventing a check on subfolders.  Default behavior is to
@@ -324,13 +328,13 @@ using the templates greater than 3.0.0.
 ** Changes from 2.1.0 to 3.0.0 for dataset_description
 - Add something about funding and submission stuff.
   closes #103
-- Add =standards information= section
-  - Add =consortium data standard=
-  - Add =consortium data standard version=
-- Add =funding information= section
-  - Add =funding consortium=
-  - Add =funding agency=
-  - Add =award number=
+- Add =Standards information= section
+  - Add =Consortium data standard=
+  - Add =Consortium data standard version=
+- Add =Funding information= section
+  - Add =Funding consortium=
+  - Add =Funding agency=
+  - Add =Award number=
 - Change =Type= to also accept =device= as a value.
 - Add =Device information= section
   # TODO https://docs.google.com/spreadsheets/d/1ioes3NqVjJZXTZnA1MbxPb26WnHxOdPX/edit
@@ -347,8 +351,8 @@ using the templates greater than 3.0.0.
     TODO in description give a list of valid fields
   - =Device target disease or disorder=
   - notes or free text caveat field goes in the description field
-- Add =number_of_performances=
-- Add =number_of_sites=
+- Add =Number of sites=
+- Add =Number of performances=
 - Add new relationType to support dataset to dataset relations.
   closes #114 dataset_description "also-in-dataset" relation assertion for all subjects, specimens, etc.
   closes #13 more details underlying #114
@@ -361,8 +365,8 @@ using the templates greater than 3.0.0.
     =sharesSpecimensWithDataset=, =sharesSamplesWithDataset=, or
     =sharesSubjectsWithDataset= adds too much complexity when there is
     already functionality that makes that possible.
-- Add =data-dictionary= section.
-  - Add =data-dictionary-path=. Not required.
+- Add =Data dictionary information= section.
+  - Add =Data dictionary path=. Not required.
     Top down path to one or more data dictionaries that are used in the
     dataset.  Needed to make it possible to detect cases where a data
     dictionary has been specified but is not being used to validate
@@ -378,9 +382,9 @@ using the templates greater than 3.0.0.
     in a data dictionary to the files it constrains for validation in
     the future.
     closes #117 data dictionary
-  - Add =data-dictionary-type=. Required for columns where =data-dictionary-path= is non null.
+  - Add =Data dictionary type=. Required for columns where =Data dictionary path= is non null.
     This field is controlled and is used to specify a schema type and a structure type.
-    The valid values for =data-dictionary-type= have not yet been decided and are currently
+    The valid values for =Data dictionary type= have not yet been decided and are currently
     implementation defined. A future version of SDS will likely provide more structure.
     | type          | status |
     |---------------+--------|
@@ -390,27 +394,26 @@ using the templates greater than 3.0.0.
     |               |        |
     If the files being constrained are json files then one could use =json-schema=, another
     option would be =linkml=, etc.
-  - Add =data-dictionary-description=.
-- Add =description=. Restored following removal in 2.x.
+  - Add =Data dictionary description=.
+- Add =Description=. Restored following removal in 2.x.
   Irony that dataset_description was missing a description field.
   closes #84 restore description field
 - Add =license= field. Controlled to SPDX short identifiers.
   # XXX probably put this in related identifiers? nah, put it at the top for visilbity
 - Fix related identifiers list removing accidental merger of =IsContinuedBy= and =Continues=.
-- =contributor role= updated with new roles added in datacite 4.5.
+- =Contributor role= updated with new roles added in datacite 4.5.
 
 ** Changes from 2.1.0 to 3.0.0 for subjects
-- Add
-- Add =metadata-only= column. XXX also needed for =perf-= and =site-=. Yes because this allows the metadata files to capture higher level performance structure.
+- Add =metadata only= column. XXX also needed for =perf-= and =site-=. Yes because this allows the metadata files to capture higher level performance structure.
 ** Changes from 2.1.0 to 3.0.0 for samples
-- Add =metadata-only= column.
+- Add =metadata only= column.
 ** Changes from 2.1.0 to 3.0.0 for code_description
 Extensive changes.
 ** Changes from 2.1.0 to 3.0.0 for resources
-- Add =resource type=
+- Add =Type= column
   software, antibody, viral vector, organism, cell line
-- Add =name=
-- Add =id-in-protocol=
+- Add =Name=
+- Add =ID in protocol=
   use if this resources fills in missing information in a protocol
   vs is a record of some measurements about the inputs that becomes data
 ** Changes from 2.1.0 to 3.0.0 for performances
@@ -443,12 +446,12 @@ If you're using a file system and spreadsheets to organize your data, then be pr
 ** Changes from 2.1.0 to 3.0.0 for sites
 This is a new file as of this version.
 As with all metadata files, additional metadata columns can always be added by users as needed.
-- Add =site-id=. Values must be unique and must match =site-[0-9A-Za-z-]+=.
-- Add =specimen-id=. References the id for the subject or sample on which the site is located.
-- Add =site-type=. Example values are point, line, volume, etc.
-- Add =laboratory-internal-id=. Optional.
-- Add =coordinate-system=. Optional.
-- Add =coordinate-system-position=. Optional.
+- Add =site id=. Values must be unique and must match =site-[0-9A-Za-z-]+=.
+- Add =specimen id=. References the id for the subject or sample on which the site is located.
+- Add =site type=. Example values are point, line, volume, etc.
+- Add =laboratory internal id=. Optional.
+- Add =coordinate system=. Optional.
+- Add =coordinate system position=. Optional.
 
 ** Changes from 2.1.0 to 3.0.0 for curation
 This is a new file as of this version. It is not included in the default template.
@@ -469,4 +472,3 @@ This is a new file as of this version. It is not included in the default templat
   - +study data collection+ DUPE
   - +study primary conclusions+ DUPE
 
-** Changes from 2.1.0 to 3.0.0 for
