@@ -639,6 +639,13 @@ See also the [[file:./developer-guide.org][sparcur developer guild]]
 :VISIBILITY: folded
 :END:
 *** DatasetTemplate
+Clean up existing files.
+
+#+begin_src bash
+pypy3 -m sparcur.simple.clean_metadata_files --for-template --cleaned-output-path ../dt_cleaned
+cp ../dt_cleaned/*.xlsx .
+#+end_src
+
 Commit any changes and push to master.
 
 #+begin_src bash
@@ -648,7 +655,7 @@ make-template-zip () {
     pushd ${CLEANROOM}
     git clone https://github.com/SciCrunch/sparc-curation.git &&
     pushd ${CLEANROOM}/sparc-curation/resources
-    zip -x '*.gitkeep' -r DatasetTemplate.zip DatasetTemplate
+    zip -x '*.gitkeep' -x 'curation.xlsx' -x 'aux' -r DatasetTemplate.zip DatasetTemplate
     mv DatasetTemplate.zip ${CLEANROOM}
     popd
     rm -rf ${CLEANROOM}/sparc-curation

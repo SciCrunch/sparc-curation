@@ -774,7 +774,7 @@ class Tabular(HasErrors):
         else:
             raise exc.NoDataError(f'{self.path}') from e2
 
-    def _openpyxl_fixes(self):
+    def _openpyxl_fixes(self, for_template=False):
         # read sheet read only to find empty columns without destroying memory
         wbro = self._openpyxl.load_workbook(self.path, read_only=True)
         if wbro is None:
@@ -836,6 +836,16 @@ class Tabular(HasErrors):
                              blame='submission',
                              path=self.path):
                 logd.warning(msg)
+
+        if for_template:
+            wb.active = 0
+            for _sheet in wb.worksheets:
+                # reset zoom
+                _sheet.sheet_view.zoomScale = None
+                # make sure top left is the active cell accounting for weird multi selection cases
+                for sel in _sheet.views.sheetView[0].selection:
+                    sel.activeCell = 'A1'
+                    sel.sqref = 'A1'
 
         return sheet, wb, sparse_empty_rows
 

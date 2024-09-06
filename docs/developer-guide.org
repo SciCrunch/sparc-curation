@@ -1709,6 +1709,7 @@ tag: =sckan-%Y-%m-$d=
 target: =dev=
 title: =sckan-%Y-%m-$d=
 Upload the blazegraph, scigraph, and docker archives.
+Add link to changelog entry.
 
 **** Push docker images
 #+begin_src bash
@@ -3783,9 +3784,10 @@ Options:
     --invariant-local-path=PATH     path relative to parent path for dataset [default: dataset]
     --export-local                  set export-parent-path to {{:parent-path}}/exports/
     --export-path=PATH              base export path containing the standard path structure [default: {auth.get_path('export-path')}]
-    --cleaned-output-path=PATH      directory path into which cleaned paths will be placed
-    --cleaned-path=PATH             base cleaned path containing the standard path structure [default: {auth.get_path('cleaned-path')}]
     --export-parent-path=PATH       direct parent path into which exports will be placed
+    --for-template                  run additional regularization steps when generating templates
+    --cleaned-path=PATH             base cleaned path containing the standard path structure [default: {auth.get_path('cleaned-path')}]
+    --cleaned-output-path=PATH      directory path into which cleaned paths will be placed
     --extension=<EXT>...            one or more file extensions to fetch
 
     -j --jobs=N                     number joblib jobs [default: 12]
@@ -4505,26 +4507,26 @@ def from_dataset_path_metadata_file_paths(dataset_path):
     return matches
 
 
-def from_path_cleaned_object(path):
+def from_path_cleaned_object(path, for_template=False):
     t = dat.Tabular(path)
-    sheet, wb, sparse_empty_rows = t._openpyxl_fixes()
+    sheet, wb, sparse_empty_rows = t._openpyxl_fixes(for_template=for_template)
     return wb
 
 
-def from_file_paths_objects(paths):
+def from_file_paths_objects(paths, for_template=False):
     for path in paths:
         if path.suffix == '.xlsx':
-            cleaned = from_path_cleaned_object(path)
+            cleaned = from_path_cleaned_object(path, for_template)
             yield cleaned
         else:
             yield None
 
 
-def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path):
+def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path, for_template=False):
     "NOTE this actually does the cleaning"
 
     paths = from_dataset_path_metadata_file_paths(dataset_path)
-    for path, obj in zip(paths, from_file_paths_objects(paths)):
+    for path, obj in zip(paths, from_file_paths_objects(paths, for_template)):
         if obj is not None:
             drp = path.relative_path_from(dataset_path)
             target = cleaned_output_path / drp
@@ -4537,7 +4539,8 @@ def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path):
 def main(path=Path.cwd(), id=None, time_now=None,
          parent_path=None, invariant_local_path='dataset',
          parent_parent_path=Path.cwd(),
-         cleaned_path=None, cleaned_output_path=None, **kwargs):
+         cleaned_path=None, cleaned_output_path=None,
+         for_template=False, **kwargs):
     # note that cleaned_path is better though of as cleaned_base_path
     # setup taken from path_metadata.py::main so check the notes there
     if path == Path.cwd() and (id is not None or parent_path is not None):
@@ -4565,7 +4568,7 @@ def main(path=Path.cwd(), id=None, time_now=None,
     else:
         cleaned_output_path = prepare_dataset_cleaned(path, cleaned_path, time_now)
 
-    from_dataset_path_cleaned_files(path, cleaned_output_path)
+    from_dataset_path_cleaned_files(path, cleaned_output_path, for_template)
 
 
 if __name__ == '__main__':
