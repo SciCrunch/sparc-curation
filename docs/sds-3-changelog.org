@@ -54,7 +54,9 @@ using the templates greater than 3.0.0.
   NO OTHER unicode general categories shall be allowed, that is no
   mark, punctuation, symbol, separator, or other. The only extra
   characters allowed outside letter and number categories shall be
-  =[.,-_ ]=.
+  =[.,-_ ]=. A metadata field with the name =Extension unicode paths=
+  can be provided in the dataset description and the presence of any
+  non-empty cell value for the field will be considered to be enabled.
 
 - Add advisory naming restrictions on use of =.= for all paths.
 
