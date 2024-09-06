@@ -327,10 +327,19 @@ using the templates greater than 3.0.0.
   - nucleic acid sequencing
 ** Changes from 2.1.0 to 3.0.0 for submission
 # closes #116 submission validation # XXX this one is a bit more complex
+- Change =Funding consortium= definition to have more examples.
+  Also align them with the conventions in the dataset description file.
 ** Changes from 2.1.0 to 3.0.0 for dataset_description
 - Add something about funding and submission stuff.
   closes #103
 - Add =Standards information= section
+  Multiple standards can be provided, one standard and version pair
+  per column. Only one version of a standard can be provided per
+  dataset. Compatibility between standards is not guaranteed. In the
+  event of conflicts the behavior of SDS validators is unspecified.
+  Validators can do whatever they want to resolve, ignore, error,
+  etc. conflicts. For example, fail immediately, warn and continue,
+  silently give priority to one standard over the other, etc.
   - Add =Consortium data standard=
   - Add =Consortium data standard version=
 - Add =Funding information= section
@@ -404,6 +413,7 @@ using the templates greater than 3.0.0.
   # XXX probably put this in related identifiers? nah, put it at the top for visilbity
 - Fix related identifiers list removing accidental merger of =IsContinuedBy= and =Continues=.
 - =Contributor role= updated with new roles added in datacite 4.5.
+- =Identifier type= updated with the set of controlled values from datacite.
 
 ** Changes from 2.1.0 to 3.0.0 for subjects
 - Add =metadata only= column. XXX also needed for =perf-= and =site-=. Yes because this allows the metadata files to capture higher level performance structure.
