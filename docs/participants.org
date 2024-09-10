@@ -83,6 +83,8 @@ statistical sense.
   - =specimen type=
     - =subject=
       - =organism=
+      - =material object=
+      - ...
     - =sample=
       - =whole organ=
       - =tissue=
