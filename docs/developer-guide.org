@@ -3785,7 +3785,7 @@ Options:
     --export-local                  set export-parent-path to {{:parent-path}}/exports/
     --export-path=PATH              base export path containing the standard path structure [default: {auth.get_path('export-path')}]
     --export-parent-path=PATH       direct parent path into which exports will be placed
-    --for-template                  run additional regularization steps when generating templates
+    --for-template=TEMPLATE         run regularization steps when generating templates
     --cleaned-path=PATH             base cleaned path containing the standard path structure [default: {auth.get_path('cleaned-path')}]
     --cleaned-output-path=PATH      directory path into which cleaned paths will be placed
     --extension=<EXT>...            one or more file extensions to fetch
@@ -4472,11 +4472,14 @@ cleaned files at cleaned file paths
 # TODO consider whether we try to do replace automatically since we can track the old metadata
 #+name: clean_metadata_files.py
 #+begin_src python :tangle ../sparcur/simple/clean_metadata_files.py :noweb yes
+from types import MappingProxyType
 from sparcur.paths import Path
 from sparcur import datasets as dat
 from sparcur.utils import symlink_latest
 from sparcur.config import auth
 from sparcur.simple.utils import rglob, log
+
+_dmpt = MappingProxyType({})
 
 
 def prepare_dataset_cleaned(dataset_path, cleaned_path=None, time_now=None):
@@ -4507,26 +4510,32 @@ def from_dataset_path_metadata_file_paths(dataset_path):
     return matches
 
 
-def from_path_cleaned_object(path, for_template=False):
+def from_path_cleaned_object(path, for_template=False, template=_dmpt):
     t = dat.Tabular(path)
-    sheet, wb, sparse_empty_rows = t._openpyxl_fixes(for_template=for_template)
+    sheet, wb, sparse_empty_rows = t._openpyxl_fixes(for_template=for_template, template=template)
     return wb
 
 
-def from_file_paths_objects(paths, for_template=False):
+def from_file_paths_objects(paths, for_template=False, known_templates=_dmpt):
+    template = known_templates[for_template] if for_template in known_templates else None
+
     for path in paths:
+        if template is not None and path.stem not in template:
+            yield None
+            continue
+
         if path.suffix == '.xlsx':
-            cleaned = from_path_cleaned_object(path, for_template)
+            cleaned = from_path_cleaned_object(path, for_template, template)
             yield cleaned
         else:
             yield None
 
 
-def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path, for_template=False):
+def from_dataset_path_cleaned_files(dataset_path, cleaned_output_path, for_template=False, known_templates=_dmpt):
     "NOTE this actually does the cleaning"
 
     paths = from_dataset_path_metadata_file_paths(dataset_path)
-    for path, obj in zip(paths, from_file_paths_objects(paths, for_template)):
+    for path, obj in zip(paths, from_file_paths_objects(paths, for_template, known_templates)):
         if obj is not None:
             drp = path.relative_path_from(dataset_path)
             target = cleaned_output_path / drp
@@ -4568,7 +4577,18 @@ def main(path=Path.cwd(), id=None, time_now=None,
     else:
         cleaned_output_path = prepare_dataset_cleaned(path, cleaned_path, time_now)
 
-    from_dataset_path_cleaned_files(path, cleaned_output_path, for_template)
+    # TODO source externally
+    known_templates =  {
+        'clean': None,
+        'default': {
+            'dataset_description': {
+                'header': 'row',
+                'remove': ['device_.+'],
+            },
+        }
+    }
+
+    from_dataset_path_cleaned_files(path, cleaned_output_path, for_template, known_templates)
 
 
 if __name__ == '__main__':

@@ -283,6 +283,7 @@ we pull a fresh copy, however when there are lots of changes the
 folders themselves start to add up, so consider cleaning those out too
 since mainly the use case is to keep a record of the metadata files
 from a given date.
+
 #+begin_src bash
 pushd ~/files/sparc-datasets-test
 
@@ -642,26 +643,31 @@ See also the [[file:./developer-guide.org][sparcur developer guild]]
 Clean up existing files.
 
 #+begin_src bash
-pypy3 -m sparcur.simple.clean_metadata_files --for-template --cleaned-output-path ../dt_cleaned
-cp ../dt_cleaned/*.xlsx .
+pushd ~/git/sparc-curation/resources
+pypy3 -m sparcur.simple.clean_metadata_files --for-template clean --cleaned-output-path dt_clean DatasetTemplate
+cp dt_cleaned/*.xlsx DatasetTemplate/
 #+end_src
 
 Commit any changes and push to master.
 
 #+begin_src bash
 make-template-zip () {
+    template_type="${1}"
     local CLEANROOM=/tmp/cleanroom/
     mkdir ${CLEANROOM} || return 1
     pushd ${CLEANROOM}
     git clone https://github.com/SciCrunch/sparc-curation.git &&
     pushd ${CLEANROOM}/sparc-curation/resources
+    # TODO path to spec file for various templates (see sparcur.simple.clean_metadata_files and datasets.Tabular._openpyxl_fixes)
+    python -m sparcur.simple.clean_metadata_files --for-template ${template_type} --cleaned-output-path "dt_${template_type}" DatasetTemplate
+    cp "dt_${template_type}"/*.xlsx DatasetTemplate/
     zip -x '*.gitkeep' -x 'curation.xlsx' -x 'aux' -r DatasetTemplate.zip DatasetTemplate
     mv DatasetTemplate.zip ${CLEANROOM}
     popd
     rm -rf ${CLEANROOM}/sparc-curation
     popd
 }
-make-template-zip
+make-template-zip default
 #+end_src
 
 Once that is done open /tmp/cleanroom/DatasetTemplate.zip in =file-roller= or similar

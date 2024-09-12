@@ -1,4 +1,5 @@
 import io
+import re
 import csv
 import copy
 import pathlib
@@ -774,7 +775,7 @@ class Tabular(HasErrors):
         else:
             raise exc.NoDataError(f'{self.path}') from e2
 
-    def _openpyxl_fixes(self, for_template=False):
+    def _openpyxl_fixes(self, for_template=False, template=None):
         # read sheet read only to find empty columns without destroying memory
         wbro = self._openpyxl.load_workbook(self.path, read_only=True)
         if wbro is None:
@@ -836,6 +837,43 @@ class Tabular(HasErrors):
                              blame='submission',
                              path=self.path):
                 logd.warning(msg)
+
+        if for_template and template is not None:
+            if self.path.stem not in template:
+                msg = f'cleaning for {for_template} template not supported for {self.path.name}'
+                raise NotImplementedError(msg)
+
+            # FIXME TODO make this configurable from somewhere external, these values will change
+            # TODO also probably want a very simple spec for this that we can maintain as
+            # ((:file "dataset_description.xlsx" :remove "device_.+")
+            #  (:file "subjects.xlsx" :add ("a" "b" "c")))
+            # or something like that
+            stem_temp = template[self.path.stem]
+            patterns_rem = stem_temp['remove'] if 'remove' in stem_temp else tuple()
+            to_add = stem_temp['add'] if 'add' in stem_temp else tuple()
+
+            row_schema = stem_temp['header'] == 'row'
+            if row_schema:
+                gen = sheet.rows
+                rem = sheet.delete_rows
+            else:
+                gen = sheet.columns
+                rem = sheet.delete_cols
+
+            if patterns_rem:
+                rx = re.compile('|'.join(patterns_rem))
+                to_remove = []
+                for r in gen:
+                    norm_head = python_identifier(r[0].value)
+                    if re.match(rx, norm_head):
+                        to_remove.append(r[0].row)
+
+                # reversed because must delete from end otherwise the
+                # higher indexes change as you delete lower indexes
+                [rem(i) for i in reversed(to_remove)]
+
+            if to_add:
+                raise NotImplementedError('TODO')
 
         if for_template:
             wb.active = 0
