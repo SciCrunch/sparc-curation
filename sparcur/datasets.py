@@ -775,7 +775,7 @@ class Tabular(HasErrors):
         else:
             raise exc.NoDataError(f'{self.path}') from e2
 
-    def _openpyxl_fixes(self, for_template=False, template=None):
+    def _openpyxl_fixes(self, for_template=False, known_templates=None):
         # read sheet read only to find empty columns without destroying memory
         wbro = self._openpyxl.load_workbook(self.path, read_only=True)
         if wbro is None:
@@ -838,44 +838,123 @@ class Tabular(HasErrors):
                              path=self.path):
                 logd.warning(msg)
 
-        if for_template and template is not None:
-            if self.path.stem not in template:
-                msg = f'cleaning for {for_template} template not supported for {self.path.name}'
-                raise NotImplementedError(msg)
+        def merge_stems(all_stems):
+            out = {}
+            header = None
+            for s in all_stems:
+                for stem, v in s.items():
+                    if stem not in out:
+                        if isinstance(v, list):
+                            # avoid mutation of parent structure
+                            out[stem] = [_ for _ in v]
+                        if isinstance(v, dict):
+                            out[stem] = copy.deepcopy(v)  # this is where the deepcopy is needed to prevent :add :header duplication
+                        else:
+                            out[stem] = v
+                    else:
+                        if 'header' not in v:
+                            msg = f'missing :header spec {v!r}'
+                            raise KeyError(msg)
 
-            # FIXME TODO make this configurable from somewhere external, these values will change
-            # TODO also probably want a very simple spec for this that we can maintain as
-            # ((:file "dataset_description.xlsx" :remove "device_.+")
-            #  (:file "subjects.xlsx" :add ("a" "b" "c")))
-            # or something like that
-            stem_temp = template[self.path.stem]
-            patterns_rem = stem_temp['remove'] if 'remove' in stem_temp else tuple()
-            to_add = stem_temp['add'] if 'add' in stem_temp else tuple()
+                        if v['header'] != header:
+                            if header is None:
+                                header = v['header']
+                            else:
+                                msg = f'heterogenous header type?? {header} != {v["header"]}'
+                                raise TypeError(msg)
 
-            row_schema = stem_temp['header'] == 'row'
-            if row_schema:
-                gen = sheet.rows
-                rem = sheet.delete_rows
-            else:
-                gen = sheet.columns
-                rem = sheet.delete_cols
+                        for key, value in v.items():
+                            if key not in out[stem]:
+                                if isinstance(value, list):
+                                    # avoid mutation of parent structure
+                                    out[stem][key] = [_ for _ in value]
+                                if isinstance(value, dict):
+                                    out[stem][key] = copy.deepcopy(value)
+                                else:
+                                    out[stem][key] = value
+                            elif isinstance(out[stem][key], list):
+                                out[stem][key].extend(value)
+                            elif key == 'add':  # FIXME implicitly assumes dict
+                                #log.debug(value)
+                                for akey, avalue in value.items():
+                                    if akey not in out[stem][key]:
+                                        if isinstance(avalue, list):
+                                            # avoid mutation of parent structure
+                                            out[stem][key][akey] = [_ for _ in avalue]
+                                        if isinstance(avalue, dict):
+                                            out[stem][key][akey] = copy.deepcopy(avalue)
+                                        else:
+                                            out[stem][key][akey] = avalue
+                                    else:
+                                        out[stem][key][akey].extend(avalue)  # FIXME implicitly assumes list
+                            else:
+                                # last one wins
+                                out[stem][key] = copy.deepcopy(value)
 
-            if patterns_rem:
-                rx = re.compile('|'.join(patterns_rem))
-                to_remove = []
-                for r in gen:
-                    norm_head = python_identifier(r[0].value)
-                    if re.match(rx, norm_head):
-                        to_remove.append(r[0].row)
+            return out
 
-                # reversed because must delete from end otherwise the
-                # higher indexes change as you delete lower indexes
-                [rem(i) for i in reversed(to_remove)]
-
-            if to_add:
-                raise NotImplementedError('TODO')
+        def get_stems(tmpl):
+            uses = [known_templates[t] for t in tmpl['use']] if 'use' in tmpl else []
+            ustems = [s for u in uses for s in get_stems(u)]  # FIXME reconvergence and inheritance issues lurking move uses resolution outside
+            _steml = [tmpl['stems']] if 'stems' in tmpl else []
+            return ustems + _steml
 
         if for_template:
+            template = known_templates[for_template] if for_template in known_templates else None
+            if template:
+                stems = merge_stems(get_stems(template))  # FIXME stupid to recompute this for every file
+
+                #import pprint
+                #log.debug(f'{self.path}\n' + pprint.pformat(stems))
+                if self.path.stem not in stems:
+                    msg = f'cleaning for {for_template} template not supported for {self.path.name}'
+                    raise NotImplementedError(msg)
+
+                # FIXME TODO make this configurable from somewhere external, these values will change
+                # TODO also probably want a very simple spec for this that we can maintain as
+                # ((:file "dataset_description.xlsx" :remove "device_.+")
+                #  (:file "subjects.xlsx" :add ("a" "b" "c")))
+                # or something like that
+                stem_temp = stems[self.path.stem]
+                patterns_rem = stem_temp['remove'] if 'remove' in stem_temp else tuple()
+                adds = stem_temp['add'] if 'add' in stem_temp else tuple()
+                to_add = adds['header'] if 'header' in adds else tuple()
+                # TODO handle non :header cases which also require append but
+                # can't use max_column or max_row to know where to start
+
+                row_schema = stem_temp['header'] == 'row'
+                if row_schema:
+                    gen = sheet.rows
+                    rem = sheet.delete_rows
+                    def dadd(headers):
+                        # FIXME empty cell issues
+                        sheet.append([[h] for h in headers])
+
+                else:
+                    gen = sheet.columns
+                    rem = sheet.delete_cols
+                    def dadd(headers):
+                        # FIXME empty cell issues
+                        mc = sheet.max_column
+                        lc = len(headers)
+                        for h, c in zip(headers, range(mc + 1, mc + lc + 1)):
+                            sheet.cell(row=1, column=c).value = h
+
+                if patterns_rem:
+                    rx = re.compile('|'.join(patterns_rem))
+                    to_remove = []
+                    for r in gen:
+                        norm_head = python_identifier(r[0].value)
+                        if re.match(rx, norm_head):
+                            to_remove.append(r[0].row)
+
+                    # reversed because must delete from end otherwise the
+                    # higher indexes change as you delete lower indexes
+                    [rem(i) for i in reversed(to_remove)]
+
+                if to_add:
+                    dadd(to_add)
+
             wb.active = 0
             for _sheet in wb.worksheets:
                 # reset zoom

@@ -4510,22 +4510,26 @@ def from_dataset_path_metadata_file_paths(dataset_path):
     return matches
 
 
-def from_path_cleaned_object(path, for_template=False, template=_dmpt):
+def from_path_cleaned_object(path, for_template=False, known_templates=_dmpt):
     t = dat.Tabular(path)
-    sheet, wb, sparse_empty_rows = t._openpyxl_fixes(for_template=for_template, template=template)
+    sheet, wb, sparse_empty_rows = t._openpyxl_fixes(for_template=for_template, known_templates=known_templates)
     return wb
 
 
 def from_file_paths_objects(paths, for_template=False, known_templates=_dmpt):
-    template = known_templates[for_template] if for_template in known_templates else None
+    if for_template:
+        template = known_templates[for_template] if for_template in known_templates else None
+        stems = template['stems'] if 'stems' in template else None
+    else:
+        stems = None
 
     for path in paths:
-        if template is not None and path.stem not in template:
+        if stems and path.stem not in stems:
             yield None
             continue
 
         if path.suffix == '.xlsx':
-            cleaned = from_path_cleaned_object(path, for_template, template)
+            cleaned = from_path_cleaned_object(path, for_template, known_templates)
             yield cleaned
         else:
             yield None
@@ -4577,16 +4581,25 @@ def main(path=Path.cwd(), id=None, time_now=None,
     else:
         cleaned_output_path = prepare_dataset_cleaned(path, cleaned_path, time_now)
 
-    # TODO source externally
-    known_templates =  {
-        'clean': None,
-        'default': {
-            'dataset_description': {
-                'header': 'row',
-                'remove': ['device_.+'],
-            },
-        }
-    }
+    if for_template:
+        from sparcur.config import auth
+        from orthauth.utils import sxpr_to_python
+        resources = auth.get_path('resources')
+        with open(resources / 'templates.sxpr') as f:
+            known_templates = sxpr_to_python(f.read())
+
+        # TODO source externally
+        _known_templates =  {
+            'clean': False,
+            'default': {
+                'stems-closed': False,
+                'stems': {
+                    'dataset_description': {
+                        'header': 'row',
+                        'remove': ['device_.+'],
+                }}}}
+    else:
+        known_templates = None
 
     from_dataset_path_cleaned_files(path, cleaned_output_path, for_template, known_templates)
 

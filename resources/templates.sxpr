@@ -1,0 +1,98 @@
+(
+ :clean ()
+ :default
+ (:stems-remove
+  ("curation")
+  :stems
+  (
+   :dataset_description
+   (
+    :header row
+    :remove ("device_.+")
+    )
+   ))
+ :device
+ (
+  :stems-closed #t
+  :stems
+  (
+   :dataset_description () ; FIXME plist conversion doesn't support boolean literals or nil right now
+   )
+
+  )
+ :heal
+ (
+  :use
+  (default)
+  :stems
+  (
+   :dataset_description
+   (:header col
+    :cells ; TODO not implemented and not clear this is the best way, probably just watn to append as values
+    ; this approach feels too granular, i think we extend :add to require require the row to add to first
+    ((("data_standard"         "value_2") "HEAL")
+     (("data_standard_version" "value_2") "1.0.0")
+     )
+    :add
+    (:data_standard         ("HEAL"  )
+     :data_standard_version ("1.0.0" )
+     )
+    )
+   :subjects
+   (
+    :header col
+    :add
+    (:header
+     ;; XXX potential name collision for :header here but we know what it means
+     ("heal subject header 1"
+      "heal subject header 2"
+      "heal subject header 3"
+      ))
+    )
+   )
+  )
+ :heal-precision
+ (
+  :use
+  (heal)
+  :stems
+  (:subjects
+   (
+    :header col
+    :add
+    (:header
+     ("precision subject header 1"
+      "precision subject header 2"
+      "precision subject header 3"
+      ))
+    ))
+  )
+ :heal-rejoin
+ (
+  :use
+  (heal)
+  :stems
+  (:subjects
+   (
+    :header col
+    :add
+    (:header
+     ("rejoin subject header 1"
+      "rejoin subject header 2"
+      "rejoin subject header 3"
+      ))
+    )
+   :samples
+   (
+    :header col
+    :add
+    (:header
+     ("rejoin sample header 1"
+      "rejoin sample header 2"
+      "rejoin sample header 3"
+      ))
+    )
+   )
+
+  )
+ )
