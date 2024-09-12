@@ -661,7 +661,7 @@ make-template-zip () {
     # TODO path to spec file for various templates (see sparcur.simple.clean_metadata_files and datasets.Tabular._openpyxl_fixes)
     python -m sparcur.simple.clean_metadata_files --for-template ${template_type} --cleaned-output-path "dt_${template_type}" DatasetTemplate
     cp "dt_${template_type}"/*.xlsx DatasetTemplate/
-    zip -x '*.gitkeep' -x 'curation.xlsx' -x 'aux' -r DatasetTemplate.zip DatasetTemplate
+    zip -x '*.gitkeep' -x '*/curation.xlsx' -x '*/aux*' -r DatasetTemplate.zip DatasetTemplate
     mv DatasetTemplate.zip ${CLEANROOM}
     popd
     rm -rf ${CLEANROOM}/sparc-curation
