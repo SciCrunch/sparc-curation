@@ -339,9 +339,14 @@ using the templates greater than 3.0.0.
   event of conflicts the behavior of SDS validators is unspecified.
   Validators can do whatever they want to resolve, ignore, error,
   etc. conflicts. For example, fail immediately, warn and continue,
-  silently give priority to one standard over the other, etc.
-  - Add =Consortium data standard=
-  - Add =Consortium data standard version=
+  silently give priority to one standard over the other, etc.  This
+  section can also be used to report on human curation standards in
+  addition to mechanically checkable standards. So fro example
+  standard for =sparc-curation= with a version =2023-01-01= might be
+  added by the curation team to indicate which version of the curation
+  process was applied to a dataset. @@comment:TODO Do we need/want =Data standard type=?@@
+  - Add =Data standard=
+  - Add =Data standard version=
 - Add =Funding information= section
   - Add =Funding consortium=
   - Add =Funding agency=
