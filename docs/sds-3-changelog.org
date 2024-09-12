@@ -1,3 +1,4 @@
+#+options: ^:{}
 * changelog 2.2.0
 this is 3.0.0 without backward incompatible changes
 
