@@ -27,7 +27,7 @@
   :stems
   (
    :dataset_description
-   (:header col
+   (:header row ; TODO need a test for mismatch
     :cells ; TODO not implemented and not clear this is the best way, probably just watn to append as values
     ; this approach feels too granular, i think we extend :add to require require the row to add to first
     ((("data_standard"         "value_2") "HEAL")

@@ -4475,7 +4475,7 @@ cleaned files at cleaned file paths
 from types import MappingProxyType
 from sparcur.paths import Path
 from sparcur import datasets as dat
-from sparcur.utils import symlink_latest
+from sparcur.utils import symlink_latest, merge_template_stems
 from sparcur.config import auth
 from sparcur.simple.utils import rglob, log
 
@@ -4519,7 +4519,8 @@ def from_path_cleaned_object(path, for_template=False, known_templates=_dmpt):
 def from_file_paths_objects(paths, for_template=False, known_templates=_dmpt):
     if for_template:
         template = known_templates[for_template] if for_template in known_templates else None
-        stems = template['stems'] if 'stems' in template else None
+        tmpl = merge_template_stems(template, known_templates) if template else None  # FIXME this gets run again
+        stems = tmpl['stems'] if 'stems' in tmpl else None
     else:
         stems = None
 
@@ -4574,7 +4575,9 @@ def main(path=Path.cwd(), id=None, time_now=None,
             raise ValueError(
                 'No remote cached data and cleaned_output_path not set. Pass'
                 '--cleaned-output-path=path/to/cleaned-for-this-dataset')
-        log.warning('running in the wild without cached metadata')
+        if not for_template:
+            log.warning('running in the wild without cached metadata')
+
         cleaned_output_path.mkdir(parents=True, exist_ok=True)
     elif not cache.is_dataset():
         raise TypeError('can only run on a single dataset')

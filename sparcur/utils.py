@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import copy
 import base64
 import logging
 import warnings
@@ -980,3 +981,81 @@ class LocId(idlib.Identifier):
 
     def uri_human(self, *args, **kwargs):
         return self.uri_api
+
+
+def merge_template_stems(template, known_templates):
+    # produce an expanded template
+    tmpl = copy.deepcopy(template)
+    try:
+        stems = merge_stems(get_stems(tmpl, known_templates))
+    except Exception as e:
+        msg = f'error in template {template}'
+        raise ValueError(msg) from e  # FIXME error type
+
+    if 'use' in tmpl:
+        tmpl['use-processed'] = tmpl.pop('use')
+
+    tmpl['stems'] = stems
+    return tmpl
+
+
+def get_stems(tmpl, known_templates):
+    uses = [known_templates[t] for t in tmpl['use']] if 'use' in tmpl else []
+    ustems = [s for u in uses for s in get_stems(u, known_templates)]  # FIXME reconvergence and inheritance issues lurking move uses resolution outside
+    _steml = [tmpl['stems']] if 'stems' in tmpl else []
+    return ustems + _steml
+
+def merge_stems(all_stems):
+    out = {}
+    header_types = {}
+    for s in all_stems:
+        for stem, v in s.items():
+            if 'header' not in v:
+                msg = f'missing :header spec {v!r}'
+                raise KeyError(msg)
+
+            if stem not in header_types or v['header'] != header_types[stem]:
+                if stem not in header_types:
+                    header_types[stem] = v['header']
+                else:
+                    msg = f'heterogenous header type?? {header_types[stem]} != {v["header"]}'
+                    raise TypeError(msg)
+
+            if stem not in out:
+                if isinstance(v, list):
+                    # avoid mutation of parent structure
+                    out[stem] = [_ for _ in v]
+                if isinstance(v, dict):
+                    out[stem] = copy.deepcopy(v)  # this is where the deepcopy is needed to prevent :add :header duplication
+                else:
+                    out[stem] = v
+            else:
+                for key, value in v.items():
+                    if key not in out[stem]:
+                        if isinstance(value, list):
+                            # avoid mutation of parent structure
+                            out[stem][key] = [_ for _ in value]
+                        if isinstance(value, dict):
+                            out[stem][key] = copy.deepcopy(value)
+                        else:
+                            out[stem][key] = value
+                    elif isinstance(out[stem][key], list):
+                        out[stem][key].extend(value)
+                    elif key == 'add':  # FIXME implicitly assumes dict
+                        #log.debug(value)
+                        for akey, avalue in value.items():
+                            if akey not in out[stem][key]:
+                                if isinstance(avalue, list):
+                                    # avoid mutation of parent structure
+                                    out[stem][key][akey] = [_ for _ in avalue]
+                                if isinstance(avalue, dict):
+                                    out[stem][key][akey] = copy.deepcopy(avalue)
+                                else:
+                                    out[stem][key][akey] = avalue
+                            else:
+                                out[stem][key][akey].extend(avalue)  # FIXME implicitly assumes list
+                    else:
+                        # last one wins
+                        out[stem][key] = copy.deepcopy(value)
+
+    return out

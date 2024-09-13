@@ -18,7 +18,7 @@ from . import exceptions as exc
 from . import normalization as nml
 from .core import log, logd, HasErrors
 from .paths import Path, PennsieveCache
-from .utils import is_list_or_tuple
+from .utils import is_list_or_tuple, merge_template_stems
 
 ROW_TYPE = object()
 COLUMN_TYPE = object()
@@ -838,74 +838,15 @@ class Tabular(HasErrors):
                              path=self.path):
                 logd.warning(msg)
 
-        def merge_stems(all_stems):
-            out = {}
-            header = None
-            for s in all_stems:
-                for stem, v in s.items():
-                    if stem not in out:
-                        if isinstance(v, list):
-                            # avoid mutation of parent structure
-                            out[stem] = [_ for _ in v]
-                        if isinstance(v, dict):
-                            out[stem] = copy.deepcopy(v)  # this is where the deepcopy is needed to prevent :add :header duplication
-                        else:
-                            out[stem] = v
-                    else:
-                        if 'header' not in v:
-                            msg = f'missing :header spec {v!r}'
-                            raise KeyError(msg)
-
-                        if v['header'] != header:
-                            if header is None:
-                                header = v['header']
-                            else:
-                                msg = f'heterogenous header type?? {header} != {v["header"]}'
-                                raise TypeError(msg)
-
-                        for key, value in v.items():
-                            if key not in out[stem]:
-                                if isinstance(value, list):
-                                    # avoid mutation of parent structure
-                                    out[stem][key] = [_ for _ in value]
-                                if isinstance(value, dict):
-                                    out[stem][key] = copy.deepcopy(value)
-                                else:
-                                    out[stem][key] = value
-                            elif isinstance(out[stem][key], list):
-                                out[stem][key].extend(value)
-                            elif key == 'add':  # FIXME implicitly assumes dict
-                                #log.debug(value)
-                                for akey, avalue in value.items():
-                                    if akey not in out[stem][key]:
-                                        if isinstance(avalue, list):
-                                            # avoid mutation of parent structure
-                                            out[stem][key][akey] = [_ for _ in avalue]
-                                        if isinstance(avalue, dict):
-                                            out[stem][key][akey] = copy.deepcopy(avalue)
-                                        else:
-                                            out[stem][key][akey] = avalue
-                                    else:
-                                        out[stem][key][akey].extend(avalue)  # FIXME implicitly assumes list
-                            else:
-                                # last one wins
-                                out[stem][key] = copy.deepcopy(value)
-
-            return out
-
-        def get_stems(tmpl):
-            uses = [known_templates[t] for t in tmpl['use']] if 'use' in tmpl else []
-            ustems = [s for u in uses for s in get_stems(u)]  # FIXME reconvergence and inheritance issues lurking move uses resolution outside
-            _steml = [tmpl['stems']] if 'stems' in tmpl else []
-            return ustems + _steml
-
         if for_template:
             template = known_templates[for_template] if for_template in known_templates else None
+            tmpl = merge_template_stems(template, known_templates)
             if template:
-                stems = merge_stems(get_stems(template))  # FIXME stupid to recompute this for every file
+                #stems = merge_stems(get_stems(template))  # FIXME stupid to recompute this for every file
+                stems = tmpl['stems']
 
                 #import pprint
-                #log.debug(f'{self.path}\n' + pprint.pformat(stems))
+                #log.info(f'{self.path}\n' + pprint.pformat(stems))
                 if self.path.stem not in stems:
                     msg = f'cleaning for {for_template} template not supported for {self.path.name}'
                     raise NotImplementedError(msg)
