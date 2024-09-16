@@ -4520,7 +4520,7 @@ def from_file_paths_objects(paths, for_template=False, known_templates=_dmpt):
     if for_template:
         template = known_templates[for_template] if for_template in known_templates else None
         tmpl = merge_template_stems(template, known_templates) if template else None  # FIXME this gets run again
-        stems = tmpl['stems'] if 'stems' in tmpl else None
+        stems = None if tmpl is None or 'stems' not in tmpl else tmpl['stems']
     else:
         stems = None
 

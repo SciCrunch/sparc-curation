@@ -905,6 +905,9 @@ class Tabular(HasErrors):
                     sel.activeCell = 'A1'
                     sel.sqref = 'A1'
 
+                # make sure the view is reset as well
+                _sheet.sheet_view.topLeftCell = 'A1'
+
         return sheet, wb, sparse_empty_rows
 
     def xlsx2(self):

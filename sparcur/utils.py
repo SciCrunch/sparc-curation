@@ -985,6 +985,9 @@ class LocId(idlib.Identifier):
 
 def merge_template_stems(template, known_templates):
     # produce an expanded template
+    if template is None:
+        return
+
     tmpl = copy.deepcopy(template)
     try:
         stems = merge_stems(get_stems(tmpl, known_templates))
