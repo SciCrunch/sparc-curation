@@ -902,9 +902,25 @@ class Tabular(HasErrors):
                 _sheet.sheet_view.zoomScale = None
                 # make sure top left is the active cell accounting for weird multi selection cases
                 for sel in _sheet.views.sheetView[0].selection:
-                    sel.activeCell = 'A1'
-                    sel.sqref = 'A1'
+                    if sel.pane != 'topLeft':
+                        etlc = _sheet.sheet_view.pane.topLeftCell
+                        if sel.pane == 'topRight':
+                            tlc = 'B1'
+                        elif sel.pane == 'bottomLeft':
+                            tlc = 'A2'
+                        else:
+                            msg = f'unknown pane {sel.pane}'
+                            raise NotImplementedError(msg)
 
+                        _sheet.sheet_view.pane.topLeftCell = tlc
+                        sel.activeCell = tlc
+                        sel.sqref = tlc
+                    else:
+                        sel.activeCell = 'A1'
+                        sel.sqref = 'A1'
+
+                # reset active pane to the one with A1
+                _sheet.sheet_view.pane.activePane = 'topLeft'
                 # make sure the view is reset as well
                 _sheet.sheet_view.topLeftCell = 'A1'
 
