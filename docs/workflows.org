@@ -650,6 +650,22 @@ cp dt_cleaned/*.xlsx DatasetTemplate/
 
 Commit any changes and push to master.
 
+Generate diffs against the previous tag and then view with =less=.
+#+begin_src bash :results none
+pushd ~/git/CLEANROOM/sparc-curation/resources/DatasetTemplate
+[ -d ../csvs ]  || mkdir ../csvs
+[ -d ../diffs ] || mkdir ../diffs
+lasttag=$(git tag --sort=taggerdate --list dataset-template* | tail -n1)
+dtver="${lasttag##*-}"
+for f in $(ls *.xlsx); do
+git show dataset-template-3.0.0:resources/DatasetTemplate/"${f}" | xlsx2csv - ../csvs/"${f%%.*}-${dtver}.csv"
+xlsx2csv "${f}" ../csvs/"${f%%.*}.csv"
+git diff --word-diff --word-diff-regex=. --no-index --color=always -- ../csvs/"${f%%.*}-${dtver}.csv" ../csvs/"${f%%.*}.csv" > ../diffs/"${f%%.*}.patch"
+done
+# less ../diffs/*
+popd
+#+end_src
+
 #+begin_src bash
 make-template-zip () {
     template_type="${1}"
