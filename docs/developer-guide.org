@@ -4573,7 +4573,7 @@ def main(path=Path.cwd(), id=None, time_now=None,
     if cache is None:
         if cleaned_output_path is None:
             raise ValueError(
-                'No remote cached data and cleaned_output_path not set. Pass'
+                'No remote cached data and cleaned_output_path not set. Pass '
                 '--cleaned-output-path=path/to/cleaned-for-this-dataset')
         if not for_template:
             log.warning('running in the wild without cached metadata')
