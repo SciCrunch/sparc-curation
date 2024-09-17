@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 67b953f938c98b111bd3685941cb2bf9c3ae7e90cd057bca2ff9ddbc4041bcd5; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: d4b052f92395a39d4b25a8a85dab85159c8e4f3ce8496d0629706640f820eed9; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -6676,6 +6676,21 @@ RETURN p1, p2, p3, p4, p5, p6
 (when ow-do-packages-emacs
   (ow-enable-use-package nil '(vterm zmq));)
   (let ((gt26 (>= emacs-major-version 26)))
+    (let ((no-byte-compile t))
+      (ow-use-packages
+       (org
+        ;;:load-path "~/git/NOFORK/org-mode/lisp/"
+        :mode ("\\.org\\'" . org-mode)
+        :bind ("<f5>" . ow-babel-eval-closest-block)
+        :init
+        (defvar org-babel-tangle-lang-exts nil) ; XXX temp fix for bad init in ob-python.el and others
+        (org-babel-do-load-languages
+         'org-babel-load-languages
+         `((cypher . t)
+           (sparql . t)
+           (shell . t)
+           (python . t)
+           ,(when gt26 '(jupyter . t)))))))
     (ow-use-packages
      vterm
      csv-mode
@@ -6688,19 +6703,7 @@ RETURN p1, p2, p3, p4, p5, p6
         '((t :foreground "DeepPink" :background unspecified :bold t))
         "Face for pattern struct." :group 'cypher-faces))
      sparql-mode
-     ob-cypher
-     (org
-      :mode ("\\.org\\'" . org-mode)
-      :bind ("<f5>" . ow-babel-eval-closest-block)
-      :init
-      (defvar org-babel-tangle-lang-exts nil) ; XXX temp fix for bad init in ob-python.el and others
-      (org-babel-do-load-languages
-       'org-babel-load-languages
-       `((cypher . t)
-         (sparql . t)
-         (shell . t)
-         (python . t)
-         ,(when gt26 '(jupyter . t))))))))
+     ob-cypher)))
 
 ;; somehow this gets around lexical scope FIXME no not really have to
 ;; modify the elvs
