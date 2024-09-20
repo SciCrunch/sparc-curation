@@ -77,12 +77,16 @@ class IdentityJsonType:
         return blob
 
 
+# FIXME issues with quantity conversion handling
+register_type(None, 'less-than')
+register_type(None, 'greater-than')
 def fromJson(blob, *,
              # nct is a hack around the fact that external
              # data can provide a column called type and we
              # do not currently have a way to indicate that
              # fromJson should treat those subtrees specially
              _no_convert_type=False,
+             _no_convert_type_transitive=False,
              _no_convert_type_keys=('subjects', 'samples')):
     def nitr(value):
         try:
@@ -99,7 +103,7 @@ def fromJson(blob, *,
                 type_name = blob['system']
             elif t in ('quantity', 'range'):
                 type_name = t
-            elif _no_convert_type:
+            elif _no_convert_type or _no_convert_type_transitive:
                 type_name = None
             elif nitr(t):
                 breakpoint()
@@ -125,12 +129,14 @@ def fromJson(blob, *,
 
         return {k: v
                 if k == 'errors' or k.endswith('_errors') else
-                fromJson(v, _no_convert_type=(_no_convert_type or
-                                              type(v) == list and
-                                              k in _no_convert_type_keys))
+                fromJson(v, _no_convert_type=(type(v) == list and  # dicts do not pass nct down
+                                              k in _no_convert_type_keys),
+                         _no_convert_type_transitive=_no_convert_type_transitive)
                 for k, v in blob.items()}
 
     elif isinstance(blob, list):
+        # lists do pass nct down because nct only applies to keys so if a key
+        # refers to a list of objects of that type then a single level is passed down
         return [fromJson(_, _no_convert_type=_no_convert_type) for _ in blob]
     else:
         return blob

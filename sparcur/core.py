@@ -235,15 +235,13 @@ class OntTerm(OTB, OntId):
 OntTerm._sinit()
 OntTerm.set_repr_args('curie', 'label')
 
-class UnmappedTerm:
-
-    def __init__(self, value):
-        self._value = value
+class UnmappedTerm(str):
 
     def asDict(self):
         return {
             'type': self.__class__.__name__,
-            'label': self._value,}
+            'label': self,
+        }
 
     @classmethod
     def fromJson(cls, blob):
@@ -251,7 +249,7 @@ class UnmappedTerm:
         return cls(blob['label'])
 
     def __repr__(self):
-        return f'{self.__class__.__name__}({self._value!r})'
+        return f'{self.__class__.__name__}({super().__repr__()})'
 
 
 class HasErrors:
