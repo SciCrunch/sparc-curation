@@ -1461,8 +1461,6 @@ elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 ancsl = list(ocg[:apinat.nextChainStartLevels:])
 anext = list(ocg[:apinat.next:])
 
-#GO:0110165
-#ILX:0776228
 _soma = OntId('NLX:154731').u
 somas = [s for s in ocg[:apinat.ontologyTerms:_soma] if (s, rdf.type, elements.Lyph) in ocg]
 soma_links = set()
@@ -1486,14 +1484,15 @@ def soma_link_edges(soma):
 soma_edges = [pair for s in somas for pair in soma_link_edges(s)]
 
 
-def get_neuron(u):
+def get_neuron(link):
     # FIXME this requires somas
-    for group in ocg[u:apinat.seedIn:]:
-        for ot in ocg[group:apinat.ontologyTerms:]:
-            return ot
+    for lyph in ocg[link:apinat.conveyingLyph:]:
+        for group in ocg[lyph:apinat.seedIn:]:
+            for ot in ocg[group:apinat.ontologyTerms:]:
+                return ot
 
 
-seeds = {e: neuron for e in somas if (neuron := get_neuron(e))}  # FIXME right now we always seed on soma, but that is not required
+seeds = {l: neuron for l in soma_links if (neuron := get_neuron(l))}  # FIXME right now we always seed on soma, but that is not required
 
 
 link_lookup = {}
@@ -1571,14 +1570,15 @@ def link_to_ont_region_layer(link):
 
     if cl is None:
         log.error(f'something has gone very wrong {link}')
+        link_lookup[link] = nord.rl(region=rdflib.URIRef(f'EXTREME-ERROR-{link}'))
 
 
 neuron_parts = {
 OntId('SAO:1770195789').u,  # axon
 OntId('SAO:1211023249').u,  # dendrite or sensory axon
 OntId('SAO:280355188').u,  # regional part of axon
-OntId('SAO:420754792').u  # regional part of dendrite
-# OntId('NLX:154731').u  # soma i think? not in scigraph
+OntId('SAO:420754792').u,  # regional part of dendrite
+_soma,
 }
 def filter_for_neuron_parts(link):
     for cl in ocg[link:apinat.conveyingLyph:]:
@@ -1606,7 +1606,20 @@ h_split_nst = [nord.adj_to_nst(a) for a in h_split_adj]
 # h_adj = [(link_lookup[a], link_lookup[b]) for a, b in l_adj]  # can't do this only produces 52 distinct graphs
 # h_nst = nord.adj_to_nst(h_adj)
 
-[(seeds[n[0]] if n[0] in seeds else None, n) for n in l_split_nst]
+nrns = [set(e for es in al for e in es) for al in l_split_adj]
+def get_seed_neuron(ns):
+    key = ns & set(seeds)
+    assert len(key) <= 1, len(key)
+    if key:
+        return seeds[next(iter(key))]
+
+
+nrn_index = [get_seed_neuron(ns) for ns in nrns]
+
+results = list(zip(nrn_index, h_split_nst))
+
+# TODO export to partial orders file for comparison
+# a quick spot check suggests that there are issues
 
 #+end_src
 
