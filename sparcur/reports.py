@@ -346,6 +346,11 @@ class Report:
         'protc:symbolic-output',
     )
 
+    def all_anno_tags(self):
+        for tag in self._all_anno_tags:
+            # FIXME hack around broken anno_tags impl
+            self.anno_tags(tag)
+
     def all(self):
         #self.access()  # must be on live data
         # TODO add a prov report for when this was last run etc.

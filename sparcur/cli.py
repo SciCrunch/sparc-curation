@@ -20,6 +20,7 @@ Usage:
     spc report   terms   [hubmap hubmap-anatomy]    [options]
     spc report   overview [<path>...]               [options]
     spc report   anno-tags <tag>...                 [options]
+    spc report   all-anno-tags                      [options]
     spc report   [samples-values subjects-values]   [options]
     spc report   [access filetypes pathids errors]  [options]
     spc report   [completeness keywords subjects]   [options]
