@@ -1437,6 +1437,9 @@ Super manual curation, identifier sync, review, merge, commit, push, etc.
 
 # FIXME partial orders process is not documented here
 # for good reason, it currently requires building scigraph and querying
+The current workflow used to produce [file:~/git/NIF-Ontology/ttl/generated/neurons/apinat-partial-orders.ttl]
+is to run [[file:./queries.org::py-nbr-1]] and then [[file:./queries.org::apinat-add-partial-orders]].
+
 Below is the start of some code to extract the partial orders without
 having to load scigraph first.
 #+begin_src jupyter-python :session pys
