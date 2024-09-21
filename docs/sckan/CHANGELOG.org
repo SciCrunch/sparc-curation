@@ -16,6 +16,16 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2024-09-21
+- NPO NLP all neurons =rdfs:label= is now =prefix id=.
+  The old =rdfs:label= is now under =ilxtr:origLabel= and =skos:prefLabel=.
+- NPO NLP use =ilxtr:hasAxonLeadingToSensorySubcellularElementIn= for neurons with sensory endings.
+- NPO partial orders corrected for splen-1, sdcol-f, and sdcol-o
+- NPO NLP various other fixes
+- ApiNATOMY splen-1 fix ontology term and layer inversion issues
+- ApiNATOMY sdcol-f fix ontology term and layer inversion issues
+- ApiNATOMY sdcol-o fix layer inversion issue
+- Include terms from partial orders in npo.ttl.
 * RC 2024-08-29
 - NPO swglnd fix forwardConnectionPhenotype axioms
 * RC 2024-08-28
