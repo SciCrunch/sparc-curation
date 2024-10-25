@@ -12,7 +12,7 @@ def dataset_status(conn, rawid):
     out['state'] = state_lut[int(out['state'])]
     f = out['failed']
     out['failed'] = f.decode() if f else False
-    out['sheet'] = int(out['sheet'])
+    out['sheet'] = None if out['sheet'] is None else int(out['sheet'])
     out['pipeline_internal_version'] = None if out['verpi'] is None else int(out.pop('verpi'))
     if out['updated'] is not None:
         out['updated'] = out['updated'].decode()
