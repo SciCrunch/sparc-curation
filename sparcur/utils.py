@@ -37,6 +37,33 @@ _ilog.addHandler(log.handlers[0])
 if hasattr(sys, 'pypy_version_info'):
     warnings.filterwarnings('ignore', module='.+protobuf.+')
 
+
+def debug_requests():
+    import requests
+    import logging
+    import http.client
+    root_log = logging.getLogger()
+    root_log.addHandler(log.handlers[0])
+    root_log.setLevel(logging.DEBUG)
+    requests_log = logging.getLogger('requests.packages.urllib3')
+    requests_log.addHandler(log.handlers[0])
+    requests_log.setLevel(logging.DEBUG)
+    requests_log.propagate = True
+    httpclient_log = logging.getLogger('http.client')
+    httpclient_log.addHandler(log.handlers[0])
+    httpclient_log.setLevel(logging.DEBUG)
+    httpclient_log.propagate = True
+
+    def patch_log(*args):
+        httpclient_log.log(logging.DEBUG, ' '.join(args))
+
+    http.client.print = patch_log
+    http.client.HTTPConnection.debuglevel = 1
+
+
+#debug_requests()
+
+
 __type_registry = {None: None}
 def register_type(cls, type_name):
     if type_name in __type_registry:
