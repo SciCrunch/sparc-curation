@@ -2254,6 +2254,9 @@ switch to that"
         [() *confirmed*]
         [(value) (set! *confirmed* value)]))
 
+    (define (dataset-push-cache-dir)
+      ; XXX this must always match the python conventions
+      (build-path (path-cache-push) (id-uuid dataset)))
     (define (push-dir)
       ; XXX this must always match the python conventions
       (build-path (path-cache-push) (id-uuid dataset) (updated-transitive) (push-id)))
@@ -2283,6 +2286,22 @@ switch to that"
            (not (string=? first-present "done.sxpr"))
            ; FIXME pretty sure I need to inverte the order of build-path and resolve-relative-path
            (resolve-relative-path (build-path path-dut-latest first-present))))
+
+    (define (get-latest-push-path base-path)
+      ; XXX check that base-path exists outside this function
+      ; TODO make sure to handle cases where the various parent paths do not exist beyond base-path
+      (define updated-cache-path (last (directory-list base-path #:build? #t)))
+      (last (directory-list updated-cache-path #:build? #t)))
+    (define (cb-debug o e)
+      (define dpcd (dataset-push-cache-dir))
+      (when (directory-exists? dpcd)
+        (let ([latest-path (get-latest-push-path dpcd)])
+          (xopen-path latest-path))))
+    (define button-debug-folder
+      (new button%
+           [label "Debug"]
+           [callback cb-debug]
+           [parent hp]))
 
     (define button-select-all "TODO") ; much easier than having to click scroll shift click etc. for thouands of files
     (define (cb-refresh o e)
