@@ -2,7 +2,7 @@
 
 import sys
 from augpathlib.meta import isoformat
-from sparcur.sparcron import get_redis_conn
+from sparcur.sparcron import get_redis_conn, _none
 from datetime import timedelta
 from dateutil import parser as dateparser
 from sparcur.utils import PennsieveId
@@ -12,9 +12,24 @@ from sparcur.sparcron.core import (
     mget_all,
     export_single_dataset
 )
-from sparcur.sparcron.status import dataset_fails
+from sparcur.sparcron.status import dataset_fails, dataset_running
 
 us = timedelta(microseconds=1)
+
+
+def reset_dataset(conn, dataset):
+    """ sometimes datasets get stuck """
+    # somehow datasets get stuck running, possibly because their
+    # runner exits without decrementing sid or something?
+    dataset_id = dataset.id
+    updated, qupdated, *_, rq, running, queued = mget_all(dataset_id)
+    sid = 'state-' + dataset_id
+    # if we only reset to queued then for some reason the logic in the
+    # main loop will not restart the export, possibly due to matching
+    # updated dates or something? therefore we reset all the way to none
+    conn.set(sid, _none)
+    # if the dataset is still in the todo list at this point then
+    # it should automatically be rerun in the next loop
 
 
 def rerun_dataset(conn, dataset):
