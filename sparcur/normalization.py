@@ -526,7 +526,19 @@ class NormValues(HasErrors):
             if isinstance(key, str) and hasattr(self, key):
 
                 self._context = rec, key, path  # FIXME lol evil
-                out = getattr(self, key)(thing)
+                try:
+                    out = getattr(self, key)(thing)
+                except Exception as e:
+                    msg = f'Error normalizing: {thing!r}'
+                    if self.addError(
+                            msg,
+                            pipeline_stage=self.__class__.__name__,
+                            # XXX FIXME sometimes it might be our error
+                            blame='submission',):
+                        logd.exception(e)
+
+                    out = thing
+
                 delattr(self, '_context')
 
                 if isinstance(out, GeneratorType):
