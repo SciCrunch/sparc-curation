@@ -160,14 +160,18 @@ class Integrator(PathData, OntologyData):
                 #if hasattr(s, 'byCol'):
                     #delattr(s, 'byCol')
 
+        def fake_organ(award):
+            msg = 'Are we even using this anymore?'
+            raise NotImplementedError(msg)
+
         if cls.no_google:
-            cls.organ = lambda award: None
+            cls.organ = fake_organ
 
         if local_only:
-            cls.organ = lambda award: None
+            cls.organ = fake_organ
             cls.member = lambda first, last: None
         else:
-            cls.organ = OrganData()
+            cls.organ = fake_organ
             if hasattr(State, 'member'):
                 cls.member = State.member
             else:

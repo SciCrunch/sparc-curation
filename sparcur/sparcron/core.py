@@ -1,7 +1,7 @@
 """
 services
 /etc/init.d/rabbitmq start
-/etc/init.d/redis start
+/etc/init.d/redict start
 
 test with
 python -m sparcur.sparcron
@@ -112,7 +112,7 @@ def ensure_caches():
     # make sure that all other values that should
     # be cached from the network are cached
     from sparcur import datasources as d
-    od = d.OrganData()
+    #od = d.OrganData()
 
 
 ensure_caches()
@@ -585,7 +585,10 @@ def diff_sheet(old_s, new_s):
         if did not in old_sheet_ids:
             log.debug(f'new dataset {did}')
             # pretend like it was already in the sheet
-            old_row, _dido = type('FakeRow', (object,), {'values': ['' for _ in new_row]}), did
+            old_row, _dido = type('FakeRow', (object,),
+                                  {'values': ['' for _ in new_row],
+                                   'award_manual': None,
+                                   },), did
         else:
             old_row, _dido = old_s._row_from_index('id', did)
 
