@@ -675,7 +675,12 @@ class Organs(FieldAlignment):
                 cell_species.value = species
 
         except AttributeError as e:
-            row = ['', '', name, id, award, species]  # XXX this was causing index errors
+            r0 = self.row_object(0)
+            cell_award = r0.award()
+            cell_species = r0.species()
+            n_blanks = cell_species.column_index - cell_award.column_index - 1
+            blanks = [''] * n_blanks
+            row = ['', '', name, id, award, *blanks, species]  # XXX this was causing index errors
             # because the columns were not being padded by appendRow
             self._appendRow(row)
 
