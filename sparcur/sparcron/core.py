@@ -48,6 +48,7 @@ from kombu import Queue, Exchange
 from celery import Celery, Task
 from celery.signals import worker_process_init, worker_process_shutdown
 from celery.schedules import crontab
+from pyontutils.utils_fast import logToFile
 
 import sparcur
 from sparcur import exceptions as exc
@@ -508,6 +509,21 @@ def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
         log.critical(f'FAIL: {fid} {updated}')
         conn.set(fid, updated)
         log.exception(e)
+    except Exception as e:
+        with open(logfile, 'at') as logfd:
+            logfd.write('\nunhandled error occured while processing this dataset\n')
+
+        # use the uuid to ensure that if multiple datasets encounter an error
+        # at the same time that they will not try to use the same logger
+        # and wind up logging messages to incorrect files which would induce
+        # all sorts of creeping insanity when trying to debug
+        flog = log.getChild(did.uuid)
+        handler = logToFile(flog, logfile)
+        try:
+            flog.critical(f'ERROR: {fid} {updated}')
+            flog.exception(e)
+        finally:
+            flog.removeHandler(handler)
 
 
 @cel.task
