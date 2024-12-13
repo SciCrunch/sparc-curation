@@ -1423,6 +1423,20 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (cb-upload-button-show-and-raise o e)
   (cb-toggle-upload o e #:show? #t))
 
+(define (cb-toggle-download o e #:show? [show? #f])
+  ; TODO detect when an actual quite is run
+  ; FIXME toggling this via button when the window is open is extremely confusing
+  ; it should probably raise the window in that case?
+  (let*-values
+      ([(new? frame-download) (get-frame-download! (current-dataset))]
+       [(do-show?) (or show? (not (send frame-download is-shown?)))])
+    (frame-to-front frame-download)
+    (when (and do-show? (or new? (not (send frame-download updated-once?))))
+      (send frame-download update))))
+
+(define (cb-download-button-show-and-raise o e)
+  (cb-toggle-download o e #:show? #t))
+
 (define (cb-refresh-dataset-metadata obj event)
   (thread
    (thunk ; FIXME text-search-box is a free variable
@@ -2047,6 +2061,20 @@ switch to that"
 
 (make-button-upload-changes panel-validate-mode)
 
+(define all-button-download-manager '())
+(define (make-button-download-manager parent)
+  (define butt
+    (new (tooltip-mixin button%)
+         [label "Download"]
+         [callback cb-download-button-show-and-raise]
+         ;[tooltip "Shortcut C-d"]
+         ; TODO separate button for the convert use case?
+         [parent parent]))
+  (set! all-button-download-manager (cons butt all-button-download-manager)))
+
+#; ; TODO not quite ready yet
+(make-button-download-manager panel-validate-mode)
+
 #; ; too esoteric
 (define button-open-export-folder (new button%
                                        [label "Open Export"]
@@ -2082,7 +2110,7 @@ switch to that"
 (define (make-button-download-all-files parent)
   (define butt
     (new (tooltip-mixin button%)
-         [label "Download"]
+         [label "Download all"]
          [tooltip "Download all files"]
          [tooltip-delay 100]
          [callback cb-download-all-files]
@@ -2546,6 +2574,197 @@ switch to that"
                 fu))])
     ; TODO remove from hash on close probably? the workflow is a bit different
     (values (not hr-frame-upload) frame-upload)))
+
+;; download
+
+(define (set-paths-view! list-box paths)
+  (define -selected (send list-box get-selections)) ; FIXME selections that get filtered out are forgotten!
+  (define selected (map (λ (i) (send list-box get-data i)) (if -selected -selected '())))
+  (println selected)
+  (send list-box current-paths-view paths)
+  (define sorted paths)
+  (send/apply list-box set (apply map list (map (λ (p) (list "???" p)) sorted)))
+  (for ([p sorted]
+        [n (in-naturals)])
+    (send list-box set-data n p)) ; TODO more data
+  (let ([current-paths-index
+         (for/list ([one-selected selected])
+           (index-of sorted one-selected
+                     (lambda (element target) ; struct id changes so eq? by itself fails
+                       (println (list element target))
+                       (and element target (string=? element target)))))])
+    (when current-paths-index
+      (for ([index current-paths-index])
+        (when index ; FIXME TODO need to stash previously selected and restore ?
+            (send list-box select index))))))
+
+(define (cb-paths-selection o e)
+  (define button-do-download (send o download-button))
+  (send button-do-download enable (not (null? (send o get-selections)))))
+
+(define (match-paths text paths)
+  "given text return paths that match"
+  (if text
+      (let* ([downcased-text (string-downcase text)]
+             [matches (for/list ([p paths] #:when (or (string-contains?  p text))) p)])
+        (if (null? matches)
+            paths
+            matches))
+      paths))
+
+(define (cb-search-paths obj e)
+  (define text (string-trim (send obj get-value)))
+  (define list-box (send obj list-box))
+  (define (current-paths) (send list-box current-paths))
+  (define (current-paths-view) (send list-box current-paths-view))
+  (define search-semaphore (send obj search-semaphore))
+  (thread
+   (thunk
+    ; adding this helps reduce the number of calls to set-datasets-view!
+    ; and the semaphore allows the sleep time to be short enough that we
+    ; don't have to worry about weird ordering issues
+    (sleep 0.08)
+    (call-with-semaphore
+     search-semaphore
+     (thunk
+      (let ([wat (string-trim (send obj get-value))])
+        ; don't run this if the text has changed in the other thread
+        ; without this you get non deterministic behavior when typing
+        ; and sometimes the shorter result will supplant the long
+        (if (= 0 (string-length text))
+            (when (not (equal? (current-paths) (current-paths-view)))
+              (set-paths-view! list-box (current-paths)))
+            (let ([matching (match-paths text (current-paths))])
+              (when (string=? text wat)
+                (unless (or (null? matching)
+                            (eq? matching (or (current-paths-view) (current-paths))))
+                  (set-paths-view! list-box matching)
+                  (when (= (length matching) 1)
+                    (send list-box set-selection 0)
+                    (cb-paths-selection list-box #f))))))))))))
+
+(define frame-download%
+  (class frame%
+    (init dataset)
+    (define update-semaphore (make-semaphore 1))
+    (super-new)
+    (rename-super [super-on-subwindow-char on-subwindow-char])
+    (define/override (on-subwindow-char receiver event)
+      (super-on-subwindow-char receiver event)
+      (send keymap handle-key-event receiver event))
+    (define/public (update)
+      (thread
+       (thunk
+        (call-with-semaphore
+         update-semaphore
+         (thunk
+          (dynamic-wind
+            (thunk
+             (send button-do-download enable #f))
+            (thunk ; nothing going on in here yet
+             "TODO")
+            (thunk
+             (send button-do-download enable #t))))))))
+    #|
+    the layout we want for this is probably search box at the top or the bottom
+    that will do substring filtering on the contents of the listbox
+
+    then the listbox with all the possible paths and their status status to the left
+
+    then to the right of the search box a button that says download but on
+    |#
+
+    (define list-box
+      (new
+       (class list-box% (super-new)
+         (define *current-paths* #f)
+         (define *current-paths-view* #f)
+         (define/public current-paths
+           (case-lambda
+             [() *current-paths*]
+             [(value) (set! *current-paths* value)]))
+         (define/public current-paths-view
+           (case-lambda
+             [() *current-paths-view*]
+             [(value) (set! *current-paths-view* value)]))
+         (define/public (download-button) button-do-download)
+         )
+       [label ""]
+       [font (make-object font% 10 'modern)]
+       [choices
+        (if #f ;'test
+            '("path/to/test/1"
+              "path/to/test/2"
+              "path/to/test/3"
+              "path/to/test/4"
+              "path/to/test/5")
+            '())]
+       [columns '("status" "path")]
+       [style '(extended column-headers clickable-headers)]
+       [callback cb-paths-selection]
+       [parent this]))
+    (send* list-box
+      (set-column-width 0 60 20 120)
+      (set-column-width 1 300 120 1200))
+    ;(define (cb-selection o e))
+    (let ([curps '("hello" "world" "how" "are" "you")])
+      (send list-box current-paths curps)
+      (send list-box current-paths-view curps))
+    (define hp
+      (new horizontal-panel%
+           [stretchable-height #f]
+           [alignment '(right center)]
+           [parent this]))
+
+    (define text-search-box
+      ; text box to make it easier to paste in identifiers or titles and
+      ; find a match and view it
+      (new (class text-field% (super-new)
+             (define *list-box* #f)
+             (define/public (search-semaphore) (make-semaphore 1))
+             (define/public list-box
+               (case-lambda
+                 [() *list-box*]
+                 [(value) (set! *list-box* value)])))
+           [label ""]
+           [callback cb-search-paths]
+           [parent hp]))
+
+    (send text-search-box list-box list-box)
+
+    (define (cb-do-download o e)
+      ; TODO define this workflow and states so that we don't try to double download
+      ; the full list of files to be downloaded needs to be here, and we will need
+      ; a file watcher or something to know when they are actually done or we need
+      ; the ability to check the status of just the downloading files, or other
+      ; files in the event that e.g. i use spc fetch directly etc. there are more issues
+      ; to work through here
+      #f)
+    (define button-do-download
+      (new button%
+           [label "Download"]
+           [callback cb-do-download]
+           [enabled #f]
+           [parent hp]))
+    (set-paths-view! list-box (send list-box current-paths-view))))
+
+(define frame-downloads (make-hash))
+(define (get-frame-download! dataset)
+  (let* ([uuid (id-uuid dataset)]
+         [hr-frame-download (hash-ref frame-downloads uuid #f)]
+         [frame-download
+          (if hr-frame-download
+              hr-frame-download
+              (let ([fu
+                     (new frame-download%
+                          [dataset dataset]
+                          [width 640]
+                          [height 480]
+                          [label (format "download for ~a" (id-uuid dataset))])])
+                (hash-set! frame-downloads (id-uuid dataset) fu)
+                fu))])
+    ; TODO remove from hash on close probably? the workflow is a bit different
+    (values (not hr-frame-download) frame-download)))
 
 ;; reports
 
