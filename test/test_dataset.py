@@ -55,6 +55,8 @@ class Helper:
             'dataset-template-1.2.3',
             'dataset-template-2.0.0',
             'dataset-template-2.1.0',
+            'dataset-template-3.0.0',
+            'dataset-template-3.0.1',
             'HEAD',)
 
     _cry_base = None
@@ -63,7 +65,7 @@ class Helper:
         if temp_path.exists():
             temp_path.rmtree()
 
-        temp_path.mkdir()
+        temp_path.mkdir(parents=True)
 
         self.file = template_root / self.template
 

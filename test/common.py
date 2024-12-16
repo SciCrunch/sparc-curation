@@ -75,7 +75,8 @@ test_organization = 'N:organization:ba06d66e-9b03-4e3d-95a8-649c30682d2d'
 test_dataset = 'N:dataset:aa859fe9-02d0-4518-981b-012ef8f35c34'
 
 onerror = onerror_windows_readwrite_remove if os.name == 'nt' else None
-atexit.register(lambda : temp_path_base.rmtree(onerror=onerror))
+atexit.register(lambda : (not temp_path_base.exists()
+                          or temp_path_base.rmtree(onerror=onerror)))
 
 SKIP_NETWORK = ('SKIP_NETWORK' in os.environ or
                 'FEATURES' in os.environ and 'network-sandbox' in os.environ['FEATURES'])
