@@ -1958,7 +1958,7 @@ class DatasetDescriptionFilePath(ObjectPath):
 
 
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']
-_props2 = sc.SamplesFileSchema.schema['properties']['samples']['items']['properties']
+_props2 = sc.SampleExportSchema._schema['properties']
 _props3 = sc._software_schema['items']['properties']
 _props4 = sc.PerformancesSchema.schema['properties']['performances']['items']['properties']
 _nsffes = [k for k, v in chain(_props.items(), _props2.items(), _props3.items(), _props4.items())

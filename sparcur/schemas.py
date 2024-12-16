@@ -1698,7 +1698,7 @@ class SubjectsSchema(JSONSchema):
 
 
 class SampleExportSchema(JSONSchema):
-    schema = {
+    _schema = {
         'type': 'object',
         'jsonld_include': {'@type': ['sparc:Sample', 'owl:NamedIndividual']},
         '': [{'context_runtime': [
@@ -1710,7 +1710,7 @@ class SampleExportSchema(JSONSchema):
                  (lambda uri_api: {'@id': uri_api + '/samples/',
                                    '@prefix': True}),
                  '#/@context/samples']}],
-        'required': ['sample_id', 'subject_id'],
+        'required': ['sample_id'],
         'properties': {
             'sample_id': {'type': 'string',
                           'pattern': fs_safe_identifier_pattern,
@@ -1739,6 +1739,11 @@ class SampleExportSchema(JSONSchema):
                                           #'@type': '@id',
                                           #'@context': {'@base': f'{base}samples/'}}
                             },
+            'was_derived_from': {'type': 'array',
+                                 'minItems': 1,
+                                 'items': {'type': 'string',  # XXX must reference another subject id
+                                           'pattern': fs_safe_identifier_pattern,},
+                                 },
             'specimen': {'type': 'string',
                          },  # what are we expecting here?
             'specimen_anatomical_location': {'oneOf':
@@ -1762,6 +1767,13 @@ class SampleExportSchema(JSONSchema):
                                            },
             **subsam_common_properties
         },}
+
+    schmea = {'allOf': [
+        {'anyOf': [
+            {'required': ['subject_id'],},
+            {'required': ['was_derived_from'],},
+        ]},
+        _schema]}
 
 
 class SamplesFileExportSchema(JSONSchema):
