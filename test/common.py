@@ -184,18 +184,26 @@ for root in ds_roots:
     log.debug(rp)
     mk_required_files(rp)  # TODO all variants of missing files
 
-dpie_path = project_path / 'dataset-pie'
-if not dpie_path.exists():
-    dpie_path.mkdir()
-    dpie_path.setxattrs(mk_fldr_meta(dpie_path, 'dataset'))  # comment out to find .cache None issues
+for pie_version in ('1.2.3', '2.1.0', '3.0.1'):
+    dpie_path = project_path / f'dataset-pie-{pie_version}'
+    if not dpie_path.exists():
+        dpie_path.mkdir()
+        dpie_path.setxattrs(mk_fldr_meta(dpie_path, 'dataset'))  # comment out to find .cache None issues
 
-for source, target in (('dd-pie.csv', 'dataset_description.csv'),
-                       ('su-pie.csv', 'subjects.csv'),
-                       ('sa-pie.csv', 'samples.csv'),):
-    targ = dpie_path / target
-    (examples_root / source).copy_to(targ)
-    attrs = mk_file_meta(targ)
-    targ.setxattrs(attrs)  # comment out to find .cache None issues
+    for source, target in (('dd-pie.csv', 'dataset_description.csv'),
+                           ('su-pie.csv', 'subjects.csv'),
+                           ('sa-pie.csv', 'samples.csv'),):
+        targ = dpie_path / target
+        (examples_root / source).copy_to(targ)
+        if source.startswith('dd-'):
+            with open(targ, 'rt') as f:
+                newtarg = f.read().replace('1.2.3', pie_version)
+
+            with open(targ, 'wt') as f:
+                f.write(newtarg)
+
+        attrs = mk_file_meta(targ)
+        targ.setxattrs(attrs)  # comment out to find .cache None issues
 
 fbfl = FakeBFLocal(project_path.cache.id, project_path.cache)
 State.bind_blackfynn(fbfl)
