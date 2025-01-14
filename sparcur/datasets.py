@@ -859,6 +859,7 @@ class Tabular(HasErrors):
                 stem_temp = stems[self.path.stem]
                 patterns_rem = stem_temp['remove'] if 'remove' in stem_temp else tuple()
                 adds = stem_temp['add'] if 'add' in stem_temp else tuple()
+                appends = {k: v for k, v in adds.items() if k != 'header'}
                 to_add = adds['header'] if 'header' in adds else tuple()
                 # TODO handle non :header cases which also require append but
                 # can't use max_column or max_row to know where to start
@@ -867,6 +868,8 @@ class Tabular(HasErrors):
                 if row_schema:
                     gen = sheet.rows
                     rem = sheet.delete_rows
+                    max_rec = sheet.max_column
+                    hindex = {python_identifier(c.value.strip()): c.row for c in next(sheet.columns)}
                     def dadd(headers):
                         # FIXME empty cell issues
                         sheet.append([[h] for h in headers])
@@ -874,6 +877,8 @@ class Tabular(HasErrors):
                 else:
                     gen = sheet.columns
                     rem = sheet.delete_cols
+                    max_rec = sheet.max_row
+                    hindex = {python_identifier(r.value.strip()): r.column for r in next(sheet.rows)}
                     def dadd(headers):
                         # FIXME empty cell issues
                         mc = sheet.max_column
@@ -895,6 +900,28 @@ class Tabular(HasErrors):
 
                 if to_add:
                     dadd(to_add)
+
+                if appends:
+                    for header, vals in appends.items():
+                        index = hindex[header]
+                        start_empty = max_rec
+                        for i in range(1, max_rec + 1):
+                            if row_schema:  # FIXME SIGH
+                                cell = sheet.cell(index, i)
+                            else:
+                                cell = sheet.cell(i, index)
+
+                            if cell.value is None or cell.value == '':
+                                start_empty = i
+                                break
+
+                        for v, j in zip(vals, range(start_empty, start_empty + len(vals))):
+                            if row_schema:  # FIXME SIGH
+                                cell = sheet.cell(index, j)
+                            else:
+                                cell = sheet.cell(j, index)
+
+                            cell.value = v
 
             wb.active = 0
             for _sheet in wb.worksheets:
