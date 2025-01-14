@@ -28,14 +28,14 @@
   (
    :dataset_description
    (:header row ; TODO need a test for mismatch
-    :cells ; TODO not implemented and not clear this is the best way, probably just watn to append as values
+    :cells ; TODO not implemented and not clear this is the best way, probably just want to append as values
     ; this approach feels too granular, i think we extend :add to require require the row to add to first
     ((("data_standard"         "value_2") "HEAL")
-     (("data_standard_version" "value_2") "1.0.0")
+     (("data_standard_version" "value_2") "20241001")
      )
     :add
     (:data_standard         ("HEAL"  )
-     :data_standard_version ("1.0.0" )
+     :data_standard_version ("20241001" )
      )
     )
    :subjects
@@ -72,14 +72,32 @@
   :use
   (heal)
   :stems
-  (:subjects
+  ;; TODO dataset description funding consortium cells
+  (:dataset_description
+   (:header row ; TODO need a test for mismatch
+    :add
+    (:data_standard         ("HEAL-REJOIN")
+     :data_standard_version ("20250114")
+     )
+    )
+   :subjects
    (
     :header col
     :add
     (:header
-     ("rejoin subject header 1"
-      "rejoin subject header 2"
-      "rejoin subject header 3"
+     ("Supplier"
+      ; Assessments
+      "Test name"
+      "Assessment Type"
+      "Assessment Measure"
+      "Assessment Score"
+      "Scoring Method Description File"
+      "Assessment Protocol Link"
+      "Comments"
+      ; experimental details
+      "Housing conditions"
+      "Light cycle"
+      "Disease model type"
       ))
     )
    :samples
@@ -87,12 +105,118 @@
     :header col
     :add
     (:header
-     ("rejoin sample header 1"
-      "rejoin sample header 2"
-      "rejoin sample header 3"
+     (
+      ; tissue/sample
+      "Relative laterality"
+      "Anatomical orientation"
+      "Time to fixation"
+      "Storage condition"
+      "Time in storage"
+      "Fixation"
+      ; experimental details
+      "Tracer type"
+      "Tissue storage time"
+      "Clearing protocol type"
+      "Clearing protocol link"
+      ; omics
+      "Storage method"
+      "Time to freezer"
+      "Storage reagent"
+      "Amount of reagent"
+      "Sample size"
+      "RIN"
+      "Method of RIN determination"
+      "Total amount of RNA in ng"
+      "RNA concentration"
+      "RNA purification method"
+      "cDNA library prep kit"
+      "cDNA library prep kit metadata"
+      "cDNA library prep protocol"
+      "cDNA stranded or unstranded"
+      "cDNA primer type"
+      "cDNA adapter sequences"
+      "Sequencing platform"
+      "Sequencer model number" ; XXX changed from Make/model
+      "Sequencer serial number" ; XXX added
+      "Sequencing protocol"
+      "Read type"
+      "Primer sequence"
+      "Adapter sequences"
+      "Number of bp read "
+      "Targeted number of reads per sample"
+      "BAM file name"
+      "Alignment method "
+      "Pipeline version"
+      "Alignment parameters"
+      "Alignment filters"
+      "Reference Sequence "
+      "Gene annotation"
+      "Annotation software "
+      "RNAseq QC metric file"
+      "Percent mapping"
+      "Percent uniquely mapping"
+      "Percent duplication rate"
+      "Percent coding"
+      "Percent intronic"
+      "Percent intergenic"
+      "3 or 5' bias"
+      "Filtering parameter "
+      "Filtering method and normalization"
+      "DV200"
+      "RNA isolation method"
       ))
     )
+   :manifest
+   (:header col
+    :add
+    (
+     "file size bytes"
+     "Instrument ID"
+     "Microscope Manufacturer"
+     "Imaging Device Model"
+     "Imaging Device Type"
+     "Software"
+     "PhysicalSizeX"
+     "PhysicalSizeY"
+     "PhysicalSizeZ"
+     "SizeX"
+     "SizeY"
+     "SizeZ"
+     "NumImages"
+     "SizeC"
+     "SizeT"
+     "ZStep"
+     "Objective ID"
+     "Objective CalibratedMagnification"
+     "Objective Model"
+     "Objective Manufacturer"
+     "LensNA"
+     "Immersion"
+     "ObjectiveSettings RefractiveIndex"
+     "SignificantBits"
+     "Detector Name"
+     "Detector Manufacturer"
+     "Detector ID"
+     "Camera Type"
+     "PMT Manufacturer"
+     "PMT Model"
+     "AcquisitionMode"
+     "Channel ID"
+     "Channel Name"
+     "Channel Fluor"
+     "Channel Color"
+     "Channel EmissionWavelength"
+     "Channel ExcitationWavelength"
+     "NDFilter"
+     "Exposure"
+     "ContrastMethod"
+     "PostProcessing"
+     "CompressionType"
+     "CompressionValue"
+     "Misc"
+     "OrigDisc"
+     ))
    )
-
   )
+
  )
