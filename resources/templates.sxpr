@@ -45,9 +45,7 @@
     :add
     (:header
      ;; XXX potential name collision for :header here but we know what it means
-     ("heal subject header 1"
-      "heal subject header 2"
-      "heal subject header 3"
+     (
       ))
     )
    )
