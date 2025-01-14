@@ -889,10 +889,10 @@ class Tabular(HasErrors):
                 if patterns_rem:
                     rx = re.compile('|'.join(patterns_rem))
                     to_remove = []
-                    for r in gen:
-                        norm_head = python_identifier(r[0].value)
+                    for rec in gen:
+                        norm_head = python_identifier(rec[0].value.strip())
                         if re.match(rx, norm_head):
-                            to_remove.append(r[0].row)
+                            to_remove.append(getattr(rec[0], ('row' if row_schema else 'column')))
 
                     # reversed because must delete from end otherwise the
                     # higher indexes change as you delete lower indexes
