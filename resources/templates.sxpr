@@ -170,54 +170,124 @@
    :manifest
    (:header col
     :add
-    (
-     "file size bytes"
-     "Instrument ID"
-     "Microscope Manufacturer"
-     "Imaging Device Model"
-     "Imaging Device Type"
-     "Software"
-     "PhysicalSizeX"
-     "PhysicalSizeY"
-     "PhysicalSizeZ"
-     "SizeX"
-     "SizeY"
-     "SizeZ"
-     "NumImages"
-     "SizeC"
-     "SizeT"
-     "ZStep"
-     "Objective ID"
-     "Objective CalibratedMagnification"
-     "Objective Model"
-     "Objective Manufacturer"
-     "LensNA"
-     "Immersion"
-     "ObjectiveSettings RefractiveIndex"
-     "SignificantBits"
-     "Detector Name"
-     "Detector Manufacturer"
-     "Detector ID"
-     "Camera Type"
-     "PMT Manufacturer"
-     "PMT Model"
-     "AcquisitionMode"
-     "Channel ID"
-     "Channel Name"
-     "Channel Fluor"
-     "Channel Color"
-     "Channel EmissionWavelength"
-     "Channel ExcitationWavelength"
-     "NDFilter"
-     "Exposure"
-     "ContrastMethod"
-     "PostProcessing"
-     "CompressionType"
-     "CompressionValue"
-     "Misc"
-     "OrigDisc"
-     ))
+    (:header
+     ("file size bytes"
+      "Instrument ID"
+      "Microscope Manufacturer"
+      "Imaging Device Model"
+      "Imaging Device Type"
+      "Software"
+      "PhysicalSizeX"
+      "PhysicalSizeY"
+      "PhysicalSizeZ"
+      "SizeX"
+      "SizeY"
+      "SizeZ"
+      "NumImages"
+      "SizeC"
+      "SizeT"
+      "ZStep"
+      "Objective ID"
+      "Objective CalibratedMagnification"
+      "Objective Model"
+      "Objective Manufacturer"
+      "LensNA"
+      "Immersion"
+      "ObjectiveSettings RefractiveIndex"
+      "SignificantBits"
+      "Detector Name"
+      "Detector Manufacturer"
+      "Detector ID"
+      "Camera Type"
+      "PMT Manufacturer"
+      "PMT Model"
+      "AcquisitionMode"
+      "Channel ID"
+      "Channel Name"
+      "Channel Fluor"
+      "Channel Color"
+      "Channel EmissionWavelength"
+      "Channel ExcitationWavelength"
+      "NDFilter"
+      "Exposure"
+      "ContrastMethod"
+      "PostProcessing"
+      "CompressionType"
+      "CompressionValue"
+      "Misc"
+      "OrigDisc"
+      )))
    )
   )
+
+ :heal-rejoin-omics ; XXX temporary example template
+ (
+  :use
+  (heal)
+  ;(heal-rejoin) ; FIXME TODO should inherit from rejoin ...
+  :stems
+  ;; TODO dataset description funding consortium cells
+  (
+   :dataset_description
+   (:header row ; TODO need a test for mismatch
+    :add
+    (:data_standard         ("HEAL-REJOIN-OMICS")
+     :data_standard_version ("20241108")
+     )
+    )
+   :samples
+   (
+    :header col
+    :add
+    (:header
+     ("Storage method"
+      "Time to freezer"
+      "Storage reagent"
+      "Amount of reagent"
+      "Sample size"
+      "RIN"
+      "Method of RIN determination"
+      "Total amount of RNA in ng"
+      "RNA concentration"
+      "RNA purification method"
+      "cDNA library prep kit"
+      "cDNA library prep kit metadata"
+      "cDNA library prep protocol"
+      "cDNA stranded or unstranded"
+      "cDNA primer type"
+      "cDNA adapter sequences"
+      "Sequencing platform"
+      "Make/model"
+      "Sequencing protocol"
+      "Read type"
+      "Primer sequence"
+      "Adapter sequences"
+      "Number of bp read"
+      "Targeted number of reads per sample"
+      "BAM file name"
+      "Alignment method"
+      "Pipeline version"
+      "Alignment parameters"
+      "Alignment filters"
+      "Reference Sequence"
+      "Gene annotation"
+      "Annotation software"
+      "RNAseq QC metric file"
+      "Percent mapping"
+      "Percent uniquely mapping"
+      "Percent duplication rate"
+      "Percent coding"
+      "Percent intronic"
+      "Percent intergenic"
+      "3 prime or 5 prime bias"
+      "Filtering parameter"
+      "Filtering method and normalization"
+      "DV200"
+      "RNA isolation method"
+      ))
+    )
+   )
+  )
+
 
  )
