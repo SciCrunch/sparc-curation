@@ -142,7 +142,7 @@ def fromJson(blob, *,
                 # do we just ... hope for the best that there are no collisions
                 # and make collisions non-fatal ???
                 msg = (f'TODO fromJson for type {t} '
-                       f'currently not implemented\n{blob}')
+                       f'currently not implemented\n{list(blob.keys())}')
                 log.critical(msg)
                 if False:  # set true if debugging when implementing new types
                     raise NotImplementedError(msg)
@@ -1089,6 +1089,9 @@ def merge_stems(all_stems):
                                 else:
                                     out[stem][key][akey] = avalue
                             else:
+                                if out[stem][key][akey] is None:
+                                    out[stem][key][akey] = []
+
                                 out[stem][key][akey].extend(avalue)  # FIXME implicitly assumes list
                     else:
                         # last one wins
