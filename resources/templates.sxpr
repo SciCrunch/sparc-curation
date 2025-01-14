@@ -167,6 +167,7 @@
     )
    :manifest
    (:header col
+    :remove ("Additional metadata")
     :add
     (:header
      ("file size bytes"
