@@ -1175,6 +1175,11 @@ class BlackfynnRemote(aug.RemotePath):
         elif not self.from_packages and self.is_file():
             # if for some reason we hit this codepath instead of doing
             # a full resync then we will implement this until then ...
+            msg = ('If you hit this during curation upload make sure '
+                   'there are not old copies of metadata files that '
+                   'have the same package id inside the dataset folder. '
+                   'e.g a backup folder like SPARC/{dataset}/backup')
+            log.error(msg)
             raise NotImplementedError('TODO')
 
     def _uri_file(self):
