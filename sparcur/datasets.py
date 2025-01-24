@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 #import openpyxl  # import time hog
 import augpathlib as aug
 from xlsx2csv import Xlsx2csv, SheetNotFoundException, InvalidXlsxFileException
-from terminaltables import AsciiTable
+from terminaltables3 import AsciiTable
 from pyontutils.utils import python_identifier
 from . import schemas as sc
 from . import raw_json as rj

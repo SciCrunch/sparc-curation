@@ -292,7 +292,7 @@ from pyontutils import clifun as clif
 from pyontutils.core import OntResGit
 from pyontutils.utils import UTCNOWISO, subclasses
 from pyontutils.config import auth as pauth
-from terminaltables import AsciiTable
+from terminaltables3 import AsciiTable
 
 from sparcur import reports  # top level
 from sparcur import datasets as dat
