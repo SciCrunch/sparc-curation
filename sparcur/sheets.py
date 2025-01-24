@@ -729,7 +729,7 @@ class Organs(FieldAlignment):
                 m2 = row.modality2()
                 m3 = row.modality3()
                 m4 = row.modality4() if hasattr(row, 'modality4') else None
-                return tuple(_.value for _ in (m1, m2, m3, m4) if _.value)
+                return tuple(_.value for _ in (m1, m2, m3, m4) if _ is not None and _.value)
             except AttributeError as e:
                 raise ValueError(f'issue in {self.name} {self.sheet_name}') from e
 
