@@ -48,23 +48,156 @@
      (
       ))
     )
-   )
-  )
+   :manifest
+   (:header col
+    :remove ("additional_metadata")
+    :add
+    (:header
+     ("file size bytes"
+      "Instrument ID"
+      "Microscope Manufacturer"
+      "Imaging Device Model"
+      "Imaging Device Type"
+      "Software"
+      "PhysicalSizeX"
+      "PhysicalSizeY"
+      "PhysicalSizeZ"
+      "SizeX"
+      "SizeY"
+      "SizeZ"
+      "NumImages"
+      "SizeC"
+      "SizeT"
+      "ZStep"
+      "Objective ID"
+      "Objective CalibratedMagnification"
+      "Objective Model"
+      "Objective Manufacturer"
+      "LensNA"
+      "Immersion"
+      "ObjectiveSettings RefractiveIndex"
+      "SignificantBits"
+      "Detector Name"
+      "Detector Manufacturer"
+      "Detector ID"
+      "Camera Type"
+      "PMT Manufacturer"
+      "PMT Model"
+      "AcquisitionMode"
+      "Channel ID"
+      "Channel Name"
+      "Channel Fluor"
+      "Channel Color"
+      "Channel EmissionWavelength"
+      "Channel ExcitationWavelength"
+      "NDFilter"
+      "Exposure"
+      "ContrastMethod"
+      "PostProcessing"
+      "CompressionType"
+      "CompressionValue"
+      "Misc"
+      "OrigDisc"
+      )))))
  :heal-precision
  (
   :use
   (heal)
   :stems
+  ;; TODO dataset description funding consortium cells
   (:subjects
    (
     :header col
     :add
     (:header
-     ("precision subject header 1"
-      "precision subject header 2"
-      "precision subject header 3"
+     (
+      ;; postmortem
+      "BMI"
+      "Height"
+      "Cause of death"
+      "Ventillator use"
+      "Ventillator time"
+      "Time of death"
+      "Date of death"
+      "Hardy scale"
+      "Cohort"
+      "Smoking frequency"
+      "Smoking duration"
+      "Drinking status"
+      "Smoke type"
+      "Cocaine"
+      "Alcohol (type)"
+      "Alcohol (number)"
+      "Alcohol (period)"
+      "Alcohol (years)"
+      "Alcohol (comments)"
+      "Heroin use"
+      "Heroin history"
+      "Prescription abuse"
+      "Signs of drug abuse"
+      "Drugs for non-medical use"
+      "Sex for money or drugs"
+      "Seizures"
+      "Illicit drug use"
+      "Recreational drug history"
+      ;;"Medical record number"
+      "Major depression"
+      "CMV total Ab"
+      "EBV IgG Ab"
+      "EBV IgM Ab"
+      "HBcAB total"
+      "HCV Ab"
+      "HIV Ab"
+      "ALS"
+      "Alzheimer's or dementia"
+      "Arthritis"
+      "Cancer (5yr)"
+      "Cancer (current)"
+      "Non-metastatic cancer"
+      "HIV"
+      "Heart attack"
+      "Ischemic heart disease"
+      "Heart disease"
+      "Diabetes type I"
+      "Diabetes type II"
       ))
-    ))
+    )
+   :samples
+   (
+    :header col
+    :add
+    (:header
+     (
+      "RNA concentration"
+      "RNA concentration method"
+      "RNA purity"
+      "RNA quality"
+      "RNA quality method"
+      "amputation"
+      "body temp"
+      "collection institution"
+      "cross clamp (first)"
+      "cross clamp (last)"
+      "cross clamp time"
+      "donor status"
+      "fixation method"
+      "fixation temp"
+      "fixation time"
+      "freeze thaw cycles"
+      "freezing method"
+      "freezing temp"
+      "incision time"
+      "ischemic time"
+      "post-mortem interval"
+      "protein concentration"
+      "protein concentration method"
+      "sample collection site"
+      "storage temp"
+      "time of sample collection"
+      )
+     )
+    )
+   )
   )
  :heal-rejoin
  (
@@ -165,57 +298,6 @@
       "RNA isolation method"
       ))
     )
-   :manifest
-   (:header col
-    :remove ("additional_metadata")
-    :add
-    (:header
-     ("file size bytes"
-      "Instrument ID"
-      "Microscope Manufacturer"
-      "Imaging Device Model"
-      "Imaging Device Type"
-      "Software"
-      "PhysicalSizeX"
-      "PhysicalSizeY"
-      "PhysicalSizeZ"
-      "SizeX"
-      "SizeY"
-      "SizeZ"
-      "NumImages"
-      "SizeC"
-      "SizeT"
-      "ZStep"
-      "Objective ID"
-      "Objective CalibratedMagnification"
-      "Objective Model"
-      "Objective Manufacturer"
-      "LensNA"
-      "Immersion"
-      "ObjectiveSettings RefractiveIndex"
-      "SignificantBits"
-      "Detector Name"
-      "Detector Manufacturer"
-      "Detector ID"
-      "Camera Type"
-      "PMT Manufacturer"
-      "PMT Model"
-      "AcquisitionMode"
-      "Channel ID"
-      "Channel Name"
-      "Channel Fluor"
-      "Channel Color"
-      "Channel EmissionWavelength"
-      "Channel ExcitationWavelength"
-      "NDFilter"
-      "Exposure"
-      "ContrastMethod"
-      "PostProcessing"
-      "CompressionType"
-      "CompressionValue"
-      "Misc"
-      "OrigDisc"
-      )))
    )
   )
 
