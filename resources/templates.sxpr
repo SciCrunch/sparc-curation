@@ -36,7 +36,7 @@
      )
     :add
     (:data_standard         ("HEAL"  )
-     :data_standard_version ("20241001" )
+     :data_standard_version ("20241001")
      )
     )
    :subjects
@@ -105,7 +105,12 @@
   (heal)
   :stems
   ;; TODO dataset description funding consortium cells
-  (:subjects
+  (:dataset_description
+   (:header row ; TODO need a test for mismatch
+    :add
+    (:data_standard         ("HEAL-PRECISION")
+     :data_standard_version ("20250205")))
+   :subjects
    (
     :header col
     :add
