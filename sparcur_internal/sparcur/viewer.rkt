@@ -2383,7 +2383,11 @@ switch to that"
           (error "push failed with ~a for ~a" status-1 (string-join argv " ")))
         (update) ; automatically run this now that we reindex
         (unless (debug-push)
-          (println (format "push completed for ~a" (dataset-id dataset))))))
+          (println (format "push completed for ~a" (dataset-id dataset))))
+        (when (debug-push)
+          ; FIXME for some reason the workflow gets stuck and we can't walk through again
+          ; unless these values are all reset
+          (cb-confirm #f #f #:force-off? #t))))
     (define (cb-push-to-remote o e)
       ; TODO probably disable clicking the button again until the process finishes or fails?
       ; 1. confirm pass the manifest of changes
