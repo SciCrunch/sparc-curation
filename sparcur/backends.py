@@ -431,7 +431,13 @@ class BlackfynnRemote(aug.RemotePath):
     def _name(self):
         name = self.bfobject.name
         if isinstance(self.bfobject, self._File) and not self.from_packages:
-            realname = os.path.basename(self.bfobject.s3_key)
+            if self.bfobject.s3_key[-36:] == self.bfobject.pkg_id[-36:]:
+                # new approach where packages s3 key is the package uuid ... so
+                # what's going on with the file id now? who knows!
+                realname = name
+            else:
+                realname = os.path.basename(self.bfobject.s3_key)
+
             if name != realname:  # mega weirdness
                 if realname.startswith(name):
                     # FIXME also check for other things that match?
@@ -1351,7 +1357,7 @@ class BlackfynnRemote(aug.RemotePath):
                 # using Remote.update_cache will never work because for the first op
                 # either the parent doesn't match or the name doesn't match and there is
                 # no way around that, so we have to use the internal method
-                self.cache._meta_updater(self.meta, fetch=False)
+                self.cache._meta_updater(self._meta_impl(check_multi=False), fetch=False)
         else:
             # FIXME likely going to need more info if we do actually hit this
             # but ok for now probably
@@ -1413,7 +1419,7 @@ class BlackfynnRemote(aug.RemotePath):
             # and the new parent cache because they should both have modified
             # times (hopefully ...) that we want to record because the thing
             # itself will appear to be unmodified
-            self.cache._meta_updater(self.meta, fetch=False)  # can't use remote.update_cache
+            self.cache._meta_updater(self._meta_impl(check_multi=False), fetch=False)  # can't use remote.update_cache
 
     def _mkdir_child(self, child_name):
         """ direct children only for this, call in recursion for multi """
@@ -1706,6 +1712,9 @@ class BlackfynnRemote(aug.RemotePath):
 
     @property
     def meta(self):
+        return self._meta_impl()
+
+    def _meta_impl(self, *, check_multi=True):
         return PathMeta(name=self.name,
                         size=self.size,
                         created=self.created,
@@ -1721,7 +1730,7 @@ class BlackfynnRemote(aug.RemotePath):
                         gid=None,  # needed to determine local writability
                         user_id=self.owner_id,
                         mode=None,
-                        multi=self._multi(),
+                        multi=self._multi() if check_multi else None,
                         # XXX WARNING these errors can leak out and can break
                         # get_errors via extract_errors, see DatasetStructure.data_dir_structure
                         # for the fix
