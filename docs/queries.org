@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: d4b052f92395a39d4b25a8a85dab85159c8e4f3ce8496d0629706640f820eed9; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 63c5bd32026960a117145ddb7abd0c99b5fa9ed46ff2b88ca1e87efae5eebe0a; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -6727,8 +6727,8 @@ RETURN p1, p2, p3, p4, p5, p6
 (fix-ocbe-queries)
 
 (unless (fboundp #'ob-cypher/scigraph/query)
-  (reval 'sha256 '30fd7742d7b00bd963310b4af9e505f07f981ff8b26f9b6315baa14574348e88 
-         "https://raw.githubusercontent.com/tgbugs/ob-cypher/7778fa42ae3a49b9370939b14a3e9cefbd884a51/ob-cypher.el"))
+  (reval 'sha256 '06f8c20452b414792e9bbbad0c26b24d67f2098ba6c172543e0d1456f4e05f00
+         "https://raw.githubusercontent.com/tgbugs/ob-cypher/e4815bb45f3f009b58dd71dde30e9d232c76ae84/ob-cypher.el"))
 
 (unless (fboundp #'org-babel-sparql--table-replace-curies)
   (reval 'sha256 '62bdbaf3d54f16b5019715f1dd175ecda8b37de420d14bcb8a469ef6820c5386
@@ -6737,16 +6737,19 @@ RETURN p1, p2, p3, p4, p5, p6
 (defun json->svg-file (json-string path) ; FIXME `defun-local' may not work with `ow-babel-eval'
   (let* ((tmp (org-babel-temp-file "cypher-dot-"))
          (dot (ob-cypher/scigraph/json-to-dot json-string))
-         (cmd (if (string= (file-name-extension path) "graphml")
-                  (format "dot2graphml %s %s" tmp path)
-                (format
-                 (concat
-                  "dot "
-                  "-Efontname='Dejavu Sans Mono' "
-                  "-Nfontname='Dejavu Sans Mono' "
-                  "-Grankdir=LR "
-                  "-T%s -o %s %s")
-                 (file-name-extension path) path tmp))))
+         (cmd (cond
+               ((string= (file-name-extension path) "gml")
+                (format "gv2gml %s -o %s" tmp path))
+               ((string= (file-name-extension path) "graphml")
+                (format "dot2graphml %s %s" tmp path))
+               (t (format
+                   (concat
+                    "dot "
+                    "-Efontname='Dejavu Sans Mono' "
+                    "-Nfontname='Dejavu Sans Mono' "
+                    "-Grankdir=LR "
+                    "-T%s -o %s %s")
+                   (file-name-extension path) path tmp)))))
     (with-temp-file tmp
       (insert dot))
     (org-babel-eval cmd "")
