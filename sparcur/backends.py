@@ -187,10 +187,14 @@ class BlackfynnRemote(aug.RemotePath):
             up = urlparse(url)
             pp = PurePath(up.path)
             if pp.name != expect.name:
-                # probably gonna hit a file size mismatch error because
-                # we are about to download the wrong file due to a race
-                msg = f'url.path.name != expect.name: {pp.name} != {expect.name}'
-                log.critical(msg)
+                if id[-36:] == pp.name:
+                    # s3 keys are now uuids so if the id matches we should be ok
+                    pass
+                else:
+                    # probably gonna hit a file size mismatch error because
+                    # we are about to download the wrong file due to a race
+                    msg = f'url.path.name != expect.name: {pp.name} != {expect.name}'
+                    log.critical(msg)
 
         log.log(9, f'file-api-mapping: {id} {file_id} {url}')
         yield from cls.get_file_by_url(url, ranges=ranges)
