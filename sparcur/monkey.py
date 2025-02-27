@@ -377,12 +377,15 @@ def bind_packages_File(File):
                             elif parent.state == 'PARENT-DELETING':
                                 if not bfobject.state == 'DELETING':
                                     bfobject.state = 'PARENT-DELETING'
+                            # FIXME TODO see if we have to deal with mixed deleting/restoring
 
                             if bfobject.type != 'Collection':
                                 log.log(9, f'what is going on 1 {bfobject}')
 
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
+                            elif bfobject.state == 'RESTORING':
+                                log.log(9, f'object stuck restoring {bfobject}')
                             else:
                                 to_yield = bfobject  # only yield if we can get a parent
 
@@ -390,6 +393,8 @@ def bind_packages_File(File):
                             log.log(9, f'what is going on 2 {bfobject}')
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
+                            elif bfobject.state == 'RESTORING':
+                                log.log(9, f'object stuck restoring {bfobject}')
                             else:
                                 to_yield = bfobject
                         elif bfobject.parent is None:
@@ -405,6 +410,8 @@ def bind_packages_File(File):
 
                             if bfobject.state == 'DELETED':
                                 log.log(9, f'object was deleted {bfobject}')
+                            elif bfobject.state == 'RESTORING':
+                                log.log(9, f'object stuck restoring {bfobject}')
                             else:
                                 to_yield = bfobject
                         else:
