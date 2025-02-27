@@ -364,7 +364,7 @@ class MetaConverter(TripleConverter):
                         s = self.c.l(pioid)
                         yield ds, TEMP.dereferencesTo, s
                         yield s, TEMP.hasDoi, ds
-                    except idlib.exc.MalformedIdentifierError as e:
+                    except (idlib.exc.IdDoesNotExistError, idlib.exc.MalformedIdentifierError) as e:
                         log.warning(e)
                         return
                 else:
