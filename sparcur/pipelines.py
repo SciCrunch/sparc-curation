@@ -1127,10 +1127,11 @@ class SDSPipeline(JSONPipeline):
               [['code_description_file',], ['inputs', 'code_description_file']],
               [['performances_file',], ['inputs', 'performances_file']],
               [['subjects_file',], ['inputs', 'subjects_file']],
+              [['samples_file',], ['inputs', 'samples_file']],
+              [['sites_file',], ['inputs', 'sites_file']],
+              [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
-              [['samples_file',], ['inputs', 'samples_file']],
-              [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['dataset_description_file', 'name'], ['meta', 'title']],
               [['dataset_description_file', 'links'], ['meta', 'additional_links']],
               # 2.0.0
@@ -1156,6 +1157,9 @@ class SDSPipeline(JSONPipeline):
                         'number_of_subjects',
                         'number_of_samples',
 
+                        'number_of_sites',  # XXX 3
+                        'number_of_performances',  # XXX 3
+
                         # 2.0.0
                         'title',  # XXX 2
                         'subtitle',  # XXX 2
@@ -1178,6 +1182,7 @@ class SDSPipeline(JSONPipeline):
         #[['subjects'], ['subjects_file']],  # first step in ending the confusion
         [['subjects_file', 'subjects'], ['subjects']],
         [['samples_file', 'samples'], ['samples']],
+        [['sites_file', 'sites'], ['sites']],
     )
 
     #conditional = (  # someday ...
@@ -1187,11 +1192,19 @@ class SDSPipeline(JSONPipeline):
         #]
     #)
 
-    cleans = [['submission_file'], ['subjects_file'], ['samples_file'], ['manifest_file'], ['performances_file'], ['code_description_file']]
+    cleans = [['submission_file'],
+              ['subjects_file'],
+              ['samples_file'],
+              ['sites_file'],
+              ['manifest_file'],
+              ['performances_file'],
+              ['code_description_file']]
 
     updates = [
         # normalize integer ids to strings to avoid errors comparing str to int
         # due to mismatch with ancient excel use cases
+        *[[['sites', int, field], norm.number_identifiers_to_string] for field in
+          ('laboratory_internal_id',)],  # don't need to normalize site_id because all must start with site- since it was introduced in 3.0
         *[[['samples', int, field], norm.number_identifiers_to_string] for field in
           ('sample_id', 'subject_id', 'was_derived_from', 'pool_id', 'sample_experimental_group', 'member_of', 'laboratory_internal_id')],
         *[[['subjects', int, field], norm.number_identifiers_to_string] for field in
@@ -1260,6 +1273,10 @@ class SDSPipeline(JSONPipeline):
                [[['samples']],
                 DT.BOX(len),
                 [['meta', 'sample_count']]],
+
+               [[['sites']],
+                DT.BOX(len),
+                [['meta', 'site_count']]],
 
                # 2.0.0
                [[['meta', 'related_identifiers']],
@@ -1485,6 +1502,7 @@ class PipelineExtras(JSONPipeline):
         [['meta', 'description'], norm.description],
         [['meta', 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['rmeta', 'timestamp_published_version'], dateparser.parse],
+        [['sites', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],  # for completeness in case sites use different protocols
         [['samples', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['subjects', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
         [['performances', int, 'protocol_url_or_doi'], norm.protocol_url_or_doi],
@@ -1528,7 +1546,7 @@ class PipelineExtras(JSONPipeline):
          De.samples_to_subjects,
          [['subjects_from_samples']]],
 
-        [[THIS_PATH, ['dir_structure'], ['performances'], ['subjects'], ['samples']],
+        [[THIS_PATH, ['dir_structure'], ['performances'], ['subjects'], ['samples'], ['sites']],
          # FIXME this needs to happen fast and early
          # FIXME structure is going to be in a separate file/blob for export
          # without the hack to augmented below if there are no samples or no
@@ -1559,6 +1577,9 @@ class PipelineExtras(JSONPipeline):
 
                       'inputs' not in p and 'related_identifiers' in p and 'message' in e
                       and 'is a required property' in e['message'] or
+
+                      'inputs' not in p and 'sites' in p and 'message' in e
+                      and e['message'] == "'site_id' is a required property" or
 
                       'inputs' not in p and 'samples' in p and 'message' in e
                       and e['message'] == "'sample_id' is a required property" or
@@ -1596,11 +1617,14 @@ class PipelineExtras(JSONPipeline):
         # functional pipeline is finished
         add_subs = 'subjects' not in data
         add_samps = 'samples' not in data
+        add_sites = 'sites' not in data
         try:
             if add_subs:
                 data['subjects'] = []
             if add_samps:
                 data['samples'] = []
+            if add_sites:
+                data['sites'] = []
 
             return self._augmented(data)
         finally:
@@ -1608,6 +1632,8 @@ class PipelineExtras(JSONPipeline):
                 data.pop('subjects')
             if add_samps:
                 data.pop('samples')
+            if add_sites:
+                data.pop('sites')
 
     @property
     def added(self):
@@ -1966,6 +1992,7 @@ class ToJsonLdPipeline(JSONPipeline):
         [['performances'], ['performances', '@graph']],
         [['subjects'], ['subjects', '@graph']],
         [['samples'], ['samples', '@graph']],
+        [['sites'], ['sites', '@graph']],
         [['resources'], ['resources', '@graph']],
     )
 
@@ -1988,6 +2015,7 @@ class ToJsonLdPipeline(JSONPipeline):
         [['performances', '@context'], lambda _: sc.PerformancesExportSchema.context()],
         [['subjects', '@context'], lambda _: sc.SubjectsExportSchema.context()],
         [['samples', '@context'], lambda _: sc.SamplesFileExportSchema.context()],
+        [['sites', '@context'], lambda _: sc.SitesFileExportSchema.context()],
         #[['resources', '@context'], lambda lifters: sc.ResourcesExportSchema.context()]
         *__includes  # owl:NamedIndividual in here ... FIXME would be nice to not have to hack it in this way
     )
@@ -2021,6 +2049,9 @@ class ToJsonLdPipeline(JSONPipeline):
          #DT.BOX(lambda uri_api: {'@id': '@id', '@context': {'@base': uri_api + '/samples/'}}),
          #[['samples', '@context', 'primary_key']]],
 
+        [[['meta', 'uri_api']],
+         DT.BOX(lambda uri_api: uri_api + '/#sites-graph'),
+         [['sites', '@id']]],
 
         [[['meta', 'uri_api']],
          DT.BOX(lambda uri_api: uri_api + '/#contributors-graph'),

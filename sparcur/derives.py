@@ -295,7 +295,7 @@ class Derives:
         return subjects,
 
     @staticmethod
-    def validate_structure(path, dir_structure, performances, subjects, samples):
+    def validate_structure(path, dir_structure, performances, subjects, samples, sites):
         he = HasErrors(pipeline_stage='Derives.validate_structure')
 
         # FIXME TODO handle pools as well and figure out cases where subjects/samples are metadata only
@@ -325,6 +325,9 @@ class Derives:
                 if av} 
 
         perfs = {p['performance_id']:p for p in performances}
+
+        site_records = sites
+        sites = {p['site_id']:p for p in site_records}
 
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
@@ -356,12 +359,19 @@ class Derives:
         records = []
         done_dirs = set()
         done_specs = set()
+        metadata_only_specs = set()
 
         ### performances
         union_perf = set(dirs) | set(perfs)
         inter_perf = set(dirs) & set(perfs)
         done_dirs.update(inter_perf)
         not_done_perfs = set(perfs) - inter_perf
+
+        ### sites
+        union_site = set(dirs) | set(sites)
+        inter_site = set(dirs) & set(sites)
+        done_dirs.update(inter_site)
+        not_done_sites = set(sites) - inter_site
 
         ### subject pools
         inter_sub_pool = set(dirs) & set(sub_pools)

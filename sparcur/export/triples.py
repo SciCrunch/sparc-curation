@@ -166,6 +166,11 @@ class TriplesExportDataset(TriplesExport):
             yield from self.data['performances']
 
     @property
+    def sites(self):
+        if 'sites' in self.data:
+            yield from self.data['sites']
+
+    @property
     def subjects(self):
         if 'subjects' in self.data:
             yield from self.data['subjects']
@@ -284,6 +289,7 @@ class TriplesExportDataset(TriplesExport):
 
         yield from self.ddt(data)
         yield from self.triples_performances
+        yield from self.triples_sites
         yield from self.triples_subjects
         yield from self.triples_samples
         yield from self.triples_specimen_dirs
@@ -371,6 +377,35 @@ class TriplesExportDataset(TriplesExport):
                 yield from converter.triples_gen(s, raw_keys=True)
 
         yield from triples_gen(self.performance_id, self.performances)
+
+    def site_id(self, v):
+        return self._thing_id(v, '/sites/')
+
+    @property
+    def triples_sites(self):
+        try:
+            dsid = self.dsid  # FIXME json reload needs to deal with this
+        except BaseException as e:  # FIXME ...
+            loge.exception(e)
+            return
+
+        def triples_gen(prefix_func, sites):
+
+            for i, site in enumerate(sites):
+                converter = conv.SiteConverter(site)
+                if 'site_id' in site:
+                    s_local = site['site_id']
+                else:
+                    s_local = f'local-{i + 1}'  # sigh
+
+                s = prefix_func(s_local)
+                yield s, rdf.type, owl.NamedIndividual
+                yield s, rdf.type, sparc.Site
+                yield s, TEMP.hasDerivedInformation, dsid
+                yield dsid, TEMP.isAboutSite, s
+                yield from converter.triples_gen(s, raw_keys=True)
+
+        yield from triples_gen(self.site_id, self.sites)
 
     def subject_id(self, v, species=None):  # TODO species for human/animal
         return self._thing_id(v, '/subjects/')

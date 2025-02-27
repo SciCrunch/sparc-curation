@@ -632,3 +632,10 @@ class SampleConverter(TripleConverter):
         # FIXME _subject_id is monkey patched in
         return TEMP.wasDerivedFromSubject, self._subject_id(value)
 SampleConverter.setup()
+
+
+class SiteConverter(TripleConverter):
+    mapping = [
+        ['site_id', TEMP.localId],
+    ] + utility
+SiteConverter.setup()
