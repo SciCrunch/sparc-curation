@@ -72,7 +72,7 @@ def make_graphs(g, pids, published):
         ng.namespace_manager.populate_from(g)
         ng.namespace_manager.bind(
             'spjl', 'https://uilx.org/tgbugs/u/sparcur-protcur-json-ld/')
-        ng.populate_from_triples(tobn(g.subjectGraphClosure(i), published))
+        ng.populate_from_triples(tobn(g.subject_triples_closure(i), published))
         sgs.append(ng)
     return sgs
 

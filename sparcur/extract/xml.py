@@ -458,6 +458,29 @@ class ExtractMSXMLExcel(XmlSource):
         return {}
 
 
+class ExtractKeyenceMetadata(XmlSource):
+    """ keyence xml metadata files
+    <Store Type="Keyence.Micro.Bio.Common.Data.Metadata.Conditions.ImageCondition, Keyence.Micro.Bio.Common.Data.Metadata, Version=1.1.2.4, Culture=neutral, PublicKeyToken=null">
+    """
+
+    top_tag = 'Store'
+    mimetype = 'application/x.vnd.keyence.metadata+xml'
+
+    def typeMatches(self):
+        if super().typeMatches():
+            st = self.xpath('/Store/@Type')
+            if st:
+                # FIXME TODO there are multiple different types inside
+                # the .gci file we don't do anything with them right
+                # now, but they are distinct, this is a placeholder
+                return st[0].startswith('Keyence.')
+
+    def _extract(self, *args, **kwargs):
+        # log flattened tags to see if we want/need any
+        # log.debug([(_.tag, _.attrib, _.text) for _ in list(self.e.iter())])
+        return {}
+
+
 ExtractXml.classes = (*[c for c in subclasses(XmlSource)], XmlSource)
 
 # FIXME not entirely clear that I am using type correctly here

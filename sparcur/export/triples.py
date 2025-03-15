@@ -389,6 +389,10 @@ class TriplesExportDataset(TriplesExport):
             loge.exception(e)
             return
 
+
+        conv.SiteConverter._subject_id = self.subject_id
+        conv.SiteConverter._primary_key = self.primary_key
+
         def triples_gen(prefix_func, sites):
 
             for i, site in enumerate(sites):
@@ -451,6 +455,7 @@ class TriplesExportDataset(TriplesExport):
             return
 
         conv.SampleConverter._subject_id = self.subject_id  # FIXME
+        conv.SampleConverter._primary_key = self.primary_key
         conv.SampleConverter.dsid = self.dsid  # FIXME FIXME very evil
         # yes this indicates that converters and exporters are
         # highly related here ...

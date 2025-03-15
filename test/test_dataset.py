@@ -7,9 +7,11 @@ import augpathlib as aug
 from .common import examples_root, template_root, project_path, temp_path, dpie_path
 from sparcur.datasets import (Tabular,
                               DatasetDescriptionFile,
+                              CurationFile,
                               SubmissionFile,
                               SubjectsFile,
                               SamplesFile,
+                              SitesFile,
                               remove_rule,)
 from sparcur import pipelines as pipes
 from sparcur import exceptions as exc
@@ -272,6 +274,27 @@ class TestDatasetDescription(Helper, unittest.TestCase):
             pass
 
 
+class TestCurationFile(Helper, unittest.TestCase):
+    template = 'curation.xlsx'
+    metadata_file_class = CurationFile
+    pipe = pipes.CurationFilePipeline
+    _cry_base = 'cu-pie.csv'
+
+    def test_cu_pie(self):
+        tf = examples_root / 'cu-pie.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        ser_deser(value)
+
+    def test_cu_pie_pipeline(self):
+        tf = examples_root / 'cu-pie.csv'
+        pipeline = self.pipe(tf, None, None)
+        data = pipeline.data
+        pprint.pprint(data)
+        ser_deser(data)
+
+
 class TestSubjectsFile(Helper, unittest.TestCase):
     template = 'subjects.xlsx'
     metadata_file_class = SubjectsFile
@@ -373,6 +396,21 @@ class TestSamplesFile(Helper, unittest.TestCase):
 
     def test_versions(self):
         self._versions()
+
+
+class TestSitesFile(Helper, unittest.TestCase):
+    template = 'sites.xlsx'
+    metadata_file_class = SitesFile
+    pipe = pipes.SitesFilePipeline
+    _cry_base = 'si-pie.csv'
+
+    def test_si_pie(self):
+        tf = examples_root / 'si-pie.csv'
+        obj = self.metadata_file_class(tf)
+        value = obj.data
+        pprint.pprint(value)
+        ser_deser(value)
+        derp = list(value['sites'][0])
 
 
 class TestDatasetPie(PipelineHelper, unittest.TestCase):

@@ -72,6 +72,8 @@ def curies_runtime(base):
         'contributor': base + 'contributors/',
         'subject': base + 'subjects/',
         'sample': base + 'samples/',
+        'site': base + 'sites/',
+        'perf': base + 'performances/',
     }
 
 

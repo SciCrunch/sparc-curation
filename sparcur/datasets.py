@@ -1935,7 +1935,9 @@ class DatasetDescriptionFile(MetadataFile):
     missing_add = {'template_schema_version': ('1.0', 1)}
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
-    groups_alt = {'contributors': ('contributor_name',
+    groups_alt = {'standards': ('data_standard',  # 3
+                                'data_standard_version',),
+                  'contributors': ('contributor_name',
                                    'contributor_orcid',
                                    'contributor_affiliation',
                                    'contributor_role',
@@ -1948,7 +1950,10 @@ class DatasetDescriptionFile(MetadataFile):
                             'study_data_collection',
                             'study_primary_conclusion',
                             'study_collection_title',),
-                  'device': (
+                  'data_dictionary': ('data_dictionary_path',
+                                      'data_dictionary_type',
+                                      'data_dictionary_description',),
+                  'device': (  # 3
                       'device_intended_use',
                       'device_current_use',
                       'device_type',
@@ -1966,7 +1971,8 @@ class DatasetDescriptionFile(MetadataFile):
     ignore_header = 'metadata_element', 'example', 'description_header'
     ignore_alt = ('basic_information', 'study_information', 'contributor_information',
                   'related_protocol__paper__dataset__etc_', 'participant_information',
-                  'device_information',)
+                  'data_dictionary_information', 'device_information',
+                  'standards_information',)
     raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     normalize_mismatch_ok = 'metadata_element',
@@ -1982,6 +1988,29 @@ class DatasetDescriptionFile(MetadataFile):
 
 class DatasetDescriptionFilePath(ObjectPath):
     obj = DatasetDescriptionFile
+
+
+_props = sc.CurationExportSchema.schema['properties']
+_ncfes = [k for k, v in _props.items()
+          if isinstance(v, dict) and sc.not_array(v)]
+_ncfes = sorted(set(_ncfes))
+
+
+class CurationFile(MetadataFile):
+    default_record_type = COLUMN_TYPE
+    record_type_key_alt = 'metadata_element'
+    record_type_key_header = record_type_key_alt
+    # reminder, can't use groups_alt on whole file
+    ignore_header = 'metadata_element',
+    ignore_alt = 'controlled_fields', 'curator_notes'
+    normalize_mismatch_ok = 'metadata_element',
+    normalize_alt_mismatch_ok = normalize_mismatch_ok
+    allow_dupes_alt = False
+    _expect_single = _ncfes
+
+
+class CurationFilePath(ObjectPath):
+    obj = CurationFile
 
 
 _props = sc.SubjectsSchema.schema['properties']['subjects']['items']['properties']

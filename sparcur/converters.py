@@ -285,9 +285,12 @@ class MetaConverter(TripleConverter):
         ['performance_count', TEMP.hasNumberOfPerformances],
         ['subject_count', TEMP.hasNumberOfSubjects],
         ['sample_count', TEMP.hasNumberOfSamples],
+        ['site_count', TEMP.hasNumberOfSites],
         ['contributor_count', TEMP.hasNumberOfContributors],
         ['number_of_subjects', TEMP.hasExpectedNumberOfSubjects],
         ['number_of_samples', TEMP.hasExpectedNumberOfSamples],
+        ['number_of_sites', TEMP.hasExpectedNumberOfSites],
+        ['number_of_performances', TEMP.hasExpectedNumberOfPerformances],
 
         ['title_for_complete_data_set', TEMP.collectionTitle],
         ['prior_batch_number', TEMP.Continues],  # see datacite relationType
@@ -608,6 +611,7 @@ class SampleConverter(TripleConverter):
         ['sample_id', TEMP.localId],  # unmangled
         #['subject_id', TEMP.wasDerivedFromSubject],
         ['specimen_anatomical_location', TEMPRAW.wasExtractedFromAnatomicalRegion],
+        ['sample_anatomical_location', TEMPRAW.wasExtractedFromAnatomicalRegion],
         ['sample_name', rdfs.label],
         ['sample_description', dc.description],
         ['experimental_group', TEMP.hasAssignedGroup],
@@ -628,6 +632,21 @@ class SampleConverter(TripleConverter):
         ['includes_chronically_implanted_electrode_', TEMP.TODO],
     ]
 
+    def wasderivedfromsample(self, value):
+        # this is the name of the field used in 1.2.3 and it required
+        # the use of the primary_key directly in the spreadsheet so it
+        # works safely with self._primary_key
+        # FIXME TODO see if anyone used multiple parents (i doubt it)
+        return TEMP.wasDerivedFromSample, self._primary_key(value)
+
+    def was_derived_from(self, value):
+        sid = value
+        if sid.startswith('sub-'):
+            return TEMP.wasDerivedFromSubject, self._subject_id(sid)
+        else:
+            # XXX was_derived_from is only support starting in 2.0.0
+            return TEMP.wasDerivedFromSample, self._primary_key(sid)
+
     def subject_id(self, value):
         # FIXME _subject_id is monkey patched in
         return TEMP.wasDerivedFromSubject, self._subject_id(value)
@@ -638,4 +657,11 @@ class SiteConverter(TripleConverter):
     mapping = [
         ['site_id', TEMP.localId],
     ] + utility
+
+    def specimen_id(self, value):
+        # TODO TEMP.onSpecimen ... or TEMP.locatedOnSpecimen ?
+        if value.startswith('sub-'):
+            return TEMP.onSubject, self._subject_id(value)
+        else:
+            return TEMP.onSample, self._primary_key(value)
 SiteConverter.setup()

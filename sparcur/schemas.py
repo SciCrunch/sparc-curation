@@ -299,6 +299,15 @@ def update_include_paths(obj, *args, path=None, key='jsonld_include', moves=tupl
     return obj  # have to return this otherwise somehow everything is turned to None?
 
 
+def pat_array(pattern):
+    return {
+        'type': 'array',
+        'minItems': 1,
+        'items': {
+            'type': 'string',
+            'pattern': pattern,}}
+
+
 def idtype(id, base=str(TEMP['id-fallthrough/'])):
     # we set base to id-fallthrough so we can easily pull out unmapped
     # cases that should be identifiers
@@ -695,6 +704,19 @@ simple_file_url_pattern = r'^file:\/\/'
 # see https://stackoverflow.com/questions/1976007/
 fs_safe_identifier_pattern = '^[A-Za-z0-9][^ \n\t*|:\\/<>\'"?]+$'
 
+# FIXME TODO review whether to restrict further the first position to alphanum only
+sds3_path_allow_pattern = '^[A-Za-z0-9.,-_ ]+$' # use with NoLTWhitepaceSchema
+sds3_path_almost_pattern = '^[A-Za-z0-9.,-_]([A-Za-z0-9.,-_ ]*[A-Za-z0-9.,-_])?$'  # use with ws_multi
+
+#_id_suffix = '[A-Za-z0-9][A-Za-z0-9-]*$'
+_id_suffix = '[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$'  # don't allow trailing separator
+entity_id_pattern = '^(sub|sam|site|perf)-' + _id_suffix
+specimen_id_pattern = '^(sub|sam)-' + _id_suffix
+sub_id_pattern = '^sub-' + _id_suffix
+sam_id_pattern = '^sam-' + _id_suffix
+site_id_pattern = '^site-' + _id_suffix
+perf_id_pattern = '^perf-' + _id_suffix
+
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern =     '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9](:[0-6][0-9](,[0-9]{1,9})?)?(Z|[+-][0-2][0-9]:[0-6][0-9])$'
 iso8601bothpattern = '^[0-9]{4}-[0-1][0-9]-[0-3][0-9](T[0-2][0-9]:[0-6][0-9](:[0-6][0-9](,[0-9]{1,9})?)?(Z|[+-][0-2][0-9]:[0-6][0-9]))?$'
@@ -725,6 +747,26 @@ class NoLTWhitespaceSchema(JSONSchema):
 
 
 string_noltws = NoLTWhitespaceSchema.schema
+
+
+class _alt_SDS3PathSchema(JSONSchema):
+
+    schema = {'allOf': [
+        {'type': 'string',
+         'pattern': sds3_path_allow_pattern,},
+        {'not': {'pattern': pattern_whitespace_lead_trail,}},
+        {'not': {'pattern': pattern_whitespace_multi}},
+    ]}
+
+
+class SDS3PathSchema(JSONSchema):
+    schema = {'allOf': [
+        {'type': 'string', 'pattern': sds3_path_almost_pattern,},
+        {'not': {'pattern': pattern_whitespace_multi}},
+    ]}
+
+
+sds3_path_schema = SDS3PathSchema.schema
 
 
 class ErrorSchema(JSONSchema):
@@ -918,7 +960,9 @@ class MbfTracingSchemaStrict(JSONSchema):
 
 class DatasetStructureSchema(JSONSchema):
     __schema = {'type': 'object',
-                'required': ['submission_file', 'dataset_description_file'],
+                'required': ['dataset_description_file',
+                             #'submission_file',  # submission is no longer explicitly required, the information derived from it is still required, but there are now multiple ways to source that information
+                             ],
                 'properties': {
                     'submission_file': {'type': 'string',
                                         'pattern': metadata_filename_pattern},
@@ -1225,10 +1269,10 @@ class DatasetDescriptionExportSchema(JSONSchema):
         'type': 'object',
         'additionalProperties': False,
         'required': ['template_schema_version',  # missing should fail for this one ...
-                     'name',
+                     #'name',  # not required because name -> title in 2.0.0
                      'description',
-                     'funding',
-                     'protocol_url_or_doi',
+                     #'funding',
+                     #'protocol_url_or_doi',  # moved to be conditionally required
                      #'completeness_of_data_set'  # TODO versioned schema validation
                      'contributors',
                      'number_of_subjects',
@@ -1244,9 +1288,9 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
             'acknowledgments': {'type': 'string'},
-            'funding': {'type': 'array',
-                        'minItems': 1,
-                        'items': {'type': 'string'}},
+            'funding_freetext': {'type': 'array',
+                                 'minItems': 1,
+                                 'items': {'type': 'string'}},
             'completeness_of_data_set': {'type': 'string'},
             'prior_batch_number': {'type': 'string'},
             'title_for_complete_data_set': {'type': 'string'},
@@ -1374,24 +1418,6 @@ class DatasetDescriptionExportSchema(JSONSchema):
                 }
             },
             'contributors': ContributorsExportSchema.schema,
-            'device': {
-                'type': 'array',
-                'minItems': 1,   # this pattern makes things self describing
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                      'device_intended_use': {'type': 'string'},
-                      'device_current_use': {'type': 'string'},
-                      'device_type': {'type': 'string'},
-                      'device_application': {'type': 'string'},
-                      'device_target_anatomy': {'type': 'string'},
-                      'device_target_species': {'type': 'string'},
-                      'device_target_sex': {'type': 'string'},
-                      'device_target_age_category': {'type': 'string'},
-                      'device_target_disease_or_disorder': {'type': 'string'},
-                    }
-                }
-            }
         }
     }
 
@@ -1413,7 +1439,7 @@ class DatasetDescription2Schema(JSONSchema):
             'title': {'type': 'string',},
             'subtitle': {'type': 'string',},
             'keywords': {'type': 'array',},
-            'funding': {'type': 'array',},
+            'funding_freetext': {'type': 'array',},
             'acknowledgements': {'type': 'string',},
 
             'study': {
@@ -1428,14 +1454,81 @@ class DatasetDescription2Schema(JSONSchema):
             'study_approach': {'type': 'array',},
             'study_technique': {'type': 'array',},
 
-            'number_of_subjects': {'type': 'integer'},
-            'number_of_samples': {'type': 'integer'},
+            #'number_of_subjects': {'type': 'integer'},  # already in 1
+            #'number_of_samples': {'type': 'integer'},
         }
+    }
+
+
+class DatasetDescription3Schema(JSONSchema):
+    schema = {
+        'properties': {
+            'dataset_type': {
+                'type': 'string',
+                'enum': ['experimental', 'computational', 'device'],
+            },
+            'standards': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                      'data_standard': {'type': 'string'},
+                      'data_standard_version': {'type': 'string'},
+                    },
+                },
+            },
+            'funding': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                      'funding_consortium': {'type': 'string'},
+                      'funding_agency': {'type': 'string'},
+                      'award_number': {'type': 'string'},
+                    },
+                },
+            },
+            'data_dictionary': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                      'data_dictionary_type': {'type': 'string'},
+                      'data_dictionary_path': {'type': 'string'},
+                      'data_dictionary_description': {'type': 'string'},
+                    },
+                },
+            },
+            'device': {
+                'type': 'array',
+                'minItems': 1,   # this pattern makes things self describing
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                      'device_intended_use': {'type': 'string'},
+                      'device_current_use': {'type': 'string'},
+                      'device_type': {'type': 'string'},
+                      'device_application': {'type': 'string'},
+                      'device_target_anatomy': {'type': 'string'},
+                      'device_target_species': {'type': 'string'},
+                      'device_target_sex': {'type': 'string'},
+                      'device_target_age_category': {'type': 'string'},
+                      'device_target_disease_or_disorder': {'type': 'string'},
+                    },
+                },
+            },
+        },
     }
 
 
 DatasetDescriptionExportSchema.schema['properties'].update(
     DatasetDescription2Schema.schema['properties'])
+
+DatasetDescriptionExportSchema.schema['properties'].update(
+    DatasetDescription3Schema.schema['properties'])
 
 
 class DatasetDescriptionSchema(JSONSchema):
@@ -1594,10 +1687,21 @@ class PerformanceExportSchema(JSONSchema):
         'required': ['performance_id',],
         'properties': {
             'performance_id': {'type': 'string',
-                               'pattern': fs_safe_identifier_pattern,
+                               'pattern': perf_id_pattern,
                                'context_value': {"@id": "@id",
                                                  "@type": "@id"},
                            },
+
+            # FIXME TODO do we allow parent performances here for nesting?
+            # or are performances always the leaves? HRM, to replicate what
+            # BIDS does you do need nesting for session/run/trial or something
+
+            # TODO one of these is required
+            'specimen': pat_array(specimen_id_pattern),  # 3
+            'subject': pat_array(sub_id_pattern),  # 3
+            'sample': pat_array(sam_id_pattern),  # 3
+            'site': pat_array(site_id_pattern),  # 3
+
             'protocol_url_or_doi': _protocol_url_or_doi_schema,  # FIXME ideally this would be true but are we sure it always is?
         },}
 
@@ -1621,6 +1725,9 @@ class PerformancesSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(PerformancesExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
+    __wat = schema['properties']['performances']['items']['properties']
+    for _k in ('specimen', 'subject', 'sample', 'site'):  # FIXME hack pat_array in as str
+        __wat[_k] = {'type': 'string'}
 
 
 class SubjectExportSchema(JSONSchema):
@@ -1639,7 +1746,7 @@ class SubjectExportSchema(JSONSchema):
         'required': ['subject_id', 'species'],
         'properties': {
             'subject_id': {'type': 'string',
-                           'pattern': fs_safe_identifier_pattern,
+                           'pattern': sub_id_pattern,  # fs_safe_identifier_pattern,  # FIXME < 2.0 allows others but encoding that statically without having template schema version is difficult
                            'context_value': {"@id": "@id",
                                              "@type": "@id"},
                            #'context_runtime': [  # TODO -> derive after add ?
@@ -1713,10 +1820,10 @@ class SampleExportSchema(JSONSchema):
         'required': ['sample_id'],
         'properties': {
             'sample_id': {'type': 'string',
-                          'pattern': fs_safe_identifier_pattern,
+                          'pattern': sam_id_pattern,  # fs_safe_identifier_pattern,  # FIXME < 2.0
                           },
             'subject_id': {'type': 'string',
-                           'pattern': fs_safe_identifier_pattern,
+                           'pattern': sub_id_pattern,  # fs_safe_identifier_pattern,  # FIXME < 2.0
                            },
             'primary_key': {'type': 'string',
                             'context_value': {"@id": "@id",
@@ -1742,11 +1849,14 @@ class SampleExportSchema(JSONSchema):
             'was_derived_from': {'type': 'array',
                                  'minItems': 1,
                                  'items': {'type': 'string',  # XXX must reference another subject id
-                                           'pattern': fs_safe_identifier_pattern,},
+                                           'pattern': specimen_id_pattern,  # fs_safe_identifier_pattern,  # FIXME < 2.0
+                                           },
                                  },
-            'specimen': {'type': 'string',
-                         },  # what are we expecting here?
-            'specimen_anatomical_location': {'oneOf':
+            'specimen': {'type': 'string',},  # I think this was the old version of specimen_type
+            'sample_type': {'type': 'string',
+                            },  # what are we expecting here?
+            'sample_experimental_group': strcont('TEMP:hasAssignedGroup'),
+            'sample_anatomical_location': {'oneOf':
                                              [{'type': 'string',},
                                               # FIXME not seeing an easy wawy out of this
                                               # other than switching many of these over to arrays
@@ -1817,10 +1927,10 @@ class SiteExportSchema(JSONSchema):
         'required': ['site_id', 'specimen_id'],
         'properties': {
             'site_id': {'type': 'string',
-                        'pattern': fs_safe_identifier_pattern,
+                        'pattern': site_id_pattern,
                         },
             'specimen_id': {'type': 'string',
-                            'pattern': fs_safe_identifier_pattern,
+                            'pattern': specimen_id_pattern,
                            },
         },
     }
@@ -1841,6 +1951,45 @@ class SitesFileExportSchema(JSONSchema):
 class SitesFileSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(SitesFileExportSchema.schema)
+    schema = JApplyRecursive(EIS._to_pattern, __schema)
+    del __schema
+
+
+class CurationExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'properties': {
+            'organ': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {  # TODO validate via ontology
+                    'anyOf': [EIS._allOf(OntTermSchema),
+                              {'type': 'string',},]},},
+            'experimental_approach': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {  # TODO validate via ontology
+                    'anyOf': [EIS._allOf(OntTermSchema),
+                              {'type': 'string',},]},},
+            'experimental_technique': {
+                'type': 'array',
+                'minItems': 1,
+                'items': {  # TODO validate via ontology
+                    'anyOf': [EIS._allOf(OntTermSchema),
+                              {'type': 'string',},]},},
+            'experimental_design': string_noltws,
+            'completeness': string_noltws,
+            'subjects_and_samples': string_noltws,
+            'primary_vs_derivative_data': string_noltws,
+            'code_availability': string_noltws,
+        },
+        'errors': ErrorSchema.schema,
+    }
+
+
+class CurationSchema(JSONSchema):
+    context = lambda : ({}, None)
+    __schema = copy.deepcopy(CurationExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
     del __schema
 
@@ -1889,6 +2038,14 @@ class ManifestRecordExportSchema(JSONSchema):
                          # TODO mimetype pattern?
                      #},
                  },
+
+                 'entity': pat_array(entity_id_pattern),  # 3
+                 'specimen': pat_array(specimen_id_pattern),  # 3
+                 'subject': pat_array(sub_id_pattern),  # 3
+                 'sample': pat_array(sam_id_pattern),  # 3
+                 'site': pat_array(site_id_pattern),  # 3
+                 'performance': pat_array(perf_id_pattern),  # 3
+
                  # extras duplicated from other sheets
                  'protocl_title': {'type': 'string',},
                  'protocol_url_or_doi': _protocol_url_or_doi_schema,
@@ -1968,14 +2125,16 @@ class PathSchema(JSONSchema):
             'checksums': {'type': 'array',
                           'minItems': 1,
                           'items': ChecksumSchema.schema,},
-            'basename': {'type': 'string',
-                         # FIXME TODO this is overly restrictive and
-                         # doesn't help in providing good feedback in
-                         # cases where people are using periods as
-                         # file name separators which messes up suffix
-                         # file type detection, it also doesn't warn
-                         # if there is no suffix
-                         'pattern': fs_safe_identifier_pattern,},
+            'basename': sds3_path_schema,  # FIXME < 3.0
+            #'basename': {'type': 'string',
+            #             # FIXME TODO this is overly restrictive and
+            #             # doesn't help in providing good feedback in
+            #             # cases where people are using periods as
+            #             # file name separators which messes up suffix
+            #             # file type detection, it also doesn't warn
+            #             # if there is no suffix
+            #             'pattern': fs_safe_identifier_pattern,
+            #             },
             'errors': ErrorSchema.schema,
         }
     }
@@ -2026,6 +2185,9 @@ class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
 class ManifestFileSchema(JSONSchema):
     __schema = copy.deepcopy(ManifestFileExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
+    __wat = schema['allOf'][1]['properties']['contents']['properties']['manifest_records']['items']['allOf'][0]['properties']
+    for _k in ('entity', 'specimen', 'subject', 'sample', 'site', 'performance'):  # FIXME hack pat_array in as str
+        __wat[_k] = {'type': 'string'}
 
 
 class ManifestFilesExportSchema(JSONSchema):
@@ -2071,7 +2233,7 @@ class MetaOutExportSchema(JSONSchema):
                       #'sample_count',
     ]
     __schema['required'].remove('contributors')
-    __schema['required'].remove('name')
+    #__schema['required'].remove('name')
     __schema['required'] += extra_required
     __schema['properties'].pop('contributors')
     __schema['properties'].pop('name')
@@ -2195,18 +2357,23 @@ class MetaOutExportSchema(JSONSchema):
         'sample_count': {'type': 'integer',
                          'context_value': inttype('TEMP:hasNumberOfSamples'),
                          },
+        'site_count': {'type': 'integer',
+                       'context_value': inttype('TEMP:hasNumberOfSites'),
+                       },
         'contributor_count': {'type': 'integer',
-                              'context_value': inttype('TEMP:hasNumberOfSamples'),
+                              'context_value': inttype('TEMP:hasNumberOfContributors'),
                               },})
 
     schema = {
         'jsonld_include': {'@type': ['sparc:Dataset', 'owl:NamedIndividual']},
         'allOf': [__schema,
-                  {'oneOf': [
+                  {'anyOf': [
+                      # FIXME this fails if if there is no dataset_type field
+                      # and one of the counts is provided i.e. for all 1.x templates
                       {'properties': {
                           'dataset_type': {
                               'type': 'string',
-                              'enum': ['computational'],
+                              'enum': ['computational', 'device'],
                           }}},
                       {'anyOf': [
                           #{'required': ['number_of_subjects']},
@@ -2232,7 +2399,7 @@ class DatasetOutExportSchema(JSONSchema):
         'id',
         'meta',
         'contributors',
-        'path_metadata',  # required for the time being as a sanity check on manifest structure, will move elsewhere in the future
+        #'path_metadata',  # conditionally required below if dataset type is not device
         'prov']
     __schema['properties'] = {
         'id': {'type': 'string',  # ye old multiple meta/bf id issue
@@ -2277,9 +2444,11 @@ class DatasetOutExportSchema(JSONSchema):
         'inputs': {'type': 'object',
                    # TODO do we need errors at this level?
                    'properties': {'dataset_description_file': DatasetDescriptionSchema.schema,
+                                  'curation_file': CurationSchema.schema,
                                   'submission_file': SubmissionSchema.schema,
                                   'subjects_file': SubjectsSchema.schema,
                                   'samples_file':SamplesFileSchema.schema,
+                                  'sites_file':SitesFileSchema.schema,
                                   },},}
 
     # FIXME switch to make samples optional since subject_id will always be there even in samples?
@@ -2294,6 +2463,14 @@ class DatasetOutExportSchema(JSONSchema):
                 (lambda uri_api: uri_api + '/'),
                 '#/@context/@base',]}],
         'allOf': [__schema,
+                  {'anyOf': [
+                      {'required': ['path_metadata']},
+                      {'properties': {'dataset_type': {'type': 'string', 'enum': ['device']}}},
+                  ]},
+                  {'anyOf': [
+                      {'required': ['protocol_url_or_doi']},
+                      {'properties': {'dataset_type': {'type': 'string', 'enum': ['computational', 'device',]}}},
+                  ]},
                   {'anyOf': [
                       {'required': ['subjects']},  # FIXME extract subjects from samples ?
                       {'required': ['samples']},

@@ -513,6 +513,17 @@ class SitesFilePipeline(PathPipeline):
 
 hasSchema = sc.HasSchema()
 @hasSchema.mark
+class CurationFilePipeline(PathPipeline):
+
+    data_transformer_class = dat.CurationFile
+
+    @hasSchema(sc.CurationSchema)
+    def data(self):
+        return super().data
+
+
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class ManifestFilePipeline(PathPipeline):
 
     data_transformer_class = dat.ManifestFile
@@ -600,7 +611,18 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
             raise e
 
     @classmethod
-    def do_xml_metadata(cls, local, id):
+    def do_xml_metadata(cls, local, id, *, debug=False):
+        # FIXME debug must be manually set here for now because
+        # there is currently no easy or obvious way to pass runtime
+        # config options down into pipeline steps (DERP) this is why
+        # we ultimately want to move everything to simple :/
+        # also debug=True will cause memory leaks due to the usual
+        # lxml nonsense
+
+        # TODO also this stuff should all shift over to the objects
+        # data extraction workflow ... then issues with changing what
+        # we extract show up again though if we do partial extraction
+
         # FIXME this is extremely inefficient to run on all datasets
         # we have a find command to subset the datasets so we don't
         # have to do an exhaustive search ... someone has to do it
@@ -614,7 +636,15 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
         blob = {'type': 'all-xml-files',  # FIXME not quite correct use of type here
                 'dataset_id': id,
                 'xml': tuple()}
-        blob['xml'] = Async(rate=False)(deferred(cls._do_subprocess)(path) for path in local_xmls)
+
+        if debug:
+            blob['xml'] = []
+            for path in local_xmls:
+                x = cls._path_to_json_meta(path)
+                blob['xml'].append(x)
+        else:
+            blob['xml'] = Async(rate=False)(deferred(cls._do_subprocess)(path) for path in local_xmls)
+
         return blob
 
 
@@ -1064,11 +1094,16 @@ class PipelineStart(JSONPipeline):
 
         if 'errors' in data:
             get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
-            sections = set((s,) for s in data)
-            # FIXME probably should just use adops.get to check for the path
-            both = get_paths & sections
+            both = []
+            for _p in get_paths:
+                try:
+                    _pv = adops.get(data, _p)
+                    both.append((_p, _pv))
+                except exc.NoSourcePathError:
+                    pass
+
             if not both:
-                log.debug(f'{get_paths}\n{sections}\n{both}')
+                log.info(f'{get_paths}\n{sections}\n{both}')
                 raise self.SkipPipelineError(data)
 
         return data
@@ -1117,6 +1152,11 @@ class SDSPipeline(JSONPipeline):
          SitesFilePipeline,
          ['sites_file']],
 
+        [[[['curation_file'], ['path']],
+          [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
+         CurationFilePipeline,
+         ['curation_file']],
+
         [[[['manifest_file'], ['paths']],
           [['dataset_description_file', 'template_schema_version'], ['template_schema_version']]],
          MapPathsCombinator(ManifestFilePipeline),
@@ -1124,11 +1164,14 @@ class SDSPipeline(JSONPipeline):
     ]
 
     copies = ([['dataset_description_file', 'contributors'], ['contributors']],
+              [['dataset_description_file', 'data_dictionary'], ['data_dictionary']],  # TODO this is the top down one, we also need the bottom up from the manifests
+              [['dataset_description_file', 'device'], ['device']],
               [['code_description_file',], ['inputs', 'code_description_file']],
               [['performances_file',], ['inputs', 'performances_file']],
               [['subjects_file',], ['inputs', 'subjects_file']],
               [['samples_file',], ['inputs', 'samples_file']],
               [['sites_file',], ['inputs', 'sites_file']],
+              [['curation_file',], ['inputs', 'curation_file']],
               [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
@@ -1183,6 +1226,7 @@ class SDSPipeline(JSONPipeline):
         [['subjects_file', 'subjects'], ['subjects']],
         [['samples_file', 'samples'], ['samples']],
         [['sites_file', 'sites'], ['sites']],
+        [['curation_file'], ['curation']],
     )
 
     #conditional = (  # someday ...
@@ -1196,6 +1240,7 @@ class SDSPipeline(JSONPipeline):
               ['subjects_file'],
               ['samples_file'],
               ['sites_file'],
+              ['curation_file'],
               ['manifest_file'],
               ['performances_file'],
               ['code_description_file']]
@@ -1211,6 +1256,11 @@ class SDSPipeline(JSONPipeline):
           ('subject_id', 'pool_id', 'subject_experimental_group', 'member_of', 'laboratory_internal_id')],
         *[[['performances', int, field], norm.number_identifiers_to_string] for field in
           ('performance_id',)],
+        [['samples', int, 'was_derived_from'], De.ident_multi],
+        *[[['performances', int, field], De.ident_multi] for field in
+          ('specimen', 'subject', 'sample', 'site')],
+        *[[['inputs', 'manifest_file', int, 'contents', 'manifest_records', int, field], De.ident_multi] for field in
+          ('entity', 'specimen', 'subject', 'sample', 'site', 'performance',)],
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
@@ -1230,6 +1280,11 @@ class SDSPipeline(JSONPipeline):
                                             #[['contributor_orcid']]],
                                            ])
                             for c in cs]),
+                []],
+
+               [[['samples'],
+                 ['meta', 'template_schema_version']],
+                (lambda ss, tsv: (ss if int(tsv.split('.')[0]) < 2 else De.samples_rekey(ss))),
                 []],
 
                [[['contributors']],
@@ -1338,11 +1393,16 @@ class SDSPipeline(JSONPipeline):
 
         if 'errors' in data:
             get_paths = set(tuple(gp) for gas, _, _ in self.subpipelines for gp, _ in gas)
-            sections = set((s,) for s in data)
-            # FIXME probably should just use adops.get to check for the path
-            both = get_paths & sections
+            both = []
+            for _p in get_paths:
+                try:
+                    _pv = adops.get(data, _p)
+                    both.append((_p, _pv))
+                except exc.NoSourcePathError:
+                    pass
+
             if not both:
-                log.debug(f'{get_paths}\n{sections}\n{both}')
+                log.info(f'{get_paths}\n{sections}\n{both}')
                 raise self.SkipPipelineError(data)
 
         return data
@@ -1405,7 +1465,7 @@ class SDSPipeline(JSONPipeline):
             data['status']['submission_errors'] = []
             data['status']['curation_errors'] = []
             #data['protocol_index'] = 9999  # I think this one has to go in reverse?
-            log.debug('pipeline skipped to end due to errors')
+            log.info('pipeline skipped to end due to errors')
 
         return data
 
@@ -1804,6 +1864,13 @@ class PipelineEnd(JSONPipeline):
         'PipelineExtras.ffail',
         'PipelineExtras.data',
         'ProtocolData',  # FIXME this is here as a placeholder
+
+        'CurationFile',
+
+        'CurationFilePipeline._transformer',
+        'CurationFilePipeline.transformer',
+        'CurationFilePipeline.data',
+
     ]
 
     _shadowed = [

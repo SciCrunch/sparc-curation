@@ -6,7 +6,7 @@ import idlib
 from sparcur import schemas as sc
 from sparcur import exceptions as exc
 from sparcur import normalization as nml
-from sparcur.core import log, logd, JPointer, HasErrors
+from sparcur.core import log, logd, JPointer, HasErrors, hashable_converter
 from sparcur.utils import register_type
 
 
@@ -31,6 +31,12 @@ def collect(*oops, unpacked=True):
 
 class Derives:
     """ all derives must return as a tuple, even if they are length 1 """
+
+    @staticmethod
+    def ident_multi(id_string):
+        """ split whitespace separated lists of identifiers """
+        ids = tuple(id_string.split())
+        return ids
 
     @staticmethod
     def contributor_name(name) -> Tuple[str, str]: 
@@ -152,6 +158,7 @@ class Derives:
 
     @staticmethod
     def _lift_mr(path_dataset, dataset_relative_path, record, should_log):
+        _should_log = should_log
         parent = dataset_relative_path.parent
         if 'filename' not in record:
             msg = f'filename missing from record in {dataset_relative_path}'
@@ -186,15 +193,25 @@ class Derives:
                            blame='submission',
                            path=_record_path):
                 if should_log:
-                    should_log = False
+                    _should_log = False
                     logd.error(message)
 
             he.embedErrors(lifted)
 
-        lifted['prov:wasDerivedFrom'] = (
-            # have to reattach path_dataset because Path.cwd() may not be
-            # the dataset root (usually the organizaiton root)
-            path_dataset / dataset_relative_path).cache_identifier
+        # have to reattach path_dataset because Path.cwd() may not be
+        # the dataset root (usually the organizaiton root)
+        _repath = path_dataset / dataset_relative_path
+        try:
+            lifted['prov:wasDerivedFrom'] = _repath.cache_identifier
+        except exc.NoStreamError as e:
+            # cache not present e.g. due to local modification so no
+            # remote id is available, so we leave the prov record out,
+            # though we could use a checksum instead
+            msg = f'missing cache metadata: {_repath}'
+            if should_log:
+                _should_log = False
+                logd.warning(msg)
+
         lifted['dataset_relative_path'] = record_drp
         lifted['manifest_record'] = {
             k:v for k, v in record.items() if k != 'filetype'
@@ -204,7 +221,7 @@ class Derives:
             # FIXME currently a string, either change name or make a list?
             lifted['mimetype'] = record['additional_types']
 
-        return lifted, should_log
+        return lifted, _should_log
 
     @staticmethod
     def _scaffolds(lifted, scaffolds):
@@ -263,6 +280,12 @@ class Derives:
         return path_metadata, scaffolds
 
     @staticmethod
+    def samples_rekey(samples):
+        """ use to rekey primary_key to be sample_id for sds version > 2 """
+        for sample in samples:
+            sample['primary_key'] = sample['sample_id']
+
+    @staticmethod
     def samples_to_subjects(samples, schema_version=None):
         """ extract subject information from samples sheet """
         # TODO only allow this for <= 1.2.3 ? or no, really
@@ -290,12 +313,14 @@ class Derives:
             'age_range_max',
             'date_of_euthanasia',
         )
-        subjects = [{k:v for k, v in blob_sample.items() if k in subject_fields}
-                    for blob_sample in samples]
+        _subjects = [{k:v for k, v in blob_sample.items() if k in subject_fields}
+                     for blob_sample in samples]
+        subjects = [dict(s) for s in set(hashable_converter(d) for d in _subjects)]
         return subjects,
 
     @staticmethod
-    def validate_structure(path, dir_structure, performances, subjects, samples, sites):
+    def validate_structure(path, dir_structure, path_metadata, # manifests,
+                           performances, subjects, samples, sites):
         he = HasErrors(pipeline_stage='Derives.validate_structure')
 
         # FIXME TODO handle pools as well and figure out cases where subjects/samples are metadata only
@@ -324,6 +349,25 @@ class Derives:
                 # cull empty in a single step
                 if av} 
 
+        ent_by_manifest = {}
+        for pmr in path_metadata:
+            if 'manifest_record' in pmr:
+                pmrmr = pmr['manifest_record']
+                for field in('entity', 'specimen', 'subject', 'sample', 'site', 'performance',):
+                    if field in pmrmr:
+                        fv = pmrmr[field]
+                        for ent_id in fv:
+                            ent_by_manifest[ent_id] = (
+                                pmr['dataset_relative_path'],
+                                (pmr['remote_id'] if 'remote_id' in pmr else None),)
+
+        ent_done_by_manifest = set(ent_by_manifest)
+        # FIXME TODO the next step is accounting for every single
+        # _file_ not just every folder, this means we have to handle
+        # the non-transitive case so we don't count parent folders
+        # unless they are explicit i think?  this gets quite a bit
+        # more complex here :/
+
         perfs = {p['performance_id']:p for p in performances}
 
         site_records = sites
@@ -339,8 +383,12 @@ class Derives:
         samps = dict(dd)
 
         ### pools
+        metadata_only_specs = set()  # TODO also need metadata_only sites and perfs etc.
         dd = defaultdict(list)
         for s, d in subs.items():
+            if 'metadata_only' in d and d['metadata_only']:
+                metadata_only_specs.add(s)
+
             if 'pool_id' in d:
                 dd[d['pool_id']].append(s)
         sub_pools = dict(dd)
@@ -348,6 +396,9 @@ class Derives:
 
         dd = defaultdict(list)
         for s, d in samps.items():
+            if d and 'metadata_only' in d[0] and d[0]['metadata_only']:
+                metadata_only_specs.add(s)
+
             if d and 'pool_id' in d[0]:
                 dd[d[0]['pool_id']].append(s)
         sam_pools = dict(dd)
@@ -359,19 +410,18 @@ class Derives:
         records = []
         done_dirs = set()
         done_specs = set()
-        metadata_only_specs = set()
 
         ### performances
         union_perf = set(dirs) | set(perfs)
         inter_perf = set(dirs) & set(perfs)
         done_dirs.update(inter_perf)
-        not_done_perfs = set(perfs) - inter_perf
+        not_done_perfs = set(perfs) - inter_perf  # TODO - metadata_only_perfs
 
         ### sites
         union_site = set(dirs) | set(sites)
         inter_site = set(dirs) & set(sites)
         done_dirs.update(inter_site)
-        not_done_sites = set(sites) - inter_site
+        not_done_sites = set(sites) - inter_site  # TODO - metadata_only_sites
 
         ### subject pools
         inter_sub_pool = set(dirs) & set(sub_pools)
@@ -382,7 +432,7 @@ class Derives:
         union_sub = set(dirs) | set(subs)
         inter_sub = set(dirs) & set(subs)
 
-        if inter_sub | pooled_subjects == set(subs):
+        if inter_sub | pooled_subjects == set(subs) - metadata_only_specs:
             ok_subs = subs
         else:
             ok_ids = inter_sub | pooled_subjects
@@ -420,7 +470,7 @@ class Derives:
 
         template_version_less_than_2 = True  # FIXME TODO
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
-        if inter_sam | pooled_samples == set(samps):
+        if inter_sam | pooled_samples == set(samps) - metadata_only_specs:
             for sample_id, blob in samps.items():
                 if sample_id in pool_sams:  # FIXME assumes 1:1 which is incorrect
                     pool_id = pool_sams[sample_id]
@@ -434,8 +484,20 @@ class Derives:
                         logd.error(msg)
                     continue
 
+                if sample_id in metadata_only_specs:
+                    if sample_id in inter_sam:
+                        # TODO embed this one probably?
+                        breakpoint()
+                        logd.error(f'metadata only sample has a folder??? {sample_id}')
+
+                    continue
+
                 if template_version_less_than_2:  # FIXME this is sure the cause an error at some point
-                    done_dirs.add((blob[0]['subject_id'], sample_id))
+                    if '_' in blob[0]['primary_key']:  # composite primary case
+                        done_dirs.add((blob[0]['subject_id'], sample_id))
+                    else:
+                        done_dirs.add(sample_id)
+
                     done_specs.add(blob[0]['primary_key'])
                     id = blob[0]['primary_key']
                 else:
@@ -482,7 +544,11 @@ class Derives:
                                 subject_id = blob['subject_id']
                                 if subject_id == p_subject_id:
                                     id = blob['primary_key']
-                                    done_dirs.add((subject_id, p_sample_id))
+                                    if '_' in id:  # composite primary key
+                                        done_dirs.add((subject_id, p_sample_id))
+                                    else:
+                                        done_dirs.add(p_sample_id)
+
                                     done_specs.add(id)
                                     actual.append(drp)
 
@@ -516,20 +582,24 @@ class Derives:
             if 'sample_id' in blob:  # FIXME sigh missing types on these
                 yield blob['subject_id']
                 if 'was_derived_from' in blob:  # TODO member_of works backward with populations, so may need to deal with that case as well
-                    parent = blob['was_derived_from']
-                    parent_pkey = blob['subject_id'] + '_' + parent
-                    if parent_pkey in _combined_index:
-                        yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
-                    else:
-                        if parent.startswith('='):
-                            msg = f'Sample was_derived_from specified as a formula. We do not currently support this.'
+                    parents = blob['was_derived_from']
+                    for parent in parents:
+                        parent_pkey = blob['subject_id'] + '_' + parent
+                        if parent_pkey in _combined_index:
+                            # this branch should pretty much never trigger now
+                            yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
+                        elif parent in _combined_index:
+                            yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
                         else:
-                            msg = 'Sample was_derived_from does not exist!'
+                            if parent.startswith('='):
+                                msg = f'Sample was_derived_from specified as a formula. We do not currently support this.'
+                            else:
+                                msg = 'Sample was_derived_from does not exist!'
 
-                        msg += f' {blob["sample_id"]!r} -> {parent!r}'
+                            msg += f' {blob["sample_id"]!r} -> {parent!r}'
 
-                        if he.addError(msg, blame='submission', path=path):
-                            logd.error(msg)
+                            if he.addError(msg, blame='submission', path=path):
+                                logd.error(msg)
 
             elif 'subject_id' in blob:
                 return
@@ -545,6 +615,7 @@ class Derives:
         maybe_not_done_specs = maybe_done_specs_all - set(done_specs)
 
         usamps = set(v['primary_key'] for vs in samps.values() for v in vs)
+        _composite_primary = set(s for s in usamps if '_' in s)
         # udirs is a set of strings and tuples, strings for top level
         # folders that are not nested and tuples for samples folders,
         # matching how done_dirs is populated above
@@ -553,11 +624,15 @@ class Derives:
             (((subject, path_name) for subject in
               set(element for depth, path, elements in matched_subpaths
                   for element in elements if element.startswith('sub-')))
-             if path_name in samps else
+             if path_name in samps and _composite_primary else
              (path_name,)))
-        udirs = _udirs  # set(dirs)
-        not_done_specs = (set(subs) | usamps) - set(done_specs)
+        udirs = _udirs  # if _composite_primary else set(dirs)
+        not_done_specs = (set(subs) | usamps) - (set(done_specs) | metadata_only_specs)
         not_done_dirs = set(udirs) - set(done_dirs)
+
+        spd = {d: set(p[-1][-1] for p in dirs[d]) for d in done_dirs}
+        # TODO reconcile with manifest mapping as well
+        not_in_primary = set(k for k, v in spd.items() if 'primary' not in v)
 
         def_not_done_specs = not_done_specs - maybe_not_done_specs
 

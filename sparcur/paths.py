@@ -822,7 +822,11 @@ class PathHelper:
         if self.cache is not None:
             return self.cache.populateJsonMetadata(blob)
         else:
-            return self._jsonMetadata()
+            if blob is None:
+                blob = {}
+
+            blob.update(self._jsonMetadata())
+            return blob
 
     def _jm_common(self, do_expensive_operations=False):
         # FIXME WARNING resolution only works if we were relative to
