@@ -121,8 +121,13 @@ def stuff(type_prefix, type_id_gen,
             recs.append([would_file, eid])
 
     if has_mta:
-        mo = has_nmm if has_nmm else ''
-        row = [eid, has_nmm, has_dir, has_rec, has_mta, has_fil, has_rod, has_rof]
+        mo = has_nmm if has_nmm else ''  # FIXME csv True/False parsing issue
+        row = [eid, mo, has_dir, has_rec, has_mta, has_fil, has_rod, has_rof]
+        if type_prefix == 'sub':
+            row.extend(('turdus merula',))
+        if type_prefix == 'site':
+            row.append(metas['sub'][1][0])
+
         metas[type_prefix].append(row)
 
     if has_fil:
@@ -138,6 +143,11 @@ files = []
 metas = {}
 for type_prefix, prefix_header in zip(*(prefixes, headers)):
     metas[type_prefix] = [[prefix_header, 'metadata_only', 'directory', 'manifest record', 'entity metadata', 'file', 'rec on dir', 'rec on file']]
+    if type_prefix == 'sub':
+        metas[type_prefix][0].append('species')
+    if type_prefix == 'site':
+        metas[type_prefix][0].append('specimen_id')
+
     type_id_gen = iter(range(9999))
     next(type_id_gen)
     #for axis in (nam_dir, nam_rec, nam_mta, nam_fil):
@@ -156,8 +166,11 @@ for type_prefix, prefix_header in zip(*(prefixes, headers)):
                                 if (not has_rec and (has_rod or has_rof) or
                                     # actually ... this case can happen ... where there is a dir included via manifest only
                                     #not has_dir and has_rod or
-                                    not has_fil and has_rof
-                                    ):
+                                    not has_fil and has_rof):
+                                    continue
+
+                                if (has_rec and not has_rod and not has_rof):
+                                    # this case is essentially degenerate with not has_rec case
                                     continue
 
                                 stuff(type_prefix, type_id_gen,

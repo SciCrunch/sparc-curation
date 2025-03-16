@@ -370,9 +370,11 @@ class Derives:
         # more complex here :/
 
         perfs = {p['performance_id']:p for p in performances}
+        metadata_only_perfs = set(k for k, v in perfs.items() if 'metadata_only' in v and v['metadata_only'])
 
         site_records = sites
         sites = {p['site_id']:p for p in site_records}
+        metadata_only_sites = set(k for k, v in sites.items() if 'metadata_only' in v and v['metadata_only'])
 
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
@@ -416,13 +418,13 @@ class Derives:
         union_perf = set(dirs) | set(perfs)
         inter_perf = set(dirs) & set(perfs)
         done_dirs.update(inter_perf)
-        not_done_perfs = set(perfs) - inter_perf  # TODO - metadata_only_perfs
+        not_done_perfs = set(perfs) - (inter_perf | metadata_only_perfs | ent_done_by_manifest)
 
         ### sites
         union_site = set(dirs) | set(sites)
         inter_site = set(dirs) & set(sites)
         done_dirs.update(inter_site)
-        not_done_sites = set(sites) - inter_site  # TODO - metadata_only_sites
+        not_done_sites = set(sites) - (inter_site | metadata_only_sites | ent_done_by_manifest)
 
         ### subject pools
         inter_sub_pool = set(dirs) & set(sub_pools)
@@ -542,7 +544,7 @@ class Derives:
                                     log.warning(f'TODO new structure {drp}')
 
                                 assert sample_id == p_sample_id  # this should always be true
-                                subject_id = blob['subject_id']
+                                subject_id = blob['subject_id'] if 'subject_id' in blob else None
                                 if subject_id == p_subject_id:
                                     id = blob['primary_key']
                                     if '_' in id:  # composite primary key
@@ -563,6 +565,10 @@ class Derives:
                                     'dirs': actual,
                                     })
                         else:
+                            if sample_id in ent_done_by_manifest:
+                                logd.info(f'done by manifest {sample_id}')
+                                continue
+
                             msg = f'No folder for sample {sample_id}'
                             if he.addError(msg, blame='submission', path=path):
                                 logd.error(msg)
@@ -628,7 +634,7 @@ class Derives:
              if path_name in samps and _composite_primary else
              (path_name,)))
         udirs = _udirs  # if _composite_primary else set(dirs)
-        not_done_specs = (set(subs) | usamps) - (set(done_specs) | metadata_only_specs)
+        not_done_specs = (set(subs) | usamps) - (set(done_specs) | metadata_only_specs | ent_done_by_manifest)
         not_done_dirs = set(udirs) - set(done_dirs)
 
         spd = {d: set(p[-1][-1] for p in dirs[d]) for d in done_dirs}
@@ -637,6 +643,22 @@ class Derives:
 
         def_not_done_specs = not_done_specs - maybe_not_done_specs
 
+        double_done_ents = done_dirs & ent_done_by_manifest
+        # TODO in a nested setting there are cases where a path mapped to an entity might contain
+        # multiple parent structures so we want to detect those cases because things get a bit tricky
+        # with multiple nesting and I don't have a complete understanding of all the cases yet
+        ent_possibly_mismatched = set((k, p) for k, (a, b) in ent_by_manifest.items() for p in a.parts if p in done_dirs)
+        # we want to catch cases where there are any done parent paths that are not exactly mapped to the entity
+        # because we need to use them for comparison against the hierarchy from the metadata sheets, nesting in
+        # folders that does not match the metadata is critical to catch
+
+        # we also want to detect cases where a dir sub-1 has a manifest record e.g. sam-1
+        # not just a case where a file sub-1/file-1.ext has a manifest record sam-1 and for that
+        # we need the more restrictive case checking just the name of the manifest record
+        ent_dir_mismatch = set((k, a.name) for k, (a, b) in ent_by_manifest.items() if a.name in done_dirs and a.name != k)
+
+        not_actually_metadata_only = (metadata_only_specs | metadata_only_sites | metadata_only_perfs) & (done_dirs | ent_done_by_manifest)
+
         obj = {}
 
         if records:
@@ -644,9 +666,47 @@ class Derives:
         else:
             pass # TODO embed an error
 
+        # FIXME TODO dirs without files case
+
+        if double_done_ents:
+            # this is not necessarily a problem but is good to catch
+            msg = ('There are entities with double mapping via directory name and manifest!'
+                   f'\n{double_done_ents}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if ent_dir_mismatch:
+            # catch cases where a directory name and the mapping are mismatched
+            msg = ('There are directories with mismatched manifest record entity mapping!'
+                   f'\n{ent_dir_mismatch}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if not_actually_metadata_only:
+            # catch cases where ents marked as metadata only actually have a dir or manifest record
+            # TODO better error message for these, specifically the full path or the metadata entry
+            msg = ('There are entities marked as metadata only that have a directory or manifest entry!'
+                   f'\n{not_actually_metadata_only}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
         if not_done_perfs:
             msg = ('There are performances that have no corresponding '
                    f'directory!\n{not_done_perfs}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if not_done_sites:
+            msg = ('There are sites that have no corresponding '
+                   f'directory!\n{not_done_sites}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
