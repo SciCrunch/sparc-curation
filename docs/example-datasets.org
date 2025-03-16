@@ -1,0 +1,344 @@
+Example SDS structures with notes on brokenness.
+Used to develop tests for the validator by generating known invalid cases.
+* examples
+** description only
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-dd-only/dataset_description.csv :mkdirp yes
+<<dd-2>>
+#+end_src
+** problems
+*** taxonomy
+- axes
+  - type
+    - subject
+    - sample
+    - site
+    - performance
+  - directory
+    - no
+    - yes
+      - count
+        - single
+        - multi
+  - manifest
+    - no
+    - without mapping to entity
+    - yes
+      - on
+        - file
+        - dir
+      - count
+        - single
+        - multi
+  - metadata
+    - entity
+      - should
+      - should not
+      - does
+      - does not
+    - modality
+      - should
+      - should not
+      - does
+      - does not
+  - files
+    - yes
+      - in dir
+        - yes
+        - no
+          - no manifest conflict
+          - manifest conflicts with dir
+    - no
+  - parent (sort of nesting?)
+    - no
+    - yes
+      - source
+        - in meta
+        - in dir
+        - in both
+        - in conflict
+      - location
+        - immediate
+        - higher
+
+*** generate
+Generate an example dataset from the taxonomy of possible combinations above.
+At the moment it is not quite complete, and should be integrated into test.
+#+begin_src python :results none
+prefixes = 'sub', 'sam', 'site', 'perf'
+headers = 'subject id', 'sample id', 'site id', 'performance id'
+mfiles = 'subjects', 'samples', 'sites', 'performances'
+tf = True, False
+nam_dir = 'dir', 'nod'
+nam_rec = 'rec', 'nor'  # FIXME no manifest record at all vs no manifest record mapping to entity :/
+nam_mta = 'mta', 'nom'
+nam_fil = 'fil', 'nof'
+nam_nmm = 'mim', 'mum'  # no_meta_marked = 'no_meta_marked', 'no_meta_missing'
+
+rec_on_dir = 'rod', 'nrd'
+rec_on_file = 'rof', 'nrf'
+
+distinct_file_gen = iter(range(9999))
+next(distinct_file_gen)
+
+def stuff(type_prefix, type_id_gen,
+          has_dir, has_dir_nam,
+          has_rec, has_rec_nam,
+          has_mta, has_mta_nam,
+          has_fil, has_fil_nam,
+          has_nmm, has_nmm_nam,
+          has_rod, has_rod_nam,
+          has_rof, has_rof_nam,
+          ):
+
+    numeric = next(type_id_gen)
+    eid = f'{type_prefix}-{numeric:0>2}-{has_dir_nam}-{has_rec_nam}-{has_mta_nam}-{has_fil_nam}-{has_nmm_nam}-{has_rod_nam}-{has_rof_nam}'
+    #print(eid)
+    if has_dir:
+        would_dir = f'primary/{eid}'  # FIXME TODO spd
+    elif has_rod:
+        would_dir = f'primary/dir-for-{numeric}-{type_prefix}'
+    else:
+        would_dir = 'primary/other'
+
+    dirs.append(would_dir)
+
+    def mwf():
+        return would_dir + f'/file-{next(distinct_file_gen):0>4}.ext'
+
+    would_file = None
+
+    if has_rec:
+        if has_rod:
+            #if not has_dir:
+                #raise ValueError('rod but not dir')
+
+            recs.append([would_dir, eid])
+        if has_rof:
+            if not has_fil:
+                raise ValueError('rof but not file')
+
+            would_file = mwf()
+            recs.append([would_file, eid])
+
+    if has_mta:
+        mo = has_nmm if has_nmm else ''
+        row = [eid, has_nmm, has_dir, has_rec, has_mta, has_fil, has_rod, has_rof]
+        metas[type_prefix].append(row)
+
+    if has_fil:
+        if would_file is None:
+            would_file = mwf()
+
+        files.append(would_file)
+
+
+recs = [['filename', 'entity',]]  # TODO rest of columns to test as well ...
+dirs = []
+files = []
+metas = {}
+for type_prefix, prefix_header in zip(*(prefixes, headers)):
+    metas[type_prefix] = [[prefix_header, 'metadata_only', 'directory', 'manifest record', 'entity metadata', 'file', 'rec on dir', 'rec on file']]
+    type_id_gen = iter(range(9999))
+    next(type_id_gen)
+    #for axis in (nam_dir, nam_rec, nam_mta, nam_fil):
+    for has_dir, has_dir_nam in zip(*(tf, nam_dir)):
+        for has_rec, has_rec_nam in zip(*(tf, nam_rec)):
+            for has_mta, has_mta_nam in zip(*(tf, nam_mta)):
+                for has_fil, has_fil_nam in zip(*(tf, nam_fil)):
+                    for has_nmm, has_nmm_nam in zip(*(tf, nam_nmm)):
+                        for has_rod, has_rod_nam in zip(*(tf, rec_on_dir)):
+                            for has_rof, has_rof_nam in zip(*(tf, rec_on_file)):
+                                # FIXME nmm is not fully orthogonal
+                                # FIXME TODO manifest recs and files interact as well ...
+                                if not has_mta and has_nmm:
+                                    continue
+
+                                if (not has_rec and (has_rod or has_rof) or
+                                    # actually ... this case can happen ... where there is a dir included via manifest only
+                                    #not has_dir and has_rod or
+                                    not has_fil and has_rof
+                                    ):
+                                    continue
+
+                                stuff(type_prefix, type_id_gen,
+                                      has_dir, has_dir_nam,
+                                      has_rec, has_rec_nam,
+                                      has_mta, has_mta_nam,
+                                      has_fil, has_fil_nam,
+                                      has_nmm, has_nmm_nam,
+                                      has_rod, has_rod_nam,
+                                      has_rof, has_rof_nam,
+                                      )
+
+
+dirs = sorted(set(dirs))
+
+import csv, pathlib
+
+base = pathlib.Path('../test/examples/org/dataset-combinatorics/').resolve()
+base.mkdir(parents=True, exist_ok=True)
+
+with open(base / ('manifest.csv'), 'wt') as f:
+    w = csv.writer(f)
+    w.writerows(recs)
+
+for key, mfn in zip(*(prefixes, mfiles)):
+    with open(base / (mfn + '.csv'), 'wt') as f:
+        w = csv.writer(f)
+        w.writerows(metas[key])
+
+for d in dirs:
+    (base / d).mkdir(parents=True, exist_ok=True)
+
+for f in files:
+    (base / f).touch()
+
+if False:
+    from pprint import pprint
+    pprint(recs, width=120)
+    pprint(metas, width=120)
+
+#+end_src
+
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-combinatorics/dataset_description.csv :mkdirp yes
+<<dd-1>>
+#+end_src
+
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-combinatorics/curation.csv :mkdirp yes
+<<cu-1>>
+#+end_src
+
+** other
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-issues/dataset_description.csv :mkdirp yes
+<<dd-2>>
+#+end_src
+
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-issues/subjects.csv :mkdirp yes
+<<su-1>>
+#+end_src
+
+* files
+** cu
+#+name: cu-1
+#+begin_src csv
+Metadata element,Value,Value 2,Value 3,Value n
+Controlled fields,,,,
+    Organ,earth,plateau province,,
+    Experimental approach,meteorological,,,
+    Experimental technique,wait-and-see technique,meteorological techinque,,
+Curator notes,,,,
+    Experimental design,100 rain gauges at 100 sites for a year,,,
+    Completeness,complete for 1873,,,
+    Subjects and samples,rain water was not retained for later analysis,,,
+    Primary vs derivative data,all data is primary,,,
+    Code availability,,,,
+#+end_src
+
+** dd
+*** exp
+#+name: dd-1
+#+begin_src csv
+Metadata element,Value,Value 2,Value 3,Value n
+Metadata version,3.0.1,,,
+Type,experimental,,,
+Standards information,,,,
+    Data standard,SPARC,,,
+    Data standard version,3.0.0,,,
+Basic information,,,,
+    Title,rainfall in the plataue province for 1873,,,
+    Subtitle,,,,
+    Description,"a collection of rainfall in inches with temporal resolution of days, lat long to 1 second resolution, elevation to 1 meter, from 100 sites",,,
+    Keywords,plateau province,powell,,
+    Funding,congressional appropriation for 1873,,,
+    Acknowledgments,thanks congress,,,
+    License,,,,
+Funding information,,,,
+    Funding consortium,appropriations bills for 1873,,,
+    Funding agency,congress,,,
+    Award number,see page thus and such of the proceedings,,,
+Study information,,,,
+    Study purpose,determine fertility of region,,,
+    Study data collection,rain gauges at 100 sites,,,
+    Study primary conclusion,it is really dry out here so we will need irrigation,,,
+    Study organ system,water cycle,interior,,
+    Study approach,longitudinal,geophysical,climatalogical,,
+    Study technique,multi-site,field-study,use-a-ruler,
+    Study collection title,report on the arid lands,,,
+Contributor information,,,,
+    Contributor name,"powell, john wesley",,,
+    Contributor ORCiD,,,,
+    Contributor affiliation,"Smithsonian Institute",,,
+    Contributor role,"PrincipalInvestigator, CorrespondingAuthor",,,
+"Related protocol, paper, dataset, etc.",,,,
+    Identifier description,,,,
+    Relation type,,,,
+    Identifier,,,,
+    Identifier type,,,,
+Participant information,,,,
+    Number of subjects,1,,,
+    Number of samples,0,,,
+    Number of sites,100,,,
+    Number of performances,36500,,,
+Data dictionary information,,,,
+    Data dictionary path,,,,
+    Data dictionary type,,,,
+    Data dictionary description,,,,
+Device information,,,,
+    Device intended use,,,,
+    Device current use,,,,
+    Device type,,,,
+    Device application,,,,
+    Device target anatomy,,,,
+    Device target species,,,,
+    Device target sex,,,,
+    Device target age category,,,,
+    Device target disease or disorder,,,,
+#+end_src
+*** dev
+#+name: dd-2
+#+begin_src csv
+Metadata element,Value,Value 2,Value 3,Value n
+Metadata version,3.0.1,,,
+Type,device,,,
+Standards information,,,,
+    Data standard,,,,
+    Data standard version,,,,
+Basic information,,,,
+    Title,eight inch rain gauge,,,
+    Subtitle,,,,
+    Description,"a standard 8 inch rain gauge",,,
+    Keywords,rain,rainfall,evaporation,
+Contributor information,,,,
+    Contributor name,"powell, john wesley",,,
+    Contributor ORCiD,,,,
+    Contributor affiliation,"Smithsonian Institute",,,
+    Contributor role,"PrincipalInvestigator, CorrespondingAuthor",,,
+"Related protocol, paper, dataset, etc.",,,,
+    Identifier description,Treatise on Meteorological Apparatus and Methods,,,
+    Relation type,IsDescribedBy,,,
+    Identifier,978-0282684020,,,
+    Identifier type,ISBN13,,,
+Participant information,,,,
+    Number of subjects,0,,,
+    Number of samples,0,,,
+Device information,,,,
+    Device intended use,measuring rainfall,,,
+    Device current use,measuring rainfall,,,
+    Device type,rate over area by volume by length,,,
+    Device application,meteorology,,,
+    Device target anatomy,percipitation,,,
+    Device target species,atmospheric water,,,
+    Device target sex,,,,
+    Device target age category,ancient,,,
+    Device target disease or disorder,bad weather,,,
+#+end_src
+** su
+#+name: su-1
+#+begin_src csv
+subject id,species,metadata only,notes
+sub-1,turdus merula,,dir
+sub-2,turdus merula,,no dir
+sub-3,turdus merula,true,no dir
+sub-4,turdus merula,true,dir
+#+end_src
+sub-5 is dir only so doesn't show up here
