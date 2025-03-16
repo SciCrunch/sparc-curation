@@ -775,6 +775,16 @@ class ErrorSchema(JSONSchema):
               'items': {'type': 'object'},}
 
 
+def anyOf(*schemas):
+    """ wrap with anyOf """
+    return {'anyOf': schemas}
+
+
+def anyOfstr(*schemas):
+    # FIXME placeholder because we still use strings in many input scenarios
+    # and either we make this non-fatal or we need to convert to a warning
+    return anyOf(string_noltws, *schemas)
+
 
 def make_id_schema(cls, pattern=None, format=None):
     id_schema = {'type': 'string'}
@@ -2330,7 +2340,7 @@ class MetaOutExportSchema(JSONSchema):
         'template_schema_version': {'type': 'string'},
         'organ': {'type': 'array',
                   'minItems': 1,
-                  'items': EIS._allOf(OntTermSchema),
+                  'items': anyOfstr(EIS._allOf(OntTermSchema)),
                   'context_value': idtype('isAbout'),
                   },
         'modality': {'type': 'array',
@@ -2342,7 +2352,7 @@ class MetaOutExportSchema(JSONSchema):
         },
         'techniques': {'type': 'array',
                        'minItems': 1,
-                       'items': EIS._allOf(OntTermSchema),
+                       'items': anyOfstr(EIS._allOf(OntTermSchema)),
                        # FIXME usedProtocolThatEmployedTechniques ...
                        'context_value': idtype('TEMP:protocolEmploysTechnique'),
         },

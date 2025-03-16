@@ -664,12 +664,24 @@ class Tabular(HasErrors):
         # is greater than the number of delimiters in the header then any
         # columns beyond the number in the header will be truncated and
         # I'm not sure that this loading routine detects that
+        def normcell(cell):
+            # normalize empty to None and string booleans to boolean
+            # to avoid cases where bool('False') -> True instead of False
+            if cell == '':
+                return None
+            elif cell.lower() == 'true':
+                return True
+            elif cell.lower() == 'false':
+                return False
+            else:
+                return cell
+
         for encoding in ('utf-8', 'latin-1'):
             try:
                 with open(self.path, 'rt', encoding=encoding) as f:
                     rows_orig = list(csv.reader(f, delimiter=delimiter))
 
-                rows = [[None if cell == '' else cell for cell in row]
+                rows = [[normcell(cell) for cell in row]
                         # normalize empty string to None for consistency
                         # with parsers for other formats, I'm sure this will
                         # cause issues downstream with NoneType vs str ...

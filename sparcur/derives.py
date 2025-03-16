@@ -435,7 +435,8 @@ class Derives:
         union_sub = set(dirs) | set(subs)
         inter_sub = set(dirs) & set(subs)
 
-        if inter_sub | pooled_subjects == set(subs) - metadata_only_specs:
+        #if inter_sub | pooled_subjects == (set(subs) - (metadata_only_specs | ent_done_by_manifest)):
+        if inter_sub | pooled_subjects == (set(subs) - metadata_only_specs):  # FIXME exact equality here causing issues
             ok_subs = subs
         else:
             ok_ids = inter_sub | pooled_subjects
@@ -473,7 +474,8 @@ class Derives:
 
         template_version_less_than_2 = True  # FIXME TODO
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
-        if inter_sam | pooled_samples == set(samps) - metadata_only_specs:
+        #if inter_sam | pooled_samples == (set(samps) - (metadata_only_specs | ent_done_by_manifest)):
+        if inter_sam | pooled_samples == (set(samps) - metadata_only_specs):  # FIXME exact equality here causing issues
             for sample_id, blob in samps.items():
                 if sample_id in pool_sams:  # FIXME assumes 1:1 which is incorrect
                     pool_id = pool_sams[sample_id]
