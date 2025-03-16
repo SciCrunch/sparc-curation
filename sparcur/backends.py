@@ -82,6 +82,9 @@ def base_data(self):
     yield from gen
 
 
+class _LocalDatasetName: pass
+
+
 class BlackfynnRemote(aug.RemotePath):
 
     _remote_type = 'blackfynn'
@@ -89,7 +92,7 @@ class BlackfynnRemote(aug.RemotePath):
     _id_class = BlackfynnId
     _api_class = None  # set in _setup
     _async_rate = None
-    _local_dataset_name = object()
+    _local_dataset_name = _LocalDatasetName()
 
     _exclude_uploaded = False
 

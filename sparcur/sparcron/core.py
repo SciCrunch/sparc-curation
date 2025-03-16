@@ -360,10 +360,12 @@ def argv_spc_find_meta(dataset_id):
         '--dataset-id', dataset_id,  # nop, debug memory issues
         "--name", "*.xml",
         "--name", "submission*",
+        "--name", "curation*",
         "--name", "code_description*",
         "--name", "dataset_description*",
         "--name", "subjects*",
         "--name", "samples*",
+        "--name", "sites*",
         "--name", "performances*",
         "--name", "manifest*",
         "--name", "resources*",

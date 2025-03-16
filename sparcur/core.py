@@ -337,7 +337,7 @@ class HasErrors:
 
 def lj(j, limit=100):
     """ use with log to format json """
-    out = '\n' + json.dumps(j, indent=2, cls=JEncode)
+    out = '\n' + json.dumps(j, indent=2, cls=JEncode)  # FIXME serialization issues with things with _ThisPathKey ...
     if out.count('\n') > limit + 3:
         asdf = out.split('\n')
         ninclude = limit // 2
@@ -779,13 +779,16 @@ def JT(blob):
     return nc()
 
 
+class _EmptyNodeKey: pass
+
+
 class AtomicDictOperations:
     """ functions that modify dicts in place """
 
     # note: no delete is implemented at the moment ...
     # in place modifications means that delete can loose data ...
 
-    __empty_node_key = object()
+    __empty_node_key = _EmptyNodeKey()
 
     @staticmethod
     def apply(function, *args,
@@ -868,7 +871,16 @@ class AtomicDictOperations:
         if update:
             pass
         elif fail_on_exists and target_key in target:
-            msg = f'A value already exists at path {target_path} in\n{lj(data)}'
+            msg = f'A value already exists at path {target_path}'
+            try:
+                _ljd = lj(data)
+                msg = f'{msg} in\n{_ljd}'
+            except Exception as e:
+                # lj can sometimes fail if data contatins an object
+                # that we don't know how to serialize, we want to
+                # make sure this error propagates as expected
+                pass
+
             raise exc.TargetPathExistsError(msg)
 
         target[target_key] = value
@@ -1317,6 +1329,19 @@ class _DictTransformer:
                                      extra_error_types=(TypeError,),
                                      failure_value=tuple())
                         if not empty(v)))
+            except exc.TargetPathExistsError as e:
+                # we convert tpe errors to logged warnings so that we
+                # don't have to deal with conditional derives that are
+                # needed in some versions of sds but not others
+                # FIXME TODO we probably want to do away with that
+                # behavior and make it version specific, but we also
+                # do not want TPE errors to be fatal because they are
+                # really confusing for curators
+                # FIXME TODO also, a TPE error should be detected before we ever
+                # run the derive function ...
+                msg = f'issue deriving from {source_paths} using {derive_function}'
+                log.warning(msg)
+                log.warning(e)
             except TypeError as e:
                 log.error('wat')
                 idmsg = data['id'] if 'id' in data else ''

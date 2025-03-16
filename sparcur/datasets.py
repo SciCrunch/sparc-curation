@@ -1927,6 +1927,7 @@ class DatasetDescriptionFile(MetadataFile):
                    'identifier': 'related_identifier',
                    'identifier_description': 'related_identifier_description',
                    'identifier_type': 'related_identifier_type',
+                   'funding': 'funding_freetext',
                    #'study_organ_system': 'organ',  # XXX do not convert, requires normalization
                    #'study_approach': 'approach',  # XXX do not convert, requires normalization
                    #'study_technique': 'technique',  # XXX do not convert, requires normalization
@@ -1937,6 +1938,9 @@ class DatasetDescriptionFile(MetadataFile):
     record_type_key_header = record_type_key_alt
     groups_alt = {'standards': ('data_standard',  # 3
                                 'data_standard_version',),
+                  'funding': ('funding_consortium',  # 3
+                              'funding_agency',
+                              'award_number',),
                   'contributors': ('contributor_name',
                                    'contributor_orcid',
                                    'contributor_affiliation',
@@ -1971,8 +1975,8 @@ class DatasetDescriptionFile(MetadataFile):
     ignore_header = 'metadata_element', 'example', 'description_header'
     ignore_alt = ('basic_information', 'study_information', 'contributor_information',
                   'related_protocol__paper__dataset__etc_', 'participant_information',
-                  'data_dictionary_information', 'device_information',
-                  'standards_information',)
+                  'funding_information', 'standards_information',
+                  'data_dictionary_information', 'device_information',)
     raw_json_class = rj.RawJsonDatasetDescription
     normalization_class = nml.NormDatasetDescriptionFile
     normalize_mismatch_ok = 'metadata_element',
@@ -2087,8 +2091,8 @@ class SamplesFile(SubjectsFile):
     # TODO merge
     __internal_id_1 = object()
     __primary_key = 'primary_key'
-    primary_key_rule = __primary_key, ('subject_id', 'sample_id'), join_cast('_')
-    __rename_1 = primary_key_rule[2](('Lab-based schema for identifying each subject',
+    _primary_key_rule = __primary_key, ('subject_id', 'sample_id'), join_cast('_')  # FIXME >= 2 does not require this really ...
+    __rename_1 = _primary_key_rule[2](('Lab-based schema for identifying each subject',
                                       ('Lab-based schema for identifying each sample, must '
                                        'be unique')))
     renames_header = {__primary_key: 'metadata_element',
@@ -2103,7 +2107,7 @@ class SamplesFile(SubjectsFile):
                               'software_rrid'),}
     ignore_header = __internal_id_1,
     ignore_alt = 'additional_fields_e_g__minds',
-    ignore_match = [['samples', primary_key_rule[2](('sub-1', 'sub-1_sam-2')),
+    ignore_match = [['samples', _primary_key_rule[2](('sub-1', 'sub-1_sam-2')),
                      {'subject_id': 'sub-1',
                       'pool_id': 'pool-1',
                       'reference_atlas': 'Paxinos Rat V3',
@@ -2112,6 +2116,13 @@ class SamplesFile(SubjectsFile):
     normalize_header = False
     allow_dupes_alt = False
     _expect_single = _nsffes
+
+    @property
+    def primary_key_rule(self):
+        if int(self.template_schema_version.split('.')[0]) < 2:
+            return self._primary_key_rule
+        else:
+            return self.__primary_key, ('sample_id',), (lambda t: t[0])
 
 
 class SamplesFilePath(ObjectPath):
@@ -2146,6 +2157,7 @@ class ManifestFile(MetadataFile):  # FIXME need a PatternManifestFile I think?
     record_type_key_alt = 'filename'
     record_type_key_header = 'metadata_element'
     groups_alt = {'manifest_records': GROUP_ALL}
+    normalization_class = nml.NormManifestFile
     normalize_header = False
     allow_dupes_alt = False
     #raw_json_class = rj.RawJsonManifestFile  # FIXME TODO sigh
@@ -2212,6 +2224,7 @@ class ManifestFilePath(ObjectPath):
 
 # XXX NOTE *_file is added to all of these keys in DatasetStructure.data
 DatasetStructure.sections = {'submission': SubmissionFilePath,
+                             'curation': CurationFilePath,
                              'code_description': CodeDescriptionFilePath,
                              'dataset_description': DatasetDescriptionFilePath,
                              'performances': PerformancesFilePath,

@@ -179,6 +179,7 @@ note of course that you don't get dynamic binding with version since it is not t
    "find"
    "--name" "*.xml"
    "--name" "submission*"
+   "--name" "curation*"
    "--name" "code_description*"
    "--name" "dataset_description*"
    "--name" "subjects*"

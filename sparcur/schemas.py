@@ -1467,6 +1467,8 @@ class DatasetDescription3Schema(JSONSchema):
                 'type': 'string',
                 'enum': ['experimental', 'computational', 'device'],
             },
+            'number_of_sites': {'type': 'integer'},  # 3
+            'number_of_performances': {'type': 'integer'},  # 3
             'standards': {
                 'type': 'array',
                 'minItems': 1,
@@ -1725,9 +1727,9 @@ class PerformancesSchema(JSONSchema):
     context = lambda : ({}, None)
     __schema = copy.deepcopy(PerformancesExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
-    __wat = schema['properties']['performances']['items']['properties']
-    for _k in ('specimen', 'subject', 'sample', 'site'):  # FIXME hack pat_array in as str
-        __wat[_k] = {'type': 'string'}
+    #__wat = schema['properties']['performances']['items']['properties']
+    #for _k in ('specimen', 'subject', 'sample', 'site'):  # FIXME hack pat_array in as str
+        #__wat[_k] = {'type': 'string'}
 
 
 class SubjectExportSchema(JSONSchema):
@@ -2185,9 +2187,9 @@ class ManifestFileExportSchema(JSONSchema):  # FIXME TODO FileObjectSchema ??
 class ManifestFileSchema(JSONSchema):
     __schema = copy.deepcopy(ManifestFileExportSchema.schema)
     schema = JApplyRecursive(EIS._to_pattern, __schema)
-    __wat = schema['allOf'][1]['properties']['contents']['properties']['manifest_records']['items']['allOf'][0]['properties']
-    for _k in ('entity', 'specimen', 'subject', 'sample', 'site', 'performance'):  # FIXME hack pat_array in as str
-        __wat[_k] = {'type': 'string'}
+    #__wat = schema['allOf'][1]['properties']['contents']['properties']['manifest_records']['items']['allOf'][0]['properties']
+    #for _k in ('entity', 'specimen', 'subject', 'sample', 'site', 'performance'):  # FIXME hack pat_array in as str
+        #__wat[_k] = {'type': 'string'}
 
 
 class ManifestFilesExportSchema(JSONSchema):

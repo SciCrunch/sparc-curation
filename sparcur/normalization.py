@@ -628,6 +628,8 @@ class NormDatasetDescriptionFile(NormValues):
             return value  # and let the schema sort them out
 
     number_of_samples = number_of_subjects
+    number_of_sites = number_of_subjects
+    number_of_performances = number_of_subjects
 
     def funding(self, value):
         if 'OT' in value:
@@ -1079,6 +1081,11 @@ class NormSamplesFile(NormSubjectsFile):
         else:
             yield value.strip()
 
+    def was_derived_from(self, value):
+        # XXX this is the correct/better places to split was_derived_from and friends
+        # much better than in pipelines directly i think ... though there are tradeoffs
+        return tuple(value.split())
+
     def __sample_id(self, value):
         # XXX unused, ids like this need to be fixed in the source data
         if not isinstance(value, str):
@@ -1095,3 +1102,21 @@ class NormSamplesFile(NormSubjectsFile):
 
 class NormPerformancesFile(NormSubjectsFile):
     """ this will do for now """
+
+    def specimen(self, value):
+        return tuple(value.split())
+
+    subject = specimen
+    sample = specimen
+    site = specimen
+
+
+class NormManifestFile(NormValues):
+
+    def entity(self, value):
+        return tuple(value.split())
+
+    specimen = entity
+    subject = entity
+    sample = entity
+    site = entity

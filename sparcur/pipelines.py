@@ -44,7 +44,8 @@ De = Derives
 
 # used to pass the runtime path of the dataset since
 # we don't want to pre-extract all the fs information
-_THIS_PATH_KEY = object()
+class _ThisPathKey: pass
+_THIS_PATH_KEY = _ThisPathKey()
 THIS_PATH = [_THIS_PATH_KEY]
 
 
@@ -915,6 +916,8 @@ class JSONPipeline(Pipeline):
             DictTransformer.derive(data, self.derives, source_key_optional=True)
         finally:
             if _THIS_PATH_KEY in data:
+                # FIXME this can cause a failure when trying to
+                # serialize data on error using .core.lj
                 data.pop(_THIS_PATH_KEY)
 
         if 'path_metadata' in repr(self.derives) and 'path_metadata' not in data:
@@ -1175,7 +1178,7 @@ class SDSPipeline(JSONPipeline):
               [['manifest_file',], ['inputs', 'manifest_file']],  # FIXME move to file level pipeline
               [['submission_file', 'submission'], ['submission']],
               [['submission_file',], ['inputs', 'submission_file']],
-              [['dataset_description_file', 'name'], ['meta', 'title']],
+              [['dataset_description_file', 'name'], ['meta', 'title']],  # XXX this is < 2 only and could cause issues from malformed templates
               [['dataset_description_file', 'links'], ['meta', 'additional_links']],
               # 2.0.0
               [['dataset_description_file', 'study', 'study_collection_title'], ['meta', 'title_for_complete_data_set']],  # XXX 2
@@ -1207,7 +1210,15 @@ class SDSPipeline(JSONPipeline):
                         'title',  # XXX 2
                         'subtitle',  # XXX 2
                         'related_identifiers',  # XXX 2
-              ))
+                        ),
+
+              # new in 3.0.0 overrides or possibly appends to the existing fields
+              # curation has priority for these
+              [['curation_file', 'organ'], ['meta', 'organ']],
+              [['curation_file', 'experimental_approach'], ['meta', 'modality']],  # FIXME -> approach
+              [['curation_file', 'experimental_technique'], ['meta', 'techniques']],
+
+              )
 
     moves = (
         [['dirs',], ['meta', 'dirs']],  # FIXME not quite right ...
@@ -1256,11 +1267,15 @@ class SDSPipeline(JSONPipeline):
           ('subject_id', 'pool_id', 'subject_experimental_group', 'member_of', 'laboratory_internal_id')],
         *[[['performances', int, field], norm.number_identifiers_to_string] for field in
           ('performance_id',)],
-        [['samples', int, 'was_derived_from'], De.ident_multi],
-        *[[['performances', int, field], De.ident_multi] for field in
-          ('specimen', 'subject', 'sample', 'site')],
-        *[[['inputs', 'manifest_file', int, 'contents', 'manifest_records', int, field], De.ident_multi] for field in
-          ('entity', 'specimen', 'subject', 'sample', 'site', 'performance',)],
+        #[['samples', int, 'was_derived_from'], De.ident_multi],
+        #*[[['performances', int, field], De.ident_multi] for field in
+          #('specimen', 'subject', 'sample', 'site')],
+        #*[[['inputs', 'manifest_file', int, 'contents', 'manifest_records', int, field], De.ident_multi] for field in
+          # FIXME this updates, but the schema is checked first somehow ???
+          # rather more ... how is this being checked before this point ???
+          # ANSWER: manifest pipeline is checking the structure before this transformation
+          # SIGH yes, known
+          #('entity', 'specimen', 'subject', 'sample', 'site', 'performance',)],
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
@@ -1347,6 +1362,7 @@ class SDSPipeline(JSONPipeline):
                     and 'related_identifier' in rid)),
                 [['meta', 'protocol_url_or_doi']]],
 
+               # FIXME this should only be done for >= 2 and < 3
                [[['inputs', 'dataset_description_file', 'study']],
                 De.study_description,  # FIXME probably temporary and may klobber/conflict
                 [['meta', 'description']]],
@@ -1606,7 +1622,13 @@ class PipelineExtras(JSONPipeline):
          De.samples_to_subjects,
          [['subjects_from_samples']]],
 
-        [[THIS_PATH, ['dir_structure'], ['performances'], ['subjects'], ['samples'], ['sites']],
+        [[THIS_PATH,
+          ['dir_structure'],
+          ['path_metadata'],  # needs path_metadata from the previous derive
+          # so that we don't have to validate the manifests twice
+          # TODO after we use the path_metadata here we should likely toss it
+          # because we have objects.py now and should really switch to use that
+          ['performances'], ['subjects'], ['samples'], ['sites']],
          # FIXME this needs to happen fast and early
          # FIXME structure is going to be in a separate file/blob for export
          # without the hack to augmented below if there are no samples or no
@@ -1618,7 +1640,7 @@ class PipelineExtras(JSONPipeline):
 
     )
 
-    adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]
+    #adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]  # FIXME TODO construct a fake curation file if one does not exist
 
     filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         # FIXME this is silly, there only needs to be a single lambda for this DUH

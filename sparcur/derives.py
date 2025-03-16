@@ -36,6 +36,7 @@ class Derives:
     def ident_multi(id_string):
         """ split whitespace separated lists of identifiers """
         ids = tuple(id_string.split())
+        raise NotImplementedError('this should be done in the normalization pass from tabular not here')
         return ids
 
     @staticmethod
