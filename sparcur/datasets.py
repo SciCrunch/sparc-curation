@@ -2131,7 +2131,7 @@ class SamplesFile(SubjectsFile):
 
     @property
     def primary_key_rule(self):
-        if int(self.template_schema_version.split('.')[0]) < 2:
+        if self.template_schema_version is None or int(self.template_schema_version.split('.')[0]) < 2:
             return self._primary_key_rule
         else:
             return self.__primary_key, ('sample_id',), (lambda t: t[0])
