@@ -585,7 +585,7 @@ class Derives:
         # XXX the real solution here is to add a column to the metadata sheets which
         # just makes it possible to assert that there this is a metadata only field
         # which I thought we had already discussed
-        def getmaybe(blob):
+        def getmaybe(blob, seen=tuple()):
             # TODO populations are a bit tricky here
             if 'sample_id' in blob:  # FIXME sigh missing types on these
                 if 'subject_id' in blob:
@@ -600,8 +600,31 @@ class Derives:
                         #if parent_pkey in _combined_index:
                             # this branch should pretty much never trigger now
                             #yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
-                        if parent in _combined_index:
-                            yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
+                        if parent in seen:
+                            # was_derived_from defines a temporal sequence of derivations
+                            # and naming does not allow aliasing, that is, I cannot call
+                            # a sample that combines existing input samples by the name
+                            # of any existing sample, further, that combinations are
+                            # necessarily destructive of the original sample, that is,
+                            # if we are being very precise, if I shave a single section
+                            # off a block, then the original block can no longer be identified
+                            # by its original id _IF NEW DATA WILL BE COLLECTED ON IT_
+                            # we can say that 100 sections are derived from the same parent
+                            # even though we didn't cut them all off at the same time because
+                            # we elide the renaming of the larger but now lesser chunk since
+                            # we don't have any data we are going to collect on it, if we
+                            # were to e.g. weigh it each time to show that it reduced in mass
+                            # (think salami accounting at a deli) we might still prefer a
+                            # performance with the original sample id because we aren't going
+                            # to combine it with something in a way that is completely destructive
+                            # the semantics for samples and was_derived_from still need a bit more
+                            # work, but this comment should be sufficient for the moment, i think
+                            # the key is about whether there is a risk of aliasing ...
+                            msg = f'cycle detected in was_derived_from {seen}'
+                            if he.addError(msg, blame='submission', path=path):
+                                logd.error(msg)
+                        elif parent in _combined_index:
+                            yield from getmaybe(_combined_index[parent], seen=seen + (parent,))  # XXX watch out for bad circular refs here
                         else:
                             if parent.startswith('='):
                                 msg = f'Sample was_derived_from specified as a formula. We do not currently support this.'
