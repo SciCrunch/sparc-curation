@@ -50,11 +50,20 @@ def dataset_queued(conn):
 
 
 def main():
+    import sys
     from pprint import pprint
     conn = get_redis_conn()
     fails = dataset_fails(conn)
     running = dataset_running(conn)
     queued = dataset_queued(conn)
+    if '--summary' in sys.argv:
+        print(
+            f':n-fails {len(fails)}\n'
+            f':n-running {len(running)}\n'
+            f':n-queued {len(queued)}'
+        )
+        return
+
     if fails:
         _f = '\n'.join(sorted([f.uuid for f in fails]))
         print(f':fails (\n{_f}\n)')
