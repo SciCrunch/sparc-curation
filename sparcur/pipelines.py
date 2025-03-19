@@ -798,7 +798,7 @@ class JSONPipeline(Pipeline):
         # so it must run on each subpipeline individually ARGH ARGH ARGH
         if 'errors' in data:
             pop_paths = [tuple(p) for p, e in [(e['path'], e) for e in data['errors']
-                                            if 'path' in e]
+                                               if 'path' in e]
                          if any(ff(e, p) for ff in self.filter_failures)]
 
             if pop_paths:
@@ -1106,7 +1106,7 @@ class PipelineStart(JSONPipeline):
                     pass
 
             if not both:
-                log.info(f'{get_paths}\n{sections}\n{both}')
+                log.info(f'{get_paths}\n{list(data)}\n{both}')
                 raise self.SkipPipelineError(data)
 
         return data
@@ -1192,7 +1192,7 @@ class SDSPipeline(JSONPipeline):
                         'protocol_url_or_doi',
 
                         'completeness_of_data_set',
-                        'funding',
+                        'funding_freetext',
                         'description',
                         #'additional_links',  # FIXME internal rename
                         'keywords',
@@ -1267,19 +1267,10 @@ class SDSPipeline(JSONPipeline):
           ('subject_id', 'pool_id', 'subject_experimental_group', 'member_of', 'laboratory_internal_id')],
         *[[['performances', int, field], norm.number_identifiers_to_string] for field in
           ('performance_id',)],
-        #[['samples', int, 'was_derived_from'], De.ident_multi],
-        #*[[['performances', int, field], De.ident_multi] for field in
-          #('specimen', 'subject', 'sample', 'site')],
-        #*[[['inputs', 'manifest_file', int, 'contents', 'manifest_records', int, field], De.ident_multi] for field in
-          # FIXME this updates, but the schema is checked first somehow ???
-          # rather more ... how is this being checked before this point ???
-          # ANSWER: manifest pipeline is checking the structure before this transformation
-          # SIGH yes, known
-          #('entity', 'specimen', 'subject', 'sample', 'site', 'performance',)],
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
-                 ['inputs', 'dataset_description_file', 'funding']],
+                 ['inputs', 'dataset_description_file', 'funding_freetext']],
                 DT.BOX(De.award_number),
                 [['meta', 'award_number']]],
 
@@ -1295,11 +1286,6 @@ class SDSPipeline(JSONPipeline):
                                             #[['contributor_orcid']]],
                                            ])
                             for c in cs]),
-                []],
-
-               [[['samples'],
-                 ['meta', 'template_schema_version']],
-                (lambda ss, tsv: (ss if int(tsv.split('.')[0]) < 2 else De.samples_rekey(ss))),
                 []],
 
                [[['contributors']],
@@ -1418,7 +1404,7 @@ class SDSPipeline(JSONPipeline):
                     pass
 
             if not both:
-                log.info(f'{get_paths}\n{sections}\n{both}')
+                log.info(f'{get_paths}\n{list(data)}\n{both}')
                 raise self.SkipPipelineError(data)
 
         return data
@@ -1662,6 +1648,9 @@ class PipelineExtras(JSONPipeline):
 
                       'inputs' not in p and 'sites' in p and 'message' in e
                       and e['message'] == "'site_id' is a required property" or
+
+                      'inputs' not in p and 'samples' in p and 'message' in e
+                      and e['message'] == "'primary_key' is a required property" or
 
                       'inputs' not in p and 'samples' in p and 'message' in e
                       and e['message'] == "'sample_id' is a required property" or

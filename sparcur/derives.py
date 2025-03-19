@@ -33,13 +33,6 @@ class Derives:
     """ all derives must return as a tuple, even if they are length 1 """
 
     @staticmethod
-    def ident_multi(id_string):
-        """ split whitespace separated lists of identifiers """
-        ids = tuple(id_string.split())
-        raise NotImplementedError('this should be done in the normalization pass from tabular not here')
-        return ids
-
-    @staticmethod
     def contributor_name(name) -> Tuple[str, str]: 
         if ', ' in name:
             last, first = name.split(', ', 1)
@@ -281,12 +274,6 @@ class Derives:
         return path_metadata, scaffolds
 
     @staticmethod
-    def samples_rekey(samples):
-        """ use to rekey primary_key to be sample_id for sds version > 2 """
-        for sample in samples:
-            sample['primary_key'] = sample['sample_id']
-
-    @staticmethod
     def samples_to_subjects(samples, schema_version=None):
         """ extract subject information from samples sheet """
         # TODO only allow this for <= 1.2.3 ? or no, really
@@ -434,6 +421,7 @@ class Derives:
         ### subjects
         union_sub = set(dirs) | set(subs)
         inter_sub = set(dirs) & set(subs)
+        inter_pool_sub = inter_sub & pooled_subjects
 
         #if inter_sub | pooled_subjects == (set(subs) - (metadata_only_specs | ent_done_by_manifest)):
         if inter_sub | pooled_subjects == (set(subs) - metadata_only_specs):  # FIXME exact equality here causing issues
@@ -452,16 +440,23 @@ class Derives:
                 pool_id = pool_subs[subject_id]
             else:
                 pool_id = None
-            done_dirs.add(subject_id)
+
+            if subject_id in inter_sub:  # dir is not done if doneness comes from a pool
+                done_dirs.add(subject_id)
+
             done_specs.add(subject_id)
             records.append({'type': 'SubjectDirs',
                             # have to split the type because we can't recover
                             # the type using just the specimen id (sigh)
                             # and we need it to set the correct prefix (sigh)
                             'specimen_id': subject_id,
-                            'dirs': [d[1] for d in dirs[subject_id]]
-                            if subject_id in dirs else
-                            [d[1] for d in dirs[pool_id]]})
+                            'dirs': (
+                                [d[1] for d in dirs[subject_id]]
+                                if subject_id in dirs else
+                                ([d[1] for d in dirs[pool_id]]
+                                 if pool_id in dirs else
+                                 # manifest case hopefully? but might be missing a dir entirely
+                                 []))})
 
         ### sample pools
         inter_sam_pool = set(dirs) & set(sam_pools)
@@ -471,6 +466,7 @@ class Derives:
         ### samples
         union_sam = set(dirs) | set(samps)
         inter_sam = set(dirs) & set(samps)
+        inter_pool_sam = inter_sam & pooled_samples
 
         template_version_less_than_2 = True  # FIXME TODO
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
@@ -498,15 +494,18 @@ class Derives:
                     continue
 
                 if template_version_less_than_2:  # FIXME this is sure the cause an error at some point
-                    if '_' in blob[0]['primary_key']:  # composite primary case
-                        done_dirs.add((blob[0]['subject_id'], sample_id))
-                    else:
-                        done_dirs.add(sample_id)
+                    if sample_id in inter_sam:  # dir is not done if doneness comes from a pool
+                        if '_' in blob[0]['primary_key']:  # composite primary case
+                            done_dirs.add((blob[0]['subject_id'], sample_id))
+                        else:
+                            done_dirs.add(sample_id)
 
                     done_specs.add(blob[0]['primary_key'])
                     id = blob[0]['primary_key']
                 else:
-                    done_dirs.add(sample_id)
+                    if sample_id in inter_sam:  # dir is not done if doneness comes from a pool
+                        done_dirs.add(sample_id)
+
                     done_specs.add(sample_id)
                     id = sample_id  # FIXME need ttl export suport for this
 
@@ -589,15 +588,19 @@ class Derives:
         def getmaybe(blob):
             # TODO populations are a bit tricky here
             if 'sample_id' in blob:  # FIXME sigh missing types on these
-                yield blob['subject_id']
+                if 'subject_id' in blob:
+                    yield blob['subject_id']
+
                 if 'was_derived_from' in blob:  # TODO member_of works backward with populations, so may need to deal with that case as well
+                    # was_derived_from is only present for >= 2 in which case parent_pkey cannot be the combined primary key
+                    # in 1.2.3 there is a wasderivedfrom field that requires the primary key be provided
                     parents = blob['was_derived_from']
                     for parent in parents:
-                        parent_pkey = blob['subject_id'] + '_' + parent
-                        if parent_pkey in _combined_index:
+                        #parent_pkey = blob['subject_id'] + '_' + parent
+                        #if parent_pkey in _combined_index:
                             # this branch should pretty much never trigger now
-                            yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
-                        elif parent in _combined_index:
+                            #yield from getmaybe(_combined_index[parent_pkey])  # XXX watch out for bad circular refs here
+                        if parent in _combined_index:
                             yield from getmaybe(_combined_index[parent])  # XXX watch out for bad circular refs here
                         else:
                             if parent.startswith('='):
@@ -639,7 +642,7 @@ class Derives:
         not_done_specs = (set(subs) | usamps) - (set(done_specs) | metadata_only_specs | ent_done_by_manifest)
         not_done_dirs = set(udirs) - set(done_dirs)
 
-        spd = {d: set(p[-1][-1] for p in dirs[d]) for d in done_dirs}
+        spd = {d: set(p[-1][-1] for p in (dirs[d[-1]] if isinstance(d, tuple) else dirs[d])) for d in done_dirs}
         # TODO reconcile with manifest mapping as well
         not_in_primary = set(k for k, v in spd.items() if 'primary' not in v)
 
@@ -669,6 +672,32 @@ class Derives:
             pass # TODO embed an error
 
         # FIXME TODO dirs without files case
+
+        if inter_pool_sub:
+            # the semantics for pools means that specimens are counted
+            # as done if they are in a pool and the pool has data, the
+            # issue is that we don't know whether samples that are in
+            # pools should also have folders, the best we can do is
+            # warn if we detect a case where a specimen is in a pool
+            # and also has separate data ... this is yet another
+            # reason why we are transitioning to use populations
+            # instead and added the ability to mark as metadata_only
+            # so that pools can retain their original semantics while
+            # populations will not implicitly mark samples as complete
+            msg = ('There are subjects in a pool that also have their own directory!'
+                   f'\n{inter_pool_sub}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if inter_pool_sam:
+            msg = ('There are samples in a pool that also have their own directory!'
+                   f'\n{inter_pool_sam}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
 
         if double_done_ents:
             # this is not necessarily a problem but is good to catch

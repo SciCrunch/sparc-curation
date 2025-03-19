@@ -31,6 +31,7 @@ _species = {
     'suncus murinus':         OntTerm('NCBITaxon:9378',  label='Suncus murinus'),
     'sus scrofa':             OntTerm('NCBITaxon:9823',  label='Sus scrofa'),
     'sus scrofa domesticus':  OntTerm('NCBITaxon:9825',  label='Sus scrofa domesticus'),
+    'turdus merula':          OntTerm('NCBITaxon:9187',  label='Turdus merula'),
 }
 
 

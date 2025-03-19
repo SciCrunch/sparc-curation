@@ -234,7 +234,7 @@ class DatasetStructure:
                 msg = f'not a path? {path} {type(path)}'
                 raise ValueError(msg)
 
-        if apc not in cls._classes:
+        if (apc, cls) not in cls._classes:
             # keep classes 1:1 with the types of paths so that equality works correctly
             # mro issues with specialized paths instead of the base
             if aug.core.need_flavour:
@@ -252,9 +252,9 @@ class DatasetStructure:
                                 )
                             )
 
-            cls._classes[apc] = newcls
+            cls._classes[apc, cls] = newcls
 
-        nc = cls._classes[apc]
+        nc = cls._classes[apc, cls]
         return nc(path)
 
     def __new__(cls, path, *args, **kwargs):
@@ -1245,6 +1245,17 @@ class MetadataFile(HasErrors):
         self.template_schema_version = template_schema_version
         self._force_ext = force_ext
 
+    @staticmethod
+    def _tsv_lt(tsv, major_version):
+        if tsv is None:
+            return False
+        try:
+            tsv_major_version = int(tsv.split('.')[0])
+            return tsv_major_version < major_version
+        except Exception as e:
+            logd.exception(e)
+            return False
+
     def xopen(self):
         self.path.xopen()
 
@@ -1716,17 +1727,25 @@ class MetadataFile(HasErrors):
         # FIXME if the 'header' column is not at position zero
         # this will fail see version 1.1 subjects template for this
         # with a note that 1.1 had many issues
+        pk_errors = tuple()
         try:
-            self.header = next(gen)
+            self.header = next(gen)  # this can raise MalformedHeaderError when gen is pk.generator
             null_header = null_check(self.header)
+            if null_header and self.primary_key_rule is not None:
+                pk_errors = tuple(pk._errors)
         except exc.MalformedHeaderError as e:
             if self.primary_key_rule is not None:
                 null_header = e
                 # don't reassign gen as insurace that it will error if
                 # we somehow escape this function
                 pk._ignore_errors = True
-                self.header = next(pk.generator)  # XXX warning, stateful generator here
-                pk._ignore_errors = False  # reset to prevent leak
+                gen = pk.generator
+                self.header = next(gen)  # XXX warning, stateful generator here
+                #pk._ignore_errors = False  #  we don't reset the generator here
+                # and allow this to continue so that it can emit bad data that
+                # will be filtered later in the pipelines as is done for metadata
+                # files that do not use a composite primary key (or rather that)
+                # don't specify a primary key, composite or otherwise
             else:
                 # this branch should never happen but on the off
                 # chance that it does, just forward the issue
@@ -1770,7 +1789,7 @@ class MetadataFile(HasErrors):
                 #log.warning(msg)  # can't quite error yet due to metadata_element
                 common_cells = exc.MalformedHeaderError(msg)
 
-        mals = null_alt, dupe_alt, null_header, dupe_header, common_cells
+        mals = null_alt, dupe_alt, null_header, dupe_header, common_cells, *pk_errors
         if any(mals):
             errors = [m for m in mals if m is not None]
             msg = '; '.join([e.args[0] for e in errors])
@@ -2131,7 +2150,7 @@ class SamplesFile(SubjectsFile):
 
     @property
     def primary_key_rule(self):
-        if self.template_schema_version is None or int(self.template_schema_version.split('.')[0]) < 2:
+        if self._tsv_lt(self.template_schema_version, 2):
             return self._primary_key_rule
         else:
             return self.__primary_key, ('sample_id',), (lambda t: t[0])

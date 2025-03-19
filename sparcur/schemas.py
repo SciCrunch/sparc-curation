@@ -1829,7 +1829,7 @@ class SampleExportSchema(JSONSchema):
                  (lambda uri_api: {'@id': uri_api + '/samples/',
                                    '@prefix': True}),
                  '#/@context/samples']}],
-        'required': ['sample_id'],
+        'required': ['primary_key', 'sample_id'],
         'properties': {
             'sample_id': {'type': 'string',
                           'pattern': sam_id_pattern,  # fs_safe_identifier_pattern,  # FIXME < 2.0
@@ -1890,7 +1890,7 @@ class SampleExportSchema(JSONSchema):
             **subsam_common_properties
         },}
 
-    schmea = {'allOf': [
+    schema = {'allOf': [
         {'anyOf': [
             {'required': ['subject_id'],},
             {'required': ['was_derived_from'],},

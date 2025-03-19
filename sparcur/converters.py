@@ -300,7 +300,7 @@ class MetaConverter(TripleConverter):
         ['timestamp_updated', TEMP.wasUpdatedAtTime],
         ['timestamp_updated_contents', TEMP.contentsWereUpdatedAtTime],
 
-        ['funding', TEMP.hasAdditionalFundingInformation],
+        ['funding_freetext', TEMP.hasAdditionalFundingInformation],
         ['completeness_of_data_set', TEMP.completenessOfDataset],
         # TODO
         #['additional_links', ],
@@ -367,7 +367,8 @@ class MetaConverter(TripleConverter):
                         s = self.c.l(pioid)
                         yield ds, TEMP.dereferencesTo, s
                         yield s, TEMP.hasDoi, ds
-                    except (idlib.exc.IdDoesNotExistError, idlib.exc.MalformedIdentifierError) as e:
+                    except (idlib.exc.IdDoesNotExistError, idlib.exc.MalformedIdentifierError, idlib.exc.ResolutionError) as e:
+                        # some dois are not pio ids, and some journals don't respond with correct codes
                         log.warning(e)
                         return
                 else:
