@@ -3,7 +3,7 @@ import json
 import itertools
 from types import GeneratorType
 from pathlib import PurePath
-from datetime import datetime, date, time
+from datetime import datetime, date, time, timedelta
 from functools import wraps
 from collections import deque, defaultdict
 import idlib
@@ -504,6 +504,24 @@ def json_export_type_converter(obj):
         return isoformat(obj)
     elif isinstance(obj, time):
         return isoformat(obj)
+    elif isinstance(obj, timedelta):
+        if hasattr(obj, 'microseconds') and obj.microseconds != 0:
+            raise NotImplementedError('milliseconds conversion not implemented for timedelta')
+
+        others = ('milliseconds', 'minutes', 'hours', 'weeks')
+        for attr in others:
+            if hasattr(obj, attr):
+                raise NotImplementedError(f'{attr} conversion not implemented for timedelta')
+
+        h_from_days = obj.days * 24
+        h_from_seconds, rem_secs = divmod(obj.seconds, 60 * 60)
+        h = h_from_days + h_from_seconds
+        m, s = divmod(rem_secs, 60)
+        iso = f'PT{h}H{m}M'
+        if s > 0:
+            iso += f'{s}S'
+
+        return iso
     elif isinstance(obj, BaseException):
         # FIXME hunt down where these are sneeking in from
         return repr(obj)
