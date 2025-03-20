@@ -515,7 +515,8 @@ class BFPNCacheBase(PrimaryCache, EatCache):
             yield from super()._bootstrap_recursive(sparse=sparse)
 
     _sparse_stems = (
-        'manifest', 'dataset_description', 'submission', 'performances', 'subjects', 'samples'
+        'manifest', 'dataset_description', 'submission', 'curation',
+        'subjects', 'samples', 'sites', 'performances',
     )
 
     _sparse_exts = (
