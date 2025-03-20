@@ -480,6 +480,17 @@ def _tsnorm(timestring):
     if len(timestring) == 27:
         return timestring
     elif len(timestring) < 27:
+        if len(timestring) == 20:
+            # truncated down to dropping the micros so no decimal which
+            # produces e.g. 530000000Z seconds instead of 53.000000Z
+            # yet another example of why truncating iso8601 datetimes
+            # when there are trailing zeros is a bad idea, i really hope
+            # they don't truncate seconds too >_<
+            return f'{timestring[:-1] + ".":0<26}Z'
+        elif len(timestring) < 20:
+            f'SIGH I hate being right: {timestring!r}'
+            raise NotImplementedError(msg)
+
         return f'{timestring[:-1]:0<26}Z'
     else:
         msg = f'unhandled timestring length {len(timestring)} for {timestring!r}'
