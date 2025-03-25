@@ -1126,7 +1126,6 @@ class PipelineStart(JSONPipeline):
         data = super().data
         kddf = 'dataset_description_file'
         ktsv = 'template_schema_version'
-        breakpoint()
         dd = kddf in data and data[kddf]
         if not dd:
             return data
