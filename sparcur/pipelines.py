@@ -1061,6 +1061,8 @@ class LoadIR(JSONPipeline):
             pass
 
 
+hasSchema = sc.HasSchema()
+@hasSchema.mark
 class PipelineStart(JSONPipeline):
 
     previous_pipeline_classes = DatasetMetadataPipeline, DatasetStructurePipeline
@@ -1110,6 +1112,63 @@ class PipelineStart(JSONPipeline):
                 raise self.SkipPipelineError(data)
 
         return data
+
+    @hasSchema.f(sc.DirStructureSchema2)
+    def _data_2(self, data):
+        return data
+
+    @hasSchema.f(sc.DirStructureSchema3)
+    def _data_3(self, data):
+        return data
+
+    @property
+    def data(self):
+        data = super().data
+        kddf = 'dataset_description_file'
+        ktsv = 'template_schema_version'
+        breakpoint()
+        dd = kddf in data and data[kddf]
+        if not dd:
+            return data
+
+        tsv = ktsv in dd and dd[ktsv]
+        if not tsv:
+            return data
+
+        try:
+            tsv_major_version = int(tsv.split('.')[0])
+        except Exception as e:
+            logd.exception(e)
+            return data
+
+        # NOTE: dir_structure and path_metadata in the dataset object
+        # metadata have distinct structure from path-metadata.json
+        # despite having the same "type": "path" dir structure is even
+        # more variable ... I fixed most of the issues related to this
+        # in objects.py which has a distinct "type": "pathmeta" in the
+        # combined metadata object, and where all the things that can
+        # change have been properly factored into objmeta, fsmeta, etc.
+        # at this point in the process we can only check directory names
+        # and it is not clear that we actually want to do this at this
+        # stage, but since it is here we will check it, path-metadata.json
+        # should also be checked but because it flows through a separate
+        # pipeline and does not currently feed into the dataset metadata
+        # curation-export.json file at the moment this is deferred, also
+        # because the proper way to do this is to have true dataset only
+        # metadata check independent of fsmeta and then merge the two
+        # however the real future workflow that we want is based entirely
+        # on extraction via objects.py which should decouple the frontend
+        # extraction code from these later pipeline stages
+        out1 = out2 = out3 = None
+        if tsv_major_version < 2:
+            #out = out1 = self._data_1(data)
+            out = out1 = data  # there were no naming restrictions at all in the version 1
+        elif tsv_major_version < 3:
+            out = out2 = self._data_2(data)
+        else:
+            out = out3 = self._data_3(data)
+
+        return out
 
 
 hasSchema = sc.HasSchema()

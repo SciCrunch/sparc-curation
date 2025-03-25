@@ -710,7 +710,9 @@ sds3_path_almost_pattern = '^[A-Za-z0-9.,-_]([A-Za-z0-9.,-_ ]*[A-Za-z0-9.,-_])?$
 
 #_id_suffix = '[A-Za-z0-9][A-Za-z0-9-]*$'
 _id_suffix = '[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$'  # don't allow trailing separator
-entity_id_pattern = '^(sub|sam|site|perf)-' + _id_suffix
+entity_prefix_pattern = '^(sub|sam|site|perf)'
+entity_prefix_no_pattern = entity_prefix_pattern + '[-_]'  # don't allow prefix_
+entity_id_pattern = entity_prefix_pattern + '-' + _id_suffix
 specimen_id_pattern = '^(sub|sam)-' + _id_suffix
 sub_id_pattern = '^sub-' + _id_suffix
 sam_id_pattern = '^sam-' + _id_suffix
@@ -749,6 +751,19 @@ class NoLTWhitespaceSchema(JSONSchema):
 string_noltws = NoLTWhitespaceSchema.schema
 
 
+class SDSEntityPathSchema(JSONSchema):
+    # paths that start with a known entity prefix MUST be correcly formed entity ids
+    schema = {'oneOf': [
+        {'pattern': entity_id_pattern},
+        {'not': {'pattern': entity_prefix_no_pattern}},
+    ]}
+
+
+class SDS2PathSchema(JSONSchema):
+    schema = copy.deepcopy(string_noltws)
+    schema['allOf'].append(SDSEntityPathSchema.schema)
+
+
 class _alt_SDS3PathSchema(JSONSchema):
 
     schema = {'allOf': [
@@ -763,6 +778,7 @@ class SDS3PathSchema(JSONSchema):
     schema = {'allOf': [
         {'type': 'string', 'pattern': sds3_path_almost_pattern,},
         {'not': {'pattern': pattern_whitespace_multi}},
+        SDSEntityPathSchema.schema,
     ]}
 
 
@@ -2150,6 +2166,34 @@ class PathSchema(JSONSchema):
             'errors': ErrorSchema.schema,
         }
     }
+
+
+class DirStructureSchema2(JSONSchema):
+    schema = {
+        'type': 'object',
+        'properties': {
+            'dir_structure': {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'path_meta': {
+                            'type': 'object',
+                            'properties': {
+                                'name': SDS2PathSchema.schema,
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+class DirStructureSchema3(JSONSchema):
+    __schema = copy.deepcopy(DirStructureSchema2.schema)
+    __schema['properties']['dir_structure']['items']['properties']['path_meta']['properties']['name'] = sds3_path_schema
+    schema = __schema
 
 
 class PathTransitiveMetadataSchema(JSONSchema):
