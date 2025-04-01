@@ -1422,7 +1422,7 @@ All of these things either run manually or are independent of the
 SCKAN release process. In most cases manual intervention is needed to
 ensure that various component sources are up to date.
 ***** SPARC curation export
-See [[./setup.org::#export-v4]] for the most recent workflow for batch release.
+See [[./workflows.org::#export-v5]] for the most recent workflow for batch release.
 ***** SPARC protcur
 #+begin_src bash
 python -m sparcur.simple.fetch_annotations
