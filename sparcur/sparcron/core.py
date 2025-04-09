@@ -53,7 +53,7 @@ from pyontutils.utils_fast import logToFile
 import sparcur
 from sparcur import exceptions as exc
 from sparcur.cli import Main, Options, __doc__ as clidoc
-from sparcur.utils import PennsieveId, GetTimeNow, log as _log
+from sparcur.utils import PennsieveId as RemoteId, GetTimeNow, log as _log
 from sparcur.paths import Path, PennsieveCache
 from sparcur.config import auth
 from sparcur.backends import PennsieveDatasetData as RemoteDatasetData, BlackfynnRemote as Remote
@@ -206,7 +206,7 @@ def populate_existing_redis(conn):
         dataset_id = 'N:dataset:' + uuid
         try:
             # catch potentially malformed ids
-            did = PennsieveId(dataset_id)
+            did = RemoteId(dataset_id)
         except idlib.exc.MalformedIdentifierError as e:
             log.error(f'strange dir in dataset export: {uuid}\n{e}')
             continue
@@ -394,7 +394,7 @@ def argv_spc_export(dataset_id):
 def ret_val_exp(dataset_id, updated, time_now, fetch=True, fetch_rmeta=True):
     timestamp = time_now.START_TIMESTAMP_LOCAL_FRIENDLY
     log.info(f'START {dataset_id} {timestamp}')
-    did = PennsieveId(dataset_id)
+    did = RemoteId(dataset_id)
     uid = 'updated-' + dataset_id
     fid = 'failed-' + dataset_id
     vid = 'verpi-' + dataset_id
@@ -620,7 +620,7 @@ def diff_sheet(old_s, new_s):
                 new_c = getattr(new_row, v)()
                 if old_c.value != new_c.value:
                     log.debug(f'sheet value {v} changed for {did}: {old_c.value!r} {new_c.value!r}')
-                    eid = 'sheet-' + PennsieveId(did).id
+                    eid = 'sheet-' + RemoteId(did).id
                     conn.incr(eid)
 
 
@@ -789,7 +789,6 @@ def get_roots(project_ids):
         class Cache(PennsieveCache): pass
         Cache._bind_flavours()
 
-        #pid = PennsieveId(project_id)
         PennsieveRemote = backend_pennsieve(
             project_id,
             Local=LPath,
@@ -800,12 +799,19 @@ def get_roots(project_ids):
     return roots
 
 
+_org_src_to_dataset = {}
+_dataset_to_org_src = {}
 roots = get_roots(project_ids)
 def datasets_remote_from_project_id(project_id, datasets_no):
     root = roots[project_id]
     datasets = [c for c in root.children if c.id not in datasets_no]
+    _rii = root.bfobject.int_id
     for d in datasets:
         dataset_project[d.id] = project_id
+        _dii = d.bfobject.int_id
+        _did = d.identifier
+        _org_src_to_dataset[_rii, _dii] = _did
+        _dataset_to_org_src[_did] = _rii, _dii
 
     return datasets
 
@@ -817,6 +823,36 @@ def datasets_remote_from_project_ids(project_ids):
         datasets.extend(datasets_remote_from_project_id(project_id, datasets_no))
 
     return datasets
+
+
+def dataset_to_org_src(did):
+    org, src = _dataset_to_org_src[did]
+    return org, src
+
+
+def org_src_to_dataset(org, src):
+    did = _org_src_to_dataset[org, src]
+    return did
+
+
+def any_to_did(dataset_uuid):
+    try:
+        did = RemoteId(dataset_uuid, type='dataset')
+    except Exception as e:
+        ldu = len(dataset_uuid)
+        if ldu == 24 and dataset_uuid[1] == ':':
+            maybe_compact_id = dataset_uuid
+        elif ldu == 22:
+            maybe_compact_id = 'd:' + dataset_uuid
+        else:
+            raise e
+
+        try:
+            did = RemoteId.fromCompact(maybe_compact_id)
+        except Exception as e2:
+            raise e2 from e
+
+    return did
 
 
 def status_report():
@@ -861,9 +897,9 @@ def status_report():
         if queued:
             que += 1
 
-    runs  = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in run]))
-    fails = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in fail]))
-    todos = '\n  '.join(sorted([PennsieveId(f.id).uuid for f in todo]))
+    runs  = '\n  '.join(sorted([RemoteId(f.id).uuid for f in run]))
+    fails = '\n  '.join(sorted([RemoteId(f.id).uuid for f in fail]))
+    todos = '\n  '.join(sorted([RemoteId(f.id).uuid for f in todo]))
     report = (
         '\nStatus Report\n'
         f'Datasets: {len(datasets)}\n'
@@ -883,6 +919,16 @@ def status_report():
 
 def test():
     check_sheet_updates()
+    return
+    datasets = datasets_remote_from_project_ids(project_ids)
+    org, src = dataset_to_org_src(datasets[0].identifier)
+    org1, src1 = dataset_to_org_src(any_to_did(datasets[0].identifier.base64uuid()))
+    org5, src5 = dataset_to_org_src(any_to_did('d:' + datasets[0].identifier.base64uuid()))
+    org2, src2 = dataset_to_org_src(any_to_did(datasets[0].identifier.uuid))
+    org3, src3 = dataset_to_org_src(any_to_did(datasets[0].identifier.id))
+    org4, src4 = dataset_to_org_src(any_to_did(datasets[0].identifier.curie))
+    did = org_src_to_dataset(org, src)
+    #breakpoint()
     return
     status_report()
     #breakpoint()
