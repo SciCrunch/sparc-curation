@@ -807,11 +807,16 @@ def datasets_remote_from_project_id(project_id, datasets_no):
     datasets = [c for c in root.children if c.id not in datasets_no]
     _rii = root.bfobject.int_id
     for d in datasets:
-        dataset_project[d.id] = project_id
-        _dii = d.bfobject.int_id
-        _did = d.identifier
-        _org_src_to_dataset[_rii, _dii] = _did
-        _dataset_to_org_src[_did] = _rii, _dii
+        new = d.id not in dataset_project
+        if new:
+            dataset_project[d.id] = project_id
+            _dii = d.bfobject.int_id
+            _did = d.identifier
+            _org_src_to_dataset[_rii, _dii] = _did
+            _dataset_to_org_src[_did] = _rii, _dii
+            conn.mset(
+                {f'didos-{_rii}-{_dii}': _did.id,
+                 f'org-src-{_did.uuid}': f'{_rii}/{_dii}',})
 
     return datasets
 
@@ -826,12 +831,34 @@ def datasets_remote_from_project_ids(project_ids):
 
 
 def dataset_to_org_src(did):
+    # local only, e.g. server should not use
     org, src = _dataset_to_org_src[did]
     return org, src
 
 
 def org_src_to_dataset(org, src):
+    # local only, e.g. server should not use
     did = _org_src_to_dataset[org, src]
+    return did
+
+
+def rd_dataset_to_org_src(did):
+    # conn.keys('org-src-*')
+    raw = conn.get(f'org-src-{did.uuid}')
+    if not raw:
+        raise KeyError(did)
+
+    o, s = raw.split(b'/')
+    return int(o), int(s)
+
+
+def rd_org_src_to_dataset(org, src):
+    # conn.keys('didos-*')
+    raw = conn.get(f'didos-{org}-{src}')
+    if not raw:
+        raise KeyError((org, src))
+
+    did = RemoteId(raw.decode())
     return did
 
 

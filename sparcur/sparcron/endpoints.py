@@ -1,7 +1,7 @@
 from flask import Flask, abort
 from sparcur.utils import log
 from .status import dataset_status, dataset_fails
-from .core import dataset_to_org_src, org_src_to_dataset, any_to_did
+from .core import rd_dataset_to_org_src, rd_org_src_to_dataset, any_to_did
 
 
 def make_app(conn, name='sparcron-status-server'):
@@ -35,7 +35,7 @@ def make_app(conn, name='sparcron-status-server'):
 
         # lookup ord_id and src_id
         try:
-            org, src = dataset_to_org_src(did)
+            org, src = rd_dataset_to_org_src(did)
         except KeyError as e:
             log.exception(e)
             abort(404)
@@ -44,7 +44,7 @@ def make_app(conn, name='sparcron-status-server'):
         return f'{org}/{src}'
 
     @app.route('/id-map/org-src/<org>/<src>')
-    def route_id_map_pub(org_id, src_id):
+    def route_id_map_pub(org, src):
         # TODO might also want to return the internal org id?
         try:
             o = int(org)
@@ -54,7 +54,7 @@ def make_app(conn, name='sparcron-status-server'):
             abort(404)
 
         try:
-            did = org_src_to_dataset(o, s)
+            did = rd_org_src_to_dataset(o, s)
         except KeyError as e:
             log.exception(e)
             abort(404)
