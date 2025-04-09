@@ -668,8 +668,12 @@ def bind_dga(Dataset):
         d.canPublish = ds['canPublish']
         return d
 
-    def DatasetAPI_get_all(self):
+    def DatasetAPI_get_all_old(self):
         resp = self._get(self._uri("/?includePublishedDataset=true"))
         return [insert_extra(ds, self) for ds in resp]
+
+    def DatasetAPI_get_all(self):
+        resp = self._get(self._uri("/paginated?limit=2147483647&includePublishedDataset=true"))
+        return [insert_extra(ds, self) for ds in resp['datasets']]
 
     return DatasetAPI_get_all
