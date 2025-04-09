@@ -855,7 +855,7 @@ def any_to_did(dataset_uuid):
     return did
 
 
-def status_report():
+def status_report(verbose_report=False):
     try:
         datasets = datasets_remote_from_project_ids(project_ids)
     except Exception as e:
@@ -908,11 +908,18 @@ def status_report():
         #f'Done:     {}\n'
         f'Running:  {len(run)}\n'
         f'Queued:   {que}\n'
-        '\n'
-        f'Running:\n  {runs}\n'
-        f'Failed:\n  {fails}\n'
-        f'Todo:\n  {todos}\n'
-    )
+        )
+
+    if verbose_report:
+        # since we can run python -m sparcur.sparcron.status to get
+        # the detailed report on demand don't include these by default
+        report += (
+            '\n'
+            f'Running:\n  {runs}\n'
+            f'Failed:\n  {fails}\n'
+            f'Todo:\n  {todos}\n'
+        )
+
     log.info(report)
     #log.info('TODO:\n' + pprint.pformat(todo))
 
