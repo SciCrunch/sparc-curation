@@ -235,13 +235,13 @@ using the templates greater than 3.0.0.
   closes #103 ensure that submission metadata and organs sheet are in combo of dataset description and curation notes
 - Delete file =code_parameters.{csv,tsv,json,xlsx}=.
   The functionality is now implemented in =code_description=.
-- Add folder =aux= to top level.
-  This folder is not required and can be used to store auxillary files
+- Add folder =auxiliary= to top level.
+  This folder is not required and can be used to store auxiliary files
   that may be needed as part of a publication process to support the
   needs of a particular publication platform. The manifest in this
   folder can reference out to other folders, but no manifest from
-  outside this folder may reference anything in the aux folder. This
-  is because the =aux= folder may be removed for external publication
+  outside this folder may reference anything in the auxiliary folder. This
+  is because the =auxiliary= folder may be removed for external publication
   and only be visible to internal systems. Example use cases would be
   for storing pre-computed thumbnails for video files.
   closes #108 aux folder
@@ -489,4 +489,39 @@ This is a new file as of this version. It is not included in the default templat
   - +study purpose+ DUPE
   - +study data collection+ DUPE
   - +study primary conclusions+ DUPE
+
+* changlog 3.0.1
+** Changes from 3.0.0 to 3.0.1 for all
+- Regularize the positioning of the view and the active cell for all files.
+
+** Changes from 3.0.0 to 3.0.1 for code_description
+- Regularize formatting
+- Regularize casing for all header fields
+- Change =TSR Column Type= =Description= to provide more detail
+- Change values in =Example= column to fix various issues
+
+** Changes from 3.0.0 to 3.0.1 for dataset_description
+- Regularize formatting
+- Rename =Metadata Version= -> =Metadata version=
+  to regularize to sentence case to match other fields
+- Add suggested record =DOI for this dataset= to related identifiers section
+- Change values in =Description= column to fix spelling errors
+
+* changelog 3.0.2
+** Changes from 3.0.1 to 3.0.2 for dataset_description
+- Change =Contributor role= =Description= to clarify that =Creator= is not a role by itself.
+
+** Changes from 3.0.1 to 3.0.2 for subjects
+- Add =number of directly derived samples=. Optional.
+  Enables top down checks on the number of derivative samples that are
+  more granular than the =number of *= fields in dataset description.
+
+** Changes from 3.0.1 to 3.0.2 for samples
+- Add =number of directly derived samples=. Optional.
+  Enables top down checks on the number of derivative samples that are
+  more granular than the =number of *= fields in dataset description.
+
+** Changes from 3.0.1 to 3.0.2 for curation
+- =Curator notes= section
+  - Add =Notes=
 
