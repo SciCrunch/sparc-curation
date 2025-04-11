@@ -490,7 +490,7 @@ This is a new file as of this version. It is not included in the default templat
   - +study data collection+ DUPE
   - +study primary conclusions+ DUPE
 
-* changlog 3.0.1
+* changelog 3.0.1
 ** Changes from 3.0.0 to 3.0.1 for all
 - Regularize the positioning of the view and the active cell for all files.
 
