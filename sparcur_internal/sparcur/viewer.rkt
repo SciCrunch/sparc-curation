@@ -1667,7 +1667,8 @@ note of course that you don't get dynamic binding with version since it is not t
                                                                   downcased-text)
                                                 (string-contains? (dataset-id-project d) text)
                                                 (string-contains? (string-downcase (dataset-project-name d))
-                                                                  downcased-text)))
+                                                                  downcased-text)
+                                                (string-contains? (dataset-publication-status d) downcased-text)))
                             d)])
             (if (null? matches)
                 datasets
