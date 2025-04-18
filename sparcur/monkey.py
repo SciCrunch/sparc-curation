@@ -673,7 +673,20 @@ def bind_dga(Dataset):
         return [insert_extra(ds, self) for ds in resp]
 
     def DatasetAPI_get_all(self):
-        resp = self._get(self._uri("/paginated?limit=2147483647&includePublishedDataset=true"))
-        return [insert_extra(ds, self) for ds in resp['datasets']]
+        undocumented_max = 500
+        done = False
+        out = []
+        for i in range(999):
+            offset = i * undocumented_max
+            # 2147483647
+            resp = self._get(self._uri(f"/paginated?limit={undocumented_max}&includePublishedDataset=true&orderBy=IntId&orderDirection=Asc&offset={offset}"))
+            _out = [insert_extra(ds, self) for ds in resp['datasets']]
+            out.extend(_out)
+            lout = len(_out)
+            if lout == 0 or (lout % undocumented_max) != 0:
+                # we're done
+                break
+
+        return out
 
     return DatasetAPI_get_all
