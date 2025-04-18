@@ -350,11 +350,36 @@ note of course that you don't get dynamic binding with version since it is not t
                      )]
          [result (car result-projects)]
          [projects (cadr result-projects)]
-         [datasets (result->dataset-list result)])
+         [datasets-remote (result->dataset-list result)]
+         [datasets-local (get-local-datasets datasets-remote)]
+         [datasets (append datasets-remote datasets-local)])
     (current-projects projects)
     (current-datasets datasets)
     (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
+
+(define (get-local-datasets datasets-remote)
+  ;; FIXME TODO this slows down startup time should probably be
+  ;; deferred and/or cached
+  (define ru (apply set (map id-uuid datasets-remote)))
+  (for/list ([uuid (map path->string (directory-list (path-export-datasets)))]
+             #:when (not (set-member? ru uuid)))
+    (define jp (build-path (path-export-datasets) uuid "LATEST" "curation-export.json"))
+    (define lej
+      (if (file-exists? jp)
+          (path->json jp)
+          #hash()))
+    (let* ([meta (hash-ref lej 'meta #hash())]
+           [folder-name (hash-ref meta 'folder_name "?")]
+           [timestamp-updated (hash-ref meta 'timestamp_updated "1970-01-01T00:00:00Z")]
+           [id-organization (hash-ref meta 'id-organization "?")])
+      (dataset
+       (string-append "N:dataset:" uuid)
+       folder-name
+       timestamp-updated
+       "?" ; the only thing I don't record is the dataset owner name
+       (string-append "N:" id-organization)
+       "no-access"))))
 
 (define (ensure-directory! path-dir)
   (unless (directory-exists? path-dir)
@@ -496,7 +521,9 @@ note of course that you don't get dynamic binding with version since it is not t
        (let* ([result-projects (get-dataset-project-list)]
               [result (car result-projects)]
               [projects (cadr result-projects)]
-              [datasets (result->dataset-list result)]
+              [datasets-remote (result->dataset-list result)]
+              [datasets-local (get-local-datasets datasets-remote)]
+              [datasets (append datasets-remote datasets-local)]
               [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
          (current-projects projects)
          (current-datasets datasets)
@@ -1203,8 +1230,11 @@ note of course that you don't get dynamic binding with version since it is not t
   (for ([ds sorted]
         [n (in-naturals)])
     (send list-box set-data n (lb-data ds)))
+  (define ndt (length datasets))
+  (define ndr (length (for/list ([d datasets] #:when (not (string=? (dataset-publication-status d) "no-access"))) d)))
+  (define ndl (- ndt ndr))
   (send button-refresh-datasets set-label
-        (format lbt-refresh-datasets (length datasets))) ; XXX free variable on the button in question
+        (format lbt-refresh-datasets ndt ndr ndl)) ; XXX free variable on the button in question
   (let ([current-dataset-index (index-of sorted selected
                                          (lambda (element target) ; struct id changes so eq? by itself fails
                                            (and element target (string=? (id-uuid element) (id-uuid target)))))])
@@ -1906,7 +1936,7 @@ switch to that"
        [parent panel-left]))
 
 ; lbt- label template
-(define lbt-refresh-datasets "Refresh Datasets (~a)")
+(define lbt-refresh-datasets "Refresh Datasets (~a ~a ~a)")
 (define button-refresh-datasets (new button%
                                      [label lbt-refresh-datasets]
                                      [callback cb-refresh-dataset-metadata]
