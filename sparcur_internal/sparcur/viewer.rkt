@@ -351,14 +351,14 @@ note of course that you don't get dynamic binding with version since it is not t
          [result (car result-projects)]
          [projects (cadr result-projects)]
          [datasets-remote (result->dataset-list result)]
-         [datasets-local (get-local-datasets datasets-remote)]
+         [datasets-local (get-local-datasets datasets-remote #:fast? #t)]
          [datasets (append datasets-remote datasets-local)])
     (current-projects projects)
     (current-datasets datasets)
     (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
 
-(define (get-local-datasets datasets-remote)
+(define (get-local-datasets datasets-remote #:fast? [fast? #f])
   ;; FIXME TODO this slows down startup time should probably be
   ;; deferred and/or cached
   (define ru (apply set (map id-uuid datasets-remote)))
@@ -366,13 +366,13 @@ note of course that you don't get dynamic binding with version since it is not t
              #:when (not (set-member? ru uuid)))
     (define jp (build-path (path-export-datasets) uuid "LATEST" "curation-export.json"))
     (define lej
-      (if (file-exists? jp)
+      (if (and (not fast?) (file-exists? jp))
           (path->json jp)
           #hash()))
     (let* ([meta (hash-ref lej 'meta #hash())]
            [folder-name (hash-ref meta 'folder_name "?")]
            [timestamp-updated (hash-ref meta 'timestamp_updated "1970-01-01T00:00:00Z")]
-           [id-organization (hash-ref meta 'id-organization "?")])
+           [id-organization (hash-ref meta 'id_organization "?")])
       (dataset
        (string-append "N:dataset:" uuid)
        folder-name
