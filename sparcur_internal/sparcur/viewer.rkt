@@ -923,7 +923,8 @@ note of course that you don't get dynamic binding with version since it is not t
      ; TODO we may want to return more stuff here
      ds)
    (define (dataset-project-name ds)
-     (cadr (assoc (dataset-id-project ds) (current-projects))))
+     (define pair (assoc (dataset-id-project ds) (current-projects)))
+     (if pair (cadr pair) "?"))
    (define (dataset-export-latest-path ds)
      (let* ([uuid (id-uuid ds)]
             [lp (build-path (path-export-datasets)
