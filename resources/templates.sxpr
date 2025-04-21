@@ -32,11 +32,11 @@
     :cells ; TODO not implemented and not clear this is the best way, probably just want to append as values
     ; this approach feels too granular, i think we extend :add to require require the row to add to first
     ((("data_standard"         "value_2") "HEAL")
-     (("data_standard_version" "value_2") "20241001")
+     (("data_standard_version" "value_2") "2024.10.01")
      )
     :add
     (:data_standard         ("HEAL"  )
-     :data_standard_version ("20241001")
+     :data_standard_version ("2024.10.01")
      )
     )
    :subjects
@@ -109,7 +109,7 @@
    (:header row ; TODO need a test for mismatch
     :add
     (:data_standard         ("HEAL-PRECISION")
-     :data_standard_version ("20250205")))
+     :data_standard_version ("2025.02.05")))
    :subjects
    (
     :header col
@@ -214,7 +214,7 @@
    (:header row ; TODO need a test for mismatch
     :add
     (:data_standard         ("HEAL-REJOIN")
-     :data_standard_version ("20250114")
+     :data_standard_version ("2025.01.14")
      )
     )
    :subjects
@@ -318,7 +318,7 @@
    (:header row ; TODO need a test for mismatch
     :add
     (:data_standard         ("HEAL-REJOIN-OMICS")
-     :data_standard_version ("20241108")
+     :data_standard_version ("2024.11.08")
      )
     )
    :samples
