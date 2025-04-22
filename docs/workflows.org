@@ -74,6 +74,44 @@ spc server --latest --count
 keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
                        for k in d['meta']['keywords']]))
 #+end_src
+** Datatset modification statistics
+I'm sure there is another way to get this data from pennsieve
+that would make more sense and that would make it possible to
+distinguish curation changes vs user changes, but this was the
+quick and dirty.
+
+#+name: el-def-helper-funs
+#+begin_src elisp :results none
+(defun --fn-sparcur-prod-dataset-mod-dates ()
+  ;; (fmakunbound '--fn-sparcur-prod-dataset-mod-dates)
+  (concat "sparcur-prod-dataset-mod-dates-"
+          (format-time-string "%Y-%m-%d" (current-time))
+          ".tsv"))
+(defun --fn-sparcur-prod-dataset-mod-dates-types ()
+  ;; (fmakunbound '--fn-sparcur-prod-dataset-mod-dates-types)
+  (concat "sparcur-prod-dataset-mod-dates-types-"
+          (format-time-string "%Y-%m-%d" (current-time))
+          ".tsv"))
+#+end_src
+
+# uhhhhh ... oh right, we haven't actually fixed org babel header elisp security yet
+#+header: :file (let (org-confirm-babel-evaluate) (org-sbe "el-def-helper-funs") (expand-file-name (--fn-sparcur-prod-dataset-mod-dates)))
+#+name: remote-result
+#+begin_src bash :dir /ssh:cassava:/var/lib/sparc/.local/share/sparcur/export/datasets/ :results file
+find -mindepth 2 -maxdepth 2 | awk -F'/' '{ print $2 "\t" $3 }' | sed 's/\.tar\.xz$//' | grep -v LATEST | sort
+#+end_src
+
+This command takes a long time run and therefore should be run separately copied back.
+Before running this all folders, even those in snapshots, should be tarred to simplify processing.
+#+begin_src bash :eval never :dir /ssh:cassava:/var/lib/sparc/.local/share/sparcur/export/datasets/
+find -name '*.tar.xz-new' -exec sh -c 'echo $(echo "${1}" | awk -F/ '"'"'{ print $2 " " $3 }'"'"' | sed '"'"s/\.tar\.xz-new$//"'"') $(tar -xvJOf "${1}" ./path-metadata.json 2>/dev/null | jq -r ".data | sort_by(.timestamp_updated) | reverse[0] | if .dataset_relative_path == \"\" then (.mimetype + \" \" + \"dataset\") else ((if .mimetype == null then \"?\" else .mimetype end) + \" \" + (if .basename == null then \"?\" else .basename end)) end")' _ {} \; | sed 's/ /\t/g' > /tmp/prod-object-events-$(date -I).tsv
+#+end_src
+
+#+header: :file (let (org-confirm-babel-evaluate) (org-sbe "el-def-helper-funs") (expand-file-name (--fn-sparcur-prod-dataset-mod-dates-types)))
+#+begin_src bash :dir /ssh:cassava:/var/lib/sparc/.local/share/sparcur/export/datasets/ :results file
+cat /tmp/prod-object-events*.tsv | sort -u
+#+end_src
+
 ** Archiving files with xattrs
 :PROPERTIES:
 :VISIBILITY: folded
@@ -123,7 +161,7 @@ pushd /var/www/sparc/sparc/
     popd
 
     pushd preview/archive/summary
-        XZ_OPT=-e9 find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec echo tar -cvJf '{}.tar.xz' '{}' \;
+        XZ_OPT=-e9 find -maxdepth 1 -not -path '.' -type d -newer $(ls -At *.tar.xz | head -n 1) -exec echo XZ_OPT=-e9 tar -cvJf '{}.tar.xz' '{}' \;
         chown nginx:nginx *.tar.xz
         # remove previous years
         find -maxdepth 1 -not -path '.' -not -path "*$(date +%Y)-*" -type d -exec echo rm -r '{}' \+
