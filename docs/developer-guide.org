@@ -3868,8 +3868,8 @@ compact them
 """
 Examples:
     # look at the second one and then run the first one since it is easier and safer to stop and resume
-    # XZ_OPT=-e9 python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'tar -cvJf "{}.tar.xz" "{}" && rm -r "{}"'
-    python -m sparcur.simple.compact | xargs -P12 -r -I{} echo tar -cvJf '{}.tar.xz' '{}'
+    # XZ_OPT=-e9 python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'tar -C "{}" -cvJf "{}.tar.xz" . && rm -r "{}"'
+    python -m sparcur.simple.compact | xargs -P12 -r -I{} echo tar -C '{}' -cvJf '{}.tar.xz' .
     # python -m sparcur.simple.compact | xargs -P6 -r -I{} echo rm -r '{}'
 """
 from sparcur.paths import Path
