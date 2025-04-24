@@ -46,6 +46,30 @@
   ; file on next start
   (delete-file this-file-exe-tmp))
 
+(define (git-commit-hash)
+  (let ((git-exe (find-executable-path "git")))
+    (if git-exe
+        (string-trim
+         (with-output-to-string
+           (thunk
+            (system* git-exe "rev-parse" "HEAD"))))
+        #f)))
+
+(define (set-commit-hash!)
+  (define commits
+    (for/list ([flag (in-vector (current-command-line-arguments))]
+               #:when (string-prefix? flag "--commit="))
+      (substring flag 9)))
+  (current-git-commit-hash
+   (if (null? commits)
+       (git-commit-hash)
+       (car commits)))
+  (when (current-git-commit-hash)
+    (send text-prefs-viewer-commit set-value (current-git-commit-hash))
+    (send (send text-prefs-viewer-commit get-editor) lock 'write)
+    )
+  (void))
+
 (define (make-lexical-parameter [default #f])
   "sometimes you want the parameter interface but don't want the thread local behavior
 note of course that you don't get dynamic binding with version since it is not thread local"
@@ -58,6 +82,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define update-running? #f)
 
 (define debug-push (make-lexical-parameter #f))
+(define current-git-commit-hash (make-lexical-parameter #f))
 
 ;; parameters (yay dynamic variables)
 (define path-config (make-parameter #f))
@@ -655,14 +680,15 @@ note of course that you don't get dynamic binding with version since it is not t
                  (let ([mtime-after (file-or-directory-modify-seconds
                                      this-file-compiled
                                      #f
-                                     (λ () -2))])
+                                     (λ () -2))]
+                       [gch (format "--commit=~a" (git-commit-hash))])
                    (when (not (= mtime-before mtime-after))
                      (println (format "running raco exe -v -o ~a ~a "
                                       this-file-exe this-file))
                      (parameterize ()
                        (when (file-exists? this-file-exe)
                          (rename-file-or-directory this-file-exe this-file-exe-tmp))
-                       (system* raco-exe "exe" "-v" "-o" this-file-exe this-file)
+                       (system* raco-exe "exe" "-v" "++exf" gch "-o" this-file-exe this-file)
                        (unless (file-exists? this-file-exe) ; restore the old version on failure
                          (when (file-exists? this-file-exe-tmp)
                            (rename-file-or-directory this-file-exe-tmp this-file-exe))))
@@ -1784,7 +1810,9 @@ switch to that"
       )))
 
 (define (cb-select-all obj e)
-  (when (is-a? obj editor-canvas%)
+  (when (or
+         (is-a? obj editor-canvas%)
+         (is-a? obj text-field%))
     (send (send obj get-editor) select-all)))
 
 (define (cb-copy-value obj e)
@@ -1793,7 +1821,9 @@ switch to that"
     (let* ([raw-value (node-data-value (send (send obj get-selected) user-data))]
            [value (*->string raw-value)])
       (send the-clipboard set-clipboard-string value (current-milliseconds))))
-  (when (is-a? obj editor-canvas%)
+  (when (or
+         (is-a? obj editor-canvas%)
+         (is-a? obj text-field%))
     (send (send obj get-editor) copy)))
 
 ; add functions
@@ -2868,6 +2898,14 @@ switch to that"
 (define panel-prefs-right (new vertical-panel%
                          [parent panel-prefs-holder]))
 
+(define text-prefs-viewer-commit
+  (new text-field%
+       [font (make-object font% 10 'modern)]
+       [label "Commit     "]
+       [enabled #t]
+       [init-value ""]
+       [parent panel-prefs-holder]))
+
 (define choice-prefs-remote-organization
   (new choice%
        [font (make-object font% 10 'modern)]
@@ -2982,6 +3020,7 @@ switch to that"
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
   (send lview select 0) ; first time to ensure current-dataset always has a value XXX callback is NOT invoked using select so we call it manually here
   (void (cb-dataset-selection lview #f))
+  (void (thread (thunk (set-commit-hash!))))
   (void (thread (thunk (refresh-dataset-metadata text-search-box)))) ; refresh datasets in a separate thread to avoid delaying startup
   (unless (eq? (system-type) 'unix)
     ; do NOT run this when gtk is the windowing toolkit it will eat up
