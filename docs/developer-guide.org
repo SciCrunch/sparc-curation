@@ -3858,6 +3858,10 @@ if __name__ == '__main__':
     pipe_main(main)
 #+end_src
 *** compact
+:PROPERTIES:
+:CUSTOM_ID: compact
+:END:
+
 find all export dataset folders that
 are older than the current snapshot and
 are not in a snapshot that is in a summary
@@ -3867,6 +3871,10 @@ compact them
 #+begin_src python :tangle ../sparcur/simple/compact.py
 """
 Examples:
+    # XXX WARNING this workflow is deprecated, but is kept here for reference because
+    # it is safe and won't cause data loss, the correct way to do it is to archive
+    # every export immediately, or arhive them all in bulk (see workflows.org)
+
     # look at the second one and then run the first one since it is easier and safer to stop and resume
     # python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'XZ_OPT=-e9 tar -C "{}" -cvJf "{}.tar.xz" . && rm -r "{}"'
     python -m sparcur.simple.compact | xargs -P12 -r -I{} echo tar -C '{}' -cvJf '{}.tar.xz' .

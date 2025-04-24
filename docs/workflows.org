@@ -74,7 +74,38 @@ spc server --latest --count
 keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords' in d['meta']
                        for k in d['meta']['keywords']]))
 #+end_src
-** Datatset modification statistics
+** Compacting dataset exports
+See also [[./developer-guide.org::#compact]].
+
+The proper way to do this is to compact _all_ exports as soon as they
+are created (though in a separate process). Then run compact to remove
+folders that are no longer needed since everything will be xzed from
+the start.
+
+To xz folders that have not yet been compressed (e.g. to backfill in
+cases where only a subset were compacted prior to updating to the new
+process) run the following.
+
+#+begin_src bash :eval never
+find /var/lib/sparc/.local/share/sparcur/export/datasets/ \
+-maxdepth 2 -mindepth 2 -type d -not -exec test -f '{}.tar.xz' \; -print | \
+xargs -P4 -r -I{} sh -c 'XZ_OPT=-e9 tar -C "{}" -cvJf "{}.tar.xz" .'
+#+end_src
+
+Once all dataset exports have been archived it is safe to run the following.
+
+#+begin_src bash :eval never
+python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'rm -r "{}"'
+#+end_src
+
+TODO Implement =sparcur.simple.compact_snapshot= to elink older
+snapshots to the archives so the folders can be removed. Need to
+figure out whether we need a different naming convention or a way
+to indicate that a snapshot points to archived data ... possibly
+by adding an extension to the uuid, or maybe the content type will
+be sufficient?
+
+** Dataset modification statistics
 I'm sure there is another way to get this data from pennsieve
 that would make more sense and that would make it possible to
 distinguish curation changes vs user changes, but this was the
@@ -104,7 +135,7 @@ find -mindepth 2 -maxdepth 2 | awk -F'/' '{ print $2 "\t" $3 }' | sed 's/\.tar\.
 This command takes a long time run and therefore should be run separately copied back.
 Before running this all folders, even those in snapshots, should be tarred to simplify processing.
 #+begin_src bash :eval never :dir /ssh:cassava:/var/lib/sparc/.local/share/sparcur/export/datasets/
-find -name '*.tar.xz-new' -exec sh -c 'echo $(echo "${1}" | awk -F/ '"'"'{ print $2 " " $3 }'"'"' | sed '"'"s/\.tar\.xz-new$//"'"') $(tar -xvJOf "${1}" ./path-metadata.json 2>/dev/null | jq -r ".data | sort_by(.timestamp_updated) | reverse[0] | if .dataset_relative_path == \"\" then (.mimetype + \" \" + \"dataset\") else ((if .mimetype == null then \"?\" else .mimetype end) + \" \" + (if .basename == null then \"?\" else .basename end)) end")' _ {} \; | sed 's/ /\t/g' > /tmp/prod-object-events-$(date -I).tsv
+find -name '*.tar.xz' -exec sh -c 'echo $(echo "${1}" | awk -F/ '"'"'{ print $2 " " $3 }'"'"' | sed '"'"s/\.tar\.xz-new$//"'"') $(tar -xvJOf "${1}" ./path-metadata.json 2>/dev/null | jq -r ".data | sort_by(.timestamp_updated) | reverse[0] | if .dataset_relative_path == \"\" then (.mimetype + \" \" + \"dataset\") else ((if .mimetype == null then \"?\" else .mimetype end) + \" \" + (if .basename == null then \"?\" else .basename end)) end")' _ {} \; | sed 's/ /\t/g' > /tmp/prod-object-events-$(date -I).tsv
 #+end_src
 
 #+header: :file (let (org-confirm-babel-evaluate) (org-sbe "el-def-helper-funs") (expand-file-name (--fn-sparcur-prod-dataset-mod-dates-types)))
