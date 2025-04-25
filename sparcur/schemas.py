@@ -1357,6 +1357,8 @@ class DatasetDescriptionExportSchema(JSONSchema):
                         'related_identifier_type': {
                             'type': 'string',
                             'enum': [
+                                # sds types
+                                'RRID',  # convert to URL when going to DataCite
                                 # datacite types
                                 'ARK',
                                 'arXiv',
@@ -1387,6 +1389,10 @@ class DatasetDescriptionExportSchema(JSONSchema):
                                 'HasProtocol', # hopefully entails WasGeneratedByFollowing
                                 'IsSoftwareFor', # includes source code
                                 'HasSoftware',
+
+                                'SharesEntitiesWithDataset',  # maybe convert to References not sure
+                                'UsedResource',  # convert to Cites or References when going to DataCite
+
                                 # DataCite conflates source and compiled, consider Requires?
                                 # Dataset -> Software -> SourceCode
 
@@ -2011,6 +2017,7 @@ class CurationExportSchema(JSONSchema):
             'subjects_and_samples': string_noltws,
             'primary_vs_derivative_data': string_noltws,
             'code_availability': string_noltws,
+            'notes': string_noltws,
         },
         'errors': ErrorSchema.schema,
     }
