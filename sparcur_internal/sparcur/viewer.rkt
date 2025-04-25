@@ -1582,6 +1582,9 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (cb-open-dataset-lastest-log obj event)
   (xopen-dataset-latest-log (current-dataset)))
 
+(define (cb-refresh-dataset-jview obj event)
+  (dataset-jview! (current-dataset) #:update #t))
+
 (define (cb-download-all-files obj event)
   (let* ([ds (current-dataset)]
          [argv (argv-download-everything ds)])
@@ -2256,8 +2259,16 @@ switch to that"
                                             [tooltip "Shortcut C-l"]
                                             [tooltip-delay 100]
                                             [callback cb-open-dataset-lastest-log]
-                                            [parent panel-power-user]
-                                            ))
+                                            [parent panel-power-user]))
+
+(define button-refresh-dataset-jview
+  ; use to sync view with cli export that can't call back could get
+  ; fancy with inotify or a socket that the cli could check, but
+  ; what's that point, if you have this open just click it
+  (new button%
+       [label "Refresh"]
+       [callback cb-refresh-dataset-jview]
+       [parent panel-power-user]))
 
 ;; upload
 
