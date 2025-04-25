@@ -1314,6 +1314,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'description': {'type': 'string'},
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
             'acknowledgments': {'type': 'string'},
+            'license': {'type': 'string'},  # TODO spdx check
             'funding_freetext': {'type': 'array',
                                  'minItems': 1,
                                  'items': {'type': 'string'}},

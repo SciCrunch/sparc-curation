@@ -1255,6 +1255,7 @@ class SDSPipeline(JSONPipeline):
                         #'additional_links',  # FIXME internal rename
                         'keywords',
                         'acknowledgments',
+                        'license',  # XXX 3
                         'originating_article_doi',
                         'title_for_complete_data_set',
 
