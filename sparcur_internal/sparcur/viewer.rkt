@@ -52,7 +52,8 @@
         (string-trim
          (with-output-to-string
            (thunk
-            (system* git-exe "rev-parse" "HEAD"))))
+            (parameterize ([current-directory this-package-path])
+              (system* git-exe "rev-parse" "HEAD" #:set-pwd? #t)))))
         #f)))
 
 (define (set-commit-hash!)
