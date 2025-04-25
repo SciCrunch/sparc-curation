@@ -337,11 +337,19 @@ class Derives:
                 # cull empty in a single step
                 if av} 
 
+        eit_drps = set()
         ent_by_manifest = {}
         for pmr in path_metadata:
             if 'manifest_record' in pmr:
                 pmrmr = pmr['manifest_record']
-                for field in('entity', 'specimen', 'subject', 'sample', 'site', 'performance',):
+                if 'entity_is_transitive' in pmrmr:
+                    eit_raw = pmrmr['entity_is_transitive']
+                    # FIXME bool/str -> bool should be handled during parsing
+                    if (eit_raw is True or
+                        isinstance(eig_raw, str) and eit_raw.lower() == 'true'):
+                        eit_drps.add(pmr['dataset_relative_path'])
+
+                for field in ('entity', 'specimen', 'subject', 'sample', 'site', 'performance',):
                     if field in pmrmr:
                         fv = pmrmr[field]
                         for ent_id in fv:
@@ -790,35 +798,79 @@ class Derives:
                 logd.error(msg)
 
         if not_done_dirs:
-            dists = {
-                d: sorted(
-                    [(nml.levenshteinDistance(d, s), s, source)
-                     for ss, source in
-                     (((def_not_done_specs | not_done_perfs), ' '),
-                      ((done_specs | inter_perf), '*'),)
-                     for s in ss])
-                for d in (sot[-1] if isinstance(sot, tuple) else sot
-                          for sot in not_done_dirs)
-            }
-            align = {
-                d: (lambda l: max(l) if l else -1)(
-                    [len(s) for _, s, _ in dss])
-                for d, dss in dists.items()}
-            report = '\n\n'.join(
-                [f'{" ".join([e[1].as_posix() for e in dirs[d]])}\n  0 {d}\n' + '\n'.join(
-                    [f'{dist:>3} {s:<{align[d]}} {source}' for dist, s, source in
-                     # unfortunately we can't limit the total number of entries because
-                     [(dist, s, so) for dist, s, so in dists[d]
-                      if dist < 10 or so == ' ' and dist < 15]])
-                 for d in sorted(sot[-1] if isinstance(sot, tuple) else sot
-                                 for sot in not_done_dirs)])
-            msg = ('There are directories that have no corresponding '
-                   f'metadata record!\n{not_done_dirs}')
-            msg_report = msg + f'\nreport:\n{report}'
-            if he.addError(msg_report,
-                           blame='submission',
-                           path=path):
-                logd.error(msg)
+            _done = {}
+            eit_done_dirs = set()
+            eit_unmached_dirs = {}
+            if eit_drps:
+                for nd in not_done_dirs:
+                    allmatch = dirs[nd]
+                    lam = len(allmatch)
+                    allp = set()
+                    matched = set()
+                    for depth, path, elements in allmatch:
+                        allp.add(path)
+                        parent = path
+                        _paths = set()
+                        while parent.as_posix() != '.':
+                            if parent in _done:
+                                matched.add(path)
+                                break
+
+                            _paths.add(parent)
+                            if parent in eit_drps:
+                                matched.add(path)
+                                for _p in _paths:
+                                    _done[_p] = parent
+
+                                break
+
+                            parent = parent.parent
+
+                    if lam == len(matched):
+                        eit_done_dirs.add(nd)
+                    else:
+                        eit_unmached_dirs[nd] = (allp - matched)
+
+            not_done_after_eit_dirs = not_done_dirs - eit_done_dirs
+            assert set(eit_unmached_dirs) == not_done_after_eit_dirs
+            if eit_done_dirs:
+                msg = (f'{len(eit_done_dirs)} directories were marked '
+                       'done via entity_is_transitive')
+                log.info(msg)
+            if eit_unmached_dirs:
+                msg = f'eit unmached:\n{eit_unmached_dirs}'
+                log.info(msg)
+
+            if not_done_after_eit_dirs:
+                dists = {
+                    d: sorted(
+                        [(nml.levenshteinDistance(d, s), s, source)
+                         for ss, source in
+                         (((def_not_done_specs | not_done_perfs), ' '),
+                          ((done_specs | inter_perf), '*'),)
+                         for s in ss])
+                    for d in (sot[-1] if isinstance(sot, tuple) else sot
+                              for sot in not_done_after_eit_dirs)
+                }
+                align = {
+                    d: (lambda l: max(l) if l else -1)(
+                        [len(s) for _, s, _ in dss])
+                    for d, dss in dists.items()}
+                report = '\n\n'.join(
+                    [f'{" ".join([e[1].as_posix() for e in dirs[d]])}\n  0 {d}\n' + '\n'.join(
+                        [f'{dist:>3} {s:<{align[d]}} {source}' for dist, s, source in
+                         # unfortunately we can't limit the total number of entries because
+                         [(dist, s, so) for dist, s, so in dists[d]
+                          if dist < 10 or so == ' ' and dist < 15]])
+                     for d in sorted(sot[-1] if isinstance(sot, tuple) else sot
+                                     for sot in not_done_after_eit_dirs)])
+                msg = ('There are directories that have no corresponding '
+                       f'metadata record!\n{not_done_after_eit_dirs}')
+                msg_report = msg + f'\nreport:\n{report}'
+                if he.addError(msg_report,
+                               blame='submission',
+                               path=path):
+                    logd.error(msg)
 
         he.embedErrors(obj)
         return obj,
