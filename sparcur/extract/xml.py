@@ -481,6 +481,54 @@ class ExtractKeyenceMetadata(XmlSource):
         return {}
 
 
+class ExtractIntanRHX(XmlSource):
+
+    top_tag = 'IntanRHX'
+
+    def _extract(self, *args, **kwargs):
+        def normv(k, v):
+            # for now preserve the exact string because we have floats
+            # and ints and JSON mangles those :/ also no types :/
+            return v
+
+            if v == 'True':
+                return True
+            elif v == 'False':
+                return False
+            else:
+                try:
+                    return int(v)
+                except ValueError:
+                    pass
+
+                try:
+                    return float(v)
+                except ValueError:
+                    pass
+
+        out = {}
+        genconfl = self.xpath('GeneralConfig')
+        if genconfl:
+            genconf = genconfl[0]
+            out['GeneralConfig'] = {k: normv(k, v) for k, v in genconf.items()}
+
+        sigl = self.xpath('SignalGroup')
+        if sigl:
+            sgs = out['SignalGroups'] = []
+            for sig in sigl:
+                sg = {'SignalGroup': dict(sig.items())}
+                chans = sig.iterchildren()
+                # FIXME currently only Channel but might be others at some point
+                if chans:
+                    chns = sg['Channels'] = []
+                    for c in chans:
+                        chns.append(dict(c.items()))
+
+                sgs.append(sg)
+
+        return out
+
+
 ExtractXml.classes = (*[c for c in subclasses(XmlSource)], XmlSource)
 
 # FIXME not entirely clear that I am using type correctly here
