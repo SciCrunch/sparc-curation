@@ -831,8 +831,12 @@ class Derives:
                     else:
                         eit_unmached_dirs[nd] = (allp - matched)
 
+
             not_done_after_eit_dirs = not_done_dirs - eit_done_dirs
-            assert set(eit_unmached_dirs) == not_done_after_eit_dirs
+
+            if eit_drps:
+                assert set(eit_unmached_dirs) == not_done_after_eit_dirs
+
             if eit_done_dirs:
                 msg = (f'{len(eit_done_dirs)} directories were marked '
                        'done via entity_is_transitive')
