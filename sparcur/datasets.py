@@ -816,7 +816,7 @@ class Tabular(HasErrors):
 
         wbro.close()
         s_lnn = set(lnn)
-        max_lnn = max(s_lnn) + 1  # + 1 to convert from index -> column number
+        max_lnn = (max(s_lnn) if s_lnn else 0) + 1  # + 1 to convert from index -> column number
         start_cols_empty = max_lnn + 1  # start deleting one column after last non-empty
         msg = (f'unique last not nones {s_lnn}, max {max_lnn}, '
                f'delete from {start_cols_empty}')
