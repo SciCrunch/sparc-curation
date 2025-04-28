@@ -2049,7 +2049,7 @@ switch to that"
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
   (set-column-width 0 70 70 300)
-  (set-column-width 1 120 60 300)
+  (set-column-width 1 120 60 600)
   (set-column-width 2 120 60 300)
   (set-column-width 3 140 60 9999)
   )
