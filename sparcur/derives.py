@@ -453,18 +453,25 @@ class Derives:
                 done_dirs.add(subject_id)
 
             done_specs.add(subject_id)
-            records.append({'type': 'SubjectDirs',
-                            # have to split the type because we can't recover
-                            # the type using just the specimen id (sigh)
-                            # and we need it to set the correct prefix (sigh)
-                            'specimen_id': subject_id,
-                            'dirs': (
-                                [d[1] for d in dirs[subject_id]]
-                                if subject_id in dirs else
-                                ([d[1] for d in dirs[pool_id]]
-                                 if pool_id in dirs else
-                                 # manifest case hopefully? but might be missing a dir entirely
-                                 []))})
+
+            _rec = {'type': 'SubjectDirs',
+                    # have to split the type because we can't recover
+                    # the type using just the specimen id (sigh)
+                    # and we need it to set the correct prefix (sigh)
+                    'specimen_id': subject_id,}
+
+            _dirs = (
+                [d[1] for d in dirs[subject_id]]
+                if subject_id in dirs else
+                ([d[1] for d in dirs[pool_id]]
+                 if pool_id in dirs else
+                 # manifest case hopefully? but might be missing a dir entirely
+                 []))
+
+            _metadata_only = subject_id in metadata_only_specs
+            if _dirs or not _metadata_only:
+                _rec['dirs'] = _dirs
+                records.append(_rec)
 
         ### sample pools
         inter_sam_pool = set(dirs) & set(sam_pools)
@@ -517,15 +524,22 @@ class Derives:
                     done_specs.add(sample_id)
                     id = sample_id  # FIXME need ttl export suport for this
 
-                records.append({'type': 'SampleDirs',
-                                # have to split the type because we can't recover
-                                # the type using just the specimen id (sigh)
-                                # and we need it to set the correct prefix (sigh)
-                                'specimen_id': id,
-                                'dirs': [d[1] for d in dirs[sample_id]]
-                                if sample_id in dirs else
-                                [d[1] for d in dirs[pool_id]]})
+                _dirs = ([d[1] for d in dirs[sample_id]]
+                         if sample_id in dirs else
+                         [d[1] for d in dirs[pool_id]])
+                _rec = {'type': 'SampleDirs',
+                        # have to split the type because we can't recover
+                        # the type using just the specimen id (sigh)
+                        # and we need it to set the correct prefix (sigh)
+                        'specimen_id': id,}
+
+                _metadata_only = id in metadata_only_specs
+                if _dirs or not _metadata_only:
+                    _rec['dirs'] = _dirs
+                    records.append(_rec)
+
         else:
+            # TODO handle case where metadata only spec has a folder or is mapped in the manifest
             logd.warning('miscount sample dirs, TODO')
             bad_dirs = []
             if template_version_less_than_2:
