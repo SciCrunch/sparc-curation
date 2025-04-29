@@ -4,13 +4,10 @@ import json
 import types
 import inspect
 from functools import wraps
-import jsonschema
 
 # FIXME these imports should not be here types rules should be set in another way
 from pathlib import PurePath
 import idlib
-import rdflib
-import requests
 import ontquery as oq
 from pysercomb.pyr.types import ProtcurExpression
 from sparcur import exceptions as exc
@@ -235,7 +232,13 @@ def json_version(version):
     }
 
 
+runtime_context_specs = None
 def get_runtime_context_specs():
+    # FIXME this takes ~ .3 seconds to run
+    global runtime_context_specs
+    if runtime_context_specs is not None:
+        return runtime_context_specs
+
     # FIXME not clear we should be embedding context_runtime deeply in
     # the schemas, though it is useful for being able to see things
     # side by side
@@ -250,6 +253,7 @@ def get_runtime_context_specs():
 
     specs = tuple(set(tuple(l) for l in collect))
     # FIXME convert to JPointer here?
+    runtime_context_specs = specs
     return specs
 
 
@@ -467,12 +471,12 @@ class HasSchema:
         return decorator
 
 
-class ConvertingChecker(jsonschema.FormatChecker):
-    _enc = JEncode()
-
-    def check(self, instance, format):
-        converted = _enc.default(instance)
-        return super().check(converted, format)
+#class ConvertingChecker(jsonschema.FormatChecker):
+#    _enc = JEncode()
+#
+#    def check(self, instance, format):
+#        converted = _enc.default(instance)
+#        return super().check(converted, format)
 
 
 def _make_st_checker(st):
@@ -492,23 +496,32 @@ class JSONSchema(object):
         str,
         PurePath,
         idlib.Stream,  # FIXME str/dict
-        rdflib.URIRef,
-        rdflib.Literal,
         oq.OntId,
         oq.OntTerm,  # FIXME str/dict
         ProtcurExpression,
     ]
 
-    type_checker = jsonschema.Draft6Validator.TYPE_CHECKER.redefine_many(
-        dict(array=(lambda c, i: isinstance(i, list) or isinstance(i, tuple)),
-             string=_make_st_checker(string_types)))
+    def __new__(cls):
+        import rdflib  # FIXME still being called by oq
+        JSONSchema.string_types.extend([
+            rdflib.URIRef,
+            rdflib.Literal,
+        ])
+        import jsonschema
+        JSONSchema.jsonschema = jsonschema
+        JSONSchema.type_checker = jsonschema.Draft6Validator.TYPE_CHECKER.redefine_many(
+            dict(array=(lambda c, i: isinstance(i, list) or isinstance(i, tuple)),
+                string=_make_st_checker(cls.string_types)))
 
-    validator_class = jsonschema.validators.extend(
-        jsonschema.Draft6Validator,
-        type_checker=type_checker)
+        JSONSchema.validator_class = jsonschema.validators.extend(
+            jsonschema.Draft6Validator,  # TODO newer for better conditional validation
+            type_checker=cls.type_checker)
+
+        JSONSchema.__new__ = object.__new__
+        return super().__new__(cls)
 
     def __init__(self):
-        format_checker = jsonschema.FormatChecker()
+        format_checker = self.jsonschema.FormatChecker()
         #format_checker = ConvertingChecker()
         types = dict(array=(list, tuple),
                      string=tuple(self.string_types))
@@ -671,7 +684,11 @@ class RemoteSchema(RuntimeSchema):
     # FIXME TODO these need to be cached locally
     @classmethod
     def setup(cls):
-        cls.schema = requests.get(cls.schema).json()
+        if not hasattr(RemoteSchema, '_requests'):
+            import requests
+            cls._requests = requests
+
+        cls.schema = cls._requests.get(cls.schema).json()
 
 
 class ApiNATOMYSchema(RemoteSchema):
@@ -2722,6 +2739,3 @@ class MISDatasetSchema(JSONSchema):
                                      'items': MISSpecimenSchema.schema},
               }
               }
-
-
-runtime_context_specs = get_runtime_context_specs()

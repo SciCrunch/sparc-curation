@@ -2214,7 +2214,7 @@ class ToJsonLdPipeline(JSONPipeline):
         data = super().added
         DictTransformer.derive(data, self.derives_after_adds, source_key_optional=True)
         # FIXME sort of out of place, but technically augment
-        resolve_context_runtime(sc.runtime_context_specs, data)
+        resolve_context_runtime(sc.get_runtime_context_specs(), data)
         return data
 
     @property
