@@ -616,7 +616,8 @@ def diff_sheet(old_s, new_s):
             #log.debug(f'{old_row.values}, {new_row.values}')
             #log.debug(f'{list(zip(old_row.values, new_row.values))}')
             for v in valid_columns:
-                old_c = getattr(old_row, v)()
+                old_f = getattr(old_row, v)
+                old_c = None if old_f is None else old_f()
                 new_c = getattr(new_row, v)()
                 if old_c.value != new_c.value:
                     log.debug(f'sheet value {v} changed for {did}: {old_c.value!r} {new_c.value!r}')
