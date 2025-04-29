@@ -1682,7 +1682,7 @@ class PipelineExtras(JSONPipeline):
          # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
          [['entity_dirs']],
-         lambda p: []],
+         lambda p: ('0.0.0' if p == ['meta', 'template_schema_version'] else [])],
 
     )
 
