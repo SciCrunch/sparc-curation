@@ -1668,6 +1668,7 @@ class PipelineExtras(JSONPipeline):
          [['subjects_from_samples']]],
 
         [[THIS_PATH,
+          ['meta', 'template_schema_version'],
           ['dir_structure'],
           ['path_metadata'],  # needs path_metadata from the previous derive
           # so that we don't have to validate the manifests twice
@@ -1680,7 +1681,7 @@ class PipelineExtras(JSONPipeline):
          # subjects then this will fail and won't run at all, yet another reason
          # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
-         [['specimen_dirs']],
+         [['entity_dirs']],
          lambda p: []],
 
     )

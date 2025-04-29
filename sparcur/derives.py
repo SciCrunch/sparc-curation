@@ -307,7 +307,7 @@ class Derives:
         return subjects,
 
     @staticmethod
-    def validate_structure(path, dir_structure, path_metadata, # manifests,
+    def validate_structure(path, template_schema_version, dir_structure, path_metadata, # manifests,
                            performances, subjects, samples, sites):
         he = HasErrors(pipeline_stage='Derives.validate_structure')
 
@@ -318,6 +318,26 @@ class Derives:
         # folder names take the ones that match ignore the known ok
         # that do not, and warn on all the rest that do not match
         # and that are not inside a known specimen or subject folder
+
+        def ent_dirs(entity_id, obj_type, entity_metadata_only_dict, records, pool_id=None, entity_id_for_dirs_lookup=None, include_specimen_id=False):
+            if entity_id_for_dirs_lookup is None:
+                entity_id_for_dirs_lookup = entity_id
+
+            entity_id_fdlu = entity_id_for_dirs_lookup
+
+            _dirs = ([d[1] for d in dirs[entity_id_fdlu]]
+                     if entity_id_fdlu in dirs else
+                     ([d[1] for d in dirs[pool_id]]
+                      if pool_id in dirs else []))
+            _rec = {'type': obj_type,
+                    'entity_id': entity_id,}
+            #if include_specimen_id:
+                #_rec['specimen_id'] = entity_id
+
+            _metadata_only = entity_id in entity_metadata_only_dict
+            if _dirs and not _metadata_only:
+                _rec['dirs'] = _dirs
+                records.append(_rec)
 
         valid_top_123 = ('source', 'primary', 'derivative',  # FIXME not here :/ schema somehow?
                          'code', 'docs', 'protocol')
@@ -413,13 +433,19 @@ class Derives:
         union_perf = set(dirs) | set(perfs)
         inter_perf = set(dirs) & set(perfs)
         done_dirs.update(inter_perf)
+        # FIXME TODO perf_done_by_manifest ?
         not_done_perfs = set(perfs) - (inter_perf | metadata_only_perfs | ent_done_by_manifest)
+        for perf in perfs:
+            ent_dirs(perf, 'PerfDirs', metadata_only_perfs, records)
 
         ### sites
         union_site = set(dirs) | set(sites)
         inter_site = set(dirs) & set(sites)
         done_dirs.update(inter_site)
+        # FIXME TODO site_done_by_manifest ?
         not_done_sites = set(sites) - (inter_site | metadata_only_sites | ent_done_by_manifest)
+        for site in sites:
+            ent_dirs(site, 'SiteDirs', metadata_only_sites, records)
 
         ### subject pools
         inter_sub_pool = set(dirs) & set(sub_pools)
@@ -454,24 +480,7 @@ class Derives:
 
             done_specs.add(subject_id)
 
-            _rec = {'type': 'SubjectDirs',
-                    # have to split the type because we can't recover
-                    # the type using just the specimen id (sigh)
-                    # and we need it to set the correct prefix (sigh)
-                    'specimen_id': subject_id,}
-
-            _dirs = (
-                [d[1] for d in dirs[subject_id]]
-                if subject_id in dirs else
-                ([d[1] for d in dirs[pool_id]]
-                 if pool_id in dirs else
-                 # manifest case hopefully? but might be missing a dir entirely
-                 []))
-
-            _metadata_only = subject_id in metadata_only_specs
-            if _dirs or not _metadata_only:
-                _rec['dirs'] = _dirs
-                records.append(_rec)
+            ent_dirs(subject_id, 'SubjectDirs', metadata_only_specs, records, pool_id=pool_id)
 
         ### sample pools
         inter_sam_pool = set(dirs) & set(sam_pools)
@@ -483,10 +492,18 @@ class Derives:
         inter_sam = set(dirs) & set(samps)
         inter_pool_sam = inter_sam & pooled_samples
 
-        template_version_less_than_2 = True  # FIXME TODO
+
+        non_unique_samples = False
+        for sample_id, blob in samps.items():
+            if len(blob) > 1:
+                non_unique_samples = True
+                break
+
+        template_version_less_than_2 = template_schema_version.startswith('1.')
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
         #if inter_sam | pooled_samples == (set(samps) - (metadata_only_specs | ent_done_by_manifest)):
-        if inter_sam | pooled_samples == (set(samps) - metadata_only_specs):  # FIXME exact equality here causing issues
+        if (inter_sam | pooled_samples == (set(samps) - metadata_only_specs)  # FIXME exact equality here causing issues
+            and not non_unique_samples):  # FIXME consider just not using this branch in less than 2 ...
             for sample_id, blob in samps.items():
                 if sample_id in pool_sams:  # FIXME assumes 1:1 which is incorrect
                     pool_id = pool_sams[sample_id]
@@ -494,11 +511,14 @@ class Derives:
                     pool_id = None
 
                 if len(blob) > 1:
-                    # FIXME TODO this means that we need to fail over to the primary keys
                     msg = f'sample_id is not unique! {sample_id}\n{blob}'
-                    if he.addError(msg, blame='submission', path=path):
-                        logd.error(msg)
-                    continue
+                    if template_version_less_than_2:
+                        logd.warning(msg)
+                    else:
+                        if he.addError(msg, blame='submission', path=path):
+                            logd.error(msg)
+
+                        continue
 
                 if sample_id in metadata_only_specs:
                     if sample_id in inter_sam:
@@ -524,19 +544,7 @@ class Derives:
                     done_specs.add(sample_id)
                     id = sample_id  # FIXME need ttl export suport for this
 
-                _dirs = ([d[1] for d in dirs[sample_id]]
-                         if sample_id in dirs else
-                         [d[1] for d in dirs[pool_id]])
-                _rec = {'type': 'SampleDirs',
-                        # have to split the type because we can't recover
-                        # the type using just the specimen id (sigh)
-                        # and we need it to set the correct prefix (sigh)
-                        'specimen_id': id,}
-
-                _metadata_only = id in metadata_only_specs
-                if _dirs or not _metadata_only:
-                    _rec['dirs'] = _dirs
-                    records.append(_rec)
+                ent_dirs(id, 'SampleDirs', metadata_only_specs, records, pool_id=pool_id, entity_id_for_dirs_lookup=sample_id)
 
         else:
             # TODO handle case where metadata only spec has a folder or is mapped in the manifest
@@ -584,7 +592,8 @@ class Derives:
                                     # have to split the type because we can't recover
                                     # the type using just the specimen id (sigh)
                                     # and we need it to set the correct prefix (sigh)
-                                    'specimen_id': id,
+                                    'entity_id': id,
+                                    #'specimen_id': id,
                                     'dirs': actual,
                                     })
                         else:
