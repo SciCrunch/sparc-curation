@@ -479,7 +479,14 @@ class StatusConverter(TripleConverter):
                     for message in v['messages']:
                         p = TEMP.message
                         # p = rdflib.Literal(k)  # will serialize, but totally against the spec everything will break
-                        yield b0, p, rdflib.Literal(message)
+                        if isinstance(message, str):
+                            _mt = message.split('\n')
+                            _lmt = len(_mt)
+                            message_trunc = message if _lmt == 1 else (_mt[0] + f' ... truncated {_lmt - 1} lines')
+                        else:
+                            message_trunc = message
+
+                        yield b0, p, rdflib.Literal(message_trunc)
 
             return comb
 
