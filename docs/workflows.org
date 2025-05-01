@@ -75,8 +75,6 @@ keywords = sorted(set([k for d in asdf['datasets'] if 'meta' in d and 'keywords'
                        for k in d['meta']['keywords']]))
 #+end_src
 ** Compacting dataset exports
-See also [[./developer-guide.org::#compact]].
-
 The proper way to do this is to compact _all_ exports as soon as they
 are created (though in a separate process). Then run compact to remove
 folders that are no longer needed since everything will be xzed from
@@ -93,10 +91,11 @@ xargs -P4 -r -I{} sh -c 'XZ_OPT=-e9 tar -C "{}" -cvJf "{}.tar.xz" .'
 #+end_src
 
 Once all dataset exports have been archived it is safe to run the following.
-
 #+begin_src bash :eval never
 python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'rm -r "{}"'
 #+end_src
+
+See [[./developer-guide.org::#compact]] for the old workflow.
 
 TODO Implement =sparcur.simple.compact_snapshot= to elink older
 snapshots to the archives so the folders can be removed. Need to
@@ -418,6 +417,72 @@ find -mindepth 2 -maxdepth 2 -type d -name 'SPARC' -exec test -d {}/../SPARC\ Co
 # get sizes of the consort folders
 find -mindepth 2 -maxdepth 2 -type d -name 'SPARC' -exec test -d {}/../SPARC\ Consortium \; -exec du -hd0 {}\ Consortium \; | sort -h
 #+end_src
+
+*** REVA merged ttl
+#+name: reva-merged-datasets
+| dataset-id                                     | short-id         |
+|------------------------------------------------+------------------|
+| N:dataset:e225ea82-54b5-457f-ad3d-faa640eb13be | f013             |
+| N:dataset:7a542123-ce8d-4f53-9b74-d259958db1ea | f012             |
+| N:dataset:1c929cf2-213a-45ed-a867-47a7864c83eb | f011             |
+| N:dataset:09a09632-a425-4802-b5f2-464c9177ef41 | f010             |
+| N:dataset:614ca71d-863f-4bb3-959e-e74e814d8e1a | f018             |
+| N:dataset:bd90e81f-fb33-40ce-93e1-44875efde91b | f014             |
+| N:dataset:bd90e81f-fb33-40ce-93e1-44875efde91b | f015             |
+| N:dataset:c5edefba-732d-4c5e-a66c-9081d6885b9e | f017             |
+| N:dataset:c5edefba-732d-4c5e-a66c-9081d6885b9e | f016             |
+| N:dataset:2a3d01c0-39d3-464a-8746-54c9d67ebe0f | f006             |
+| N:dataset:5c7b9f9d-eeda-4370-a5b8-892020f863c2 | f007             |
+| N:dataset:33a9f81e-1deb-4c2c-922a-f9eac47ed3e5 | f008             |
+| N:dataset:ec6ad74e-7b59-409b-8fc7-a304319b6faf | f003             |
+| N:dataset:aa43eda8-b29a-4c25-9840-ecbd57598afc | f001             |
+| N:dataset:bc4cc558-727c-4691-ae6d-498b57a10085 | f002             |
+| N:dataset:04a5fed9-7ba6-4292-b1a6-9cab5c38895f | f004             |
+| N:dataset:a8b2bdc7-54df-46a3-810e-83cdf33cfc3a | f005             |
+| N:dataset:9d2b7a97-1923-4880-a3cc-3a85c8720839 | f009             |
+| N:dataset:fb1cbd05-4320-4d8b-ac3a-44f1fe810718 | MicroCT          |
+| N:dataset:f8c2985b-1fd3-4db8-90f4-3ce72357c949 | Excised-Nerve-CT |
+| N:dataset:47723323-5c44-4656-8c01-da5bd39ff053 | Anatomy          |
+| N:dataset:17c63dac-4f07-436e-98b0-45457d0571a1 | Histology        |
+| N:dataset:3da605ff-1d3b-47ea-82c3-b99395ceedde | 3D-Nerve-Tracing |
+
+not ready/missing
+| N:dataset:a80b6ba1-f7e4-42dc-8c78-b7573c4c798a | MRI              |
+| N:dataset:0affd8ff-6670-4ca5-b125-70f1eeb032f8 | MUSE             |
+
+#+begin_src elisp :var data-in=reva-merged-datasets() :results none :lexical yes
+(let ((local t)
+      (user "")
+      (n 0))
+ (with-temp-buffer
+   (insert "@prefix ilxtr: <http://uri.interlex.org/tgbugs/uris/readable/> .\n")
+   (mapcar
+    (lambda (row)
+      (let* ((dataset-id (car row))
+             (uuid (car (reverse (string-split dataset-id ":"))))
+             (url (format "https://cassava.ucsd.edu/sparc/datasets/%s/LATEST/curation-export.ttl" uuid))
+             (file (format "~%s/.local/share/sparcur/export/datasets/%s/LATEST/curation-export.ttl" user uuid))
+             (url-or-file (if local file url))
+             (new-min (point-max)))
+        (goto-char (point-max)) ; withoutthis insert-file-contents will insert at 1
+        (with-url-handler-mode
+          (insert-file-contents url-or-file)
+          (let ((new-max (point-max)))
+            (setq n (1+ n))
+            (message ":n %s :new-min %s :new-max %s" n new-min new-max )
+            (evil-ex-substitute new-min new-max '("local:") (format "local%s:" n) '("g"))
+            (evil-ex-substitute new-min new-max '("a owl:Ontology") "a ilxtr:EmbeddedOntology" '("g"))
+            ;;(evil-ex-substitute (point-min) (point-max) '("local:") (format "local%s:" n) '("g"))
+            ))))
+    data-in)
+   (goto-char (point-max))
+   ;; FIXME somehow rdflib ttl parser complaining about bare / in curies which is allowed ffs
+   (insert (format "\nilxtr:ontologies\\/reva-merge-test a owl:Ontology ; rdfs:label \"REVA dataset metadata merge %s\" .\n" (format-time-string "%Y-%m-%d" (current-time)))) ; TODO better metadata obvs e.g. via (defun (make-ontology-metadata ...) ..)
+   ;; don't bother with this for now because we will have to run it later anyway
+   ;;(shell-command-on-region (point-min) (point-max) "ttlfmt -f ttl" (current-buffer) 'replace) ; slooow
+   (write-file "/tmp/reva-merged.ttl")))
+#+end_src
+
 ** datasets causing issues with fetching files
 :PROPERTIES:
 :CREATED:  [2022-02-08 Tue 13:58]
