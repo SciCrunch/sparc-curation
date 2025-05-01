@@ -268,6 +268,19 @@ note of course that you don't get dynamic binding with version since it is not t
 
 ;; utility functions
 
+(define uuid-dataset-hash (make-immutable-hash))
+
+(define (rehash-current-datasets!)
+  ; FIXME this should almost certainly be done automatically if current-datasets is called with an argument
+  (set! uuid-dataset-hash
+    (make-immutable-hash
+     (for/list ([ds (current-datasets)])
+       (cons (id-uuid ds) ds)))))
+
+(define (ident->dataset ident)
+  (let ((uuid (car (reverse (string-split ident ":")))))
+    (hash-ref uuid-dataset-hash uuid)))
+
 (define --sigh (gensym))
 (define (py-system* exe #:set-pwd? [set-pwd? --sigh] . args)
   (call-with-environment
@@ -381,6 +394,7 @@ note of course that you don't get dynamic binding with version since it is not t
          [datasets (append datasets-remote datasets-local)])
     (current-projects projects)
     (current-datasets datasets)
+    (rehash-current-datasets!)
     (set-datasets-view! lview (current-datasets)) ; FIXME TODO have to store elsewhere for search so we
     result))
 
@@ -553,6 +567,7 @@ note of course that you don't get dynamic binding with version since it is not t
               [unfiltered? (= 0 (string-length (string-trim (send text-search-box get-value))))])
          (current-projects projects)
          (current-datasets datasets)
+         (rehash-current-datasets!)
          (if unfiltered?
              (call-with-semaphore
               jview-semaphore
@@ -613,7 +628,13 @@ note of course that you don't get dynamic binding with version since it is not t
             ; FIXME use my hr function from elsewhere
             (let ([ihr (get-path-err)])
               (if ihr
-                  (hash-ref (hash-ref ihr '|#/specimen_dirs| #hash((messages . ()))) 'messages)
+                  (hash-ref
+                   (hash-ref
+                    ihr '|#/entity_dirs|
+                    (hash-ref ; try the old path since there is a clean transition
+                     ihr '|#/specimen_dirs|
+                     #hash((messages . ()))))
+                   'messages)
                   '()))))
 
 (define (manifest-report)
