@@ -3,84 +3,159 @@ import base64
 import pathlib
 import boto3  # sigh
 import requests
-from orthauth.stores import Secrets
+from config import Config
+import json
+
+log_file = open('progress_log.txt', 'a')
+
+bp_list = []
 
 
-def fun0(resp):
-    print(resp.headers, resp.text)
-    return token
+def get_biolucida_token():
+    url_bl_auth = f"{Config.BIOLUCIDA_ENDPOINT}/authenticate"
+    response = requests.post(url_bl_auth,
+                        data=dict(
+                            username=Config.BIOLUCIDA_USERNAME,
+                            password=Config.BIOLUCIDA_PASSWORD,
+                            token=''))
+    if response.status_code == requests.codes.ok:
+        content = response.json()
+        if content['status'] == 'success':
+            return content['token']
+    return None
+
+def initiate_biolucida_upload(filename, filesize, chunk_size, token):
+    url_bl_uinit = f"{Config.BIOLUCIDA_ENDPOINT}/upload/init"
+    response = requests.post(url_bl_uinit,
+                        data=dict(
+                            filename=filename,
+                            filesize=filesize,
+                            chunk_size=chunk_size),
+                            headers=dict(token=token))
+    if response.status_code == requests.codes.ok:
+        content = response.json()
+        if content['status'] == 'success':
+            return content['upload_key'], content['total_chunks']
+    return None
 
 
-def fun1(resp):
-    print(resp.headers, resp.text)
-    return upload_key
+def cancel_biolucida_upload(upload_key):
+    url_bl_ucancel = f"{Config.BIOLUCIDA_ENDPOINT}/upload/cancel"
+    response = requests.post(url_bl_ucancel,
+                        data=dict(
+                            upload_key=upload_key
+                        ))
+    if response.status_code == requests.codes.ok:
+        content = response.json()
+        if content['status'] == 'success':
+            return content['filepath'], content['files']
+    return None
+
+def finalise_biolucida_upload(upload_key, filename):
+    url_bl_ufin = f"{Config.BIOLUCIDA_ENDPOINT}/upload/finish"
+    response = requests.post(url_bl_ufin,
+                    data=dict(upload_key=upload_key))
+    output = {}
+    if response.status_code == requests.codes.ok:
+        log_file.write(f"Upload for {filename} completed\n")
+        content = response.json()
+        if content['status'] == 'success':
+            content = response.json()
+            if 'img_id' in content:
+              log_file.write(f"Finish api biolucida id: {content['img_id']}\n")
+              output['img_id']  = content['img_id']
+            else:
+              if 'collection_id' in content and 'basename' in content:
+                log_file.write(f"Finish api biolucida id: {content['collection_id']}\n")
+                output['collection_id'] = content['collection_id']
+                output['basename'] = content['basename']
+            return output
+    else:
+        log_file.write(f"Finish api for upload for {filename} failed\n")
+    return None
+
+def get_biolucida_id(filename):
+    url_bl_search = f"{Config.BIOLUCIDA_ENDPOINT}/search/{filename}"
+    resp = requests.get(url_bl_search)
+    if resp.status_code == requests.codes.ok:
+        content = resp.json()
+        if content['status'] == 'success':
+            images = content['images']
+            for image in images:
+                if image['original_name'] == filename:
+                    return image['url'] #this is the id
+
+    return None
 
 
-def fun2(resp):
+def get_upload_key(resp):
     print(resp.headers, resp.text)
     return imageid
 
 
-def upload_to_bl(dataset_id, published_id, package_id, s3url, filename, filesize,
-                 secrets=None, username=None, BL_SERVER_URL="sparc.biolucida.net", chunk_size=4096):
+def upload_to_bl(dataset_id, published_id, package_id, s3url, filename, filesize, chunk_size=1048576):
+    print(f"Uploading {published_id}, {s3url}, {filename}")
+    log_file.write(f"Upload {published_id}, {dataset_id}, {package_id}, {s3url}, {filename}, {filesize}\n")
     # see https://documenter.getpostman.com/view/8986837/SWLh5mQL
     # see also https://github.com/nih-sparc/sparc-app/blob/0ca1c33e245b39b0f07485a990e3862af085013e/nuxt.config.js#L101
-    url_bl_auth = f"https://{BL_SERVER_URL}/api/v1/authenticate"  # username password token
-    url_bl_uinit = f"https://{BL_SERVER_URL}/api/v1/upload/init" # filesize chunk_size filename -> upload_key
+    BL_SERVER_URL = Config.BIOLUCIDA_ENDPOINT
+     # filesize chunk_size filename -> upload_key
     # chunk_size is after decoded from base64
     # chunk_id means we can go in parallel in principle
-    url_bl_ucont = f"https://{BL_SERVER_URL}/api/v1/upload/continue" # upload_key upload_data chunk_id
-    url_bl_ufin = f"https://{BL_SERVER_URL}/api/v1/upload/finish"  # upload_key
-    url_bl_ima = f"https://{BL_SERVER_URL}/api/v1/imagemap/add"  # imageid sourceid blackfynn_datasetId discover_datasetId
+    url_bl_ucont = f"{BL_SERVER_URL}/upload/continue" # upload_key upload_data chunk_id
+    url_bl_ima = f"{BL_SERVER_URL}/imagemap/add"  # imageid sourceid blackfynn_datasetId discover_datasetId
+
+    token = get_biolucida_token()
+    item = {
+        "package_id": package_id,
+        "filename": filename,
+        "discover_id": published_id,
+        "status": "failed"
+    }
+
+    if token:
+        upload_key, expect_chunks = initiate_biolucida_upload(filename, filesize, chunk_size, token)
+        log_file.write(f"{upload_key}, {expect_chunks}\n")
+        # see https://documenter.getpostman.com/view/8986837/SWLh5mQL
+
+        if upload_key:
+            resp_s3 = requests.get(s3url, stream=True)
+            for i, chunk in enumerate(resp_s3.iter_content(chunk_size=chunk_size)):
+                msg = f"Chunk {i} of {expect_chunks}: "
+                log_file.write(msg)
+                print(msg)
+                b64chunk = base64.encodebytes(chunk)
+                resp_cont = requests.post(url_bl_ucont,
+                                        data=dict(
+                                            upload_key=upload_key,
+                                            upload_data=b64chunk,
+                                            chunk_id=i))
+                if resp_cont.status_code == requests.codes.ok:                           
+                    content = resp_cont.json()
+                    if content['status'] == 'success':
+                        log_file.write("Successful\n")
+                        print("Successful")
+                    else:
+                        log_file.write("Fail\n")
+                        print("Fail")
+                else:
+                    log_file.write("Fail\n")
+                    print("Fail")
+
+            data = finalise_biolucida_upload(upload_key, filename)
+            if data:
+              item['status'] = "successful"
+              for key in data:
+                item[key] = data[key]
+    bp_list.append(item)
+    print(item['status'])
     
-    password = secrets('biolucida', 'sparc', 'api', username, 'password')
-    fake_token = 'derp-fake-token'
-    resp_auth = requests.post(url_bl_auth,
-                              data=dict(
-                                  username=username,
-                                  password=password,
-                                  token=fake_token))
-    token = fun0(resp_auth)
-
-    resp_init = requests.post(url_bl_uinit,
-                              data=dict(
-                                  filename=filename,
-                                  filesize=filesize,
-                                  chunk_size=chunk_size),
-                              headers=dict(token=token))
-    upload_key = fun1(resp_init)
-
-    resp_s3 = requests.get(s3url, stream=True)
-    expect_chunks = math.ceil(filesize / chunk_size)
-    for i, chunk in enumerate(resps3.iter_content(chunk_size=chunk_size)):
-        b64chunk = base64.encode(chunk)
-        resp_cont = requests.post(url_bl_ucont,
-                                  data=dict(
-                                      upload_key=upload_key,
-                                      upload_data=b64chunk,
-                                      chunk_id=i))
-        print(resp_cont.text)
-
-    resp_fin = requests.post(url_bl_ufin,
-                             data=dict(upload_key=upload_key))
-
-    imageid = fun2(resp_fin)  # ... uh no idea how we get this, hopefully it is in resp_fin ???
-    resp_img = requests.post(url_bl_ima,
-                             data=dict(
-                                 imageId=imageid,
-                                 sourceId=package_id,
-                                 blackfynn_datasetId=dataset_id,
-                                 discover_datasetId=id_published),
-                             headers=dict(token=token))
-    print(resp_img.text)
-
 
 def kwargs_from_pathmeta(blob, pennsieve_session, published_id):
     dataset_id = 'N:' + blob['dataset_id']
     package_id = 'N:' + blob['remote_id']
     filename = blob['basename']
     filesize = blob['size_bytes']
-
     resp = pennsieve_session.get(blob['uri_api'])
     s3url = resp.json()['url']
     return dict(
@@ -93,12 +168,11 @@ def kwargs_from_pathmeta(blob, pennsieve_session, published_id):
     )
 
 
-def make_pennsieve_session(secrets, organization_id):
-    api_key = secrets('pennsieve', organization_id, 'key')
-    api_secret = secrets('pennsieve', organization_id, 'secret')
-    PENNSIEVE_URL = "https://api.pennsieve.io"
+def make_pennsieve_session():
+    api_key = Config.PENNSIEVE_API_TOKEN
+    api_secret = Config.PENNSIEVE_API_SECRET
 
-    r = requests.get(f"{PENNSIEVE_URL}/authentication/cognito-config")
+    r = requests.get(f"{Config.PENNSIEVE_API_HOST}/authentication/cognito-config")
     r.raise_for_status()
 
     cognito_app_client_id = r.json()["tokenPool"]["appClientId"]
@@ -124,7 +198,7 @@ def make_pennsieve_session(secrets, organization_id):
     return session
 
 
-def upload_dataset_files_to_bioluc(dataset_id, secrets=None, extensions=("jpx", "jp2"), bioluc_username=None):
+def process_files(dataset_id, skipped, extensions=("jpx", "jp2"), bioluc_username=None):
     dataset_uuid = dataset_id.split(':')[-1]
     url_metadata = f"https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/curation-export.json"
     url_path_metadata = f"https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/path-metadata.json"
@@ -133,9 +207,8 @@ def upload_dataset_files_to_bioluc(dataset_id, secrets=None, extensions=("jpx", 
     metadata = requests.get(url_metadata).json()
     path_metadata = requests.get(url_path_metadata).json()
     published_id = metadata['meta'].get('id_published', None)
-    organization_id = 'N:' + path_metadata['data'][0]['external_parent_id']
 
-    pennsieve_session = make_pennsieve_session(secrets, organization_id)
+    pennsieve_session = make_pennsieve_session()
 
     # get jpx and jp2 files
     matches = []
@@ -145,26 +218,47 @@ def upload_dataset_files_to_bioluc(dataset_id, secrets=None, extensions=("jpx", 
             matches.append(blob)
 
     wargs = []
+
     for match in matches:
         wargs.append(kwargs_from_pathmeta(match, pennsieve_session, published_id))
 
     for warg in wargs:
-        upload_to_bl(**warg, secrets=secrets, username=bioluc_username)
-
-    # filter for just the jpx and jp2 files
-    # get the package ids
-    # loop over the package ids and
-    # get the s3 key from pennsieve api
-    # pull from the s3 address and upload the biolucida endpoint
-    # get the image id from biolucida
-    # post the package id to the biolucida image id so that it is mapped
+      try:
+        if not warg['package_id'] in skipped:
+          print('Required uploading', warg['filename'])
+          upload_to_bl(**warg)
+        else:
+          print('uploaded', warg['filename'])
+      except:
+        item = {
+          "package_id": warg['package_id'],
+          "filename": warg['filename'],
+          "discover_id": warg['published_id'],
+          "status": "failed"
+        }
+        bp_list.append(item)
 
 
 def main():
     dataset_id = "N:dataset:aa43eda8-b29a-4c25-9840-ecbd57598afc"  # f001
-    secrets = Secrets(pathlib.Path('~/ni/dev/secrets.sxpr').expanduser())
-    upload_dataset_files_to_bioluc(dataset_id, secrets=secrets, bioluc_username='tgbugs')
+    skipped = []
+    try:
+      f = open('input.json', 'rb')
+      with f:
+        data = json.load(f)
+        for item in data:
+          if item['status'] == 'successful':
+            bp_list.append(item)
+            skipped.append(item['package_id'])
+        print(skipped)
+    except OSError:
+      print("No input file")
 
+    process_files(dataset_id, skipped)
+    log_file.close()
+
+    with open('output.json', 'w') as f:
+        json.dump(bp_list, f)
 
 if __name__ == "__main__":
     main()
