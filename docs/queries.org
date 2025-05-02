@@ -1,4 +1,4 @@
-# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 63c5bd32026960a117145ddb7abd0c99b5fa9ed46ff2b88ca1e87efae5eebe0a; -*-
+# -*- org-adapt-indentation: nil; org-edit-src-content-indentation: 0; orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: c0beaa9b5b973262b2d5b55ed0754b0259c6179cadeee3279c8e977ec8e4515e; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 # [[file:queries.pdf]] [[file:queries.html]]
 #+name: orgstrap-shebang
@@ -5098,12 +5098,14 @@ Useful version information is not present in all ontology files at the moment.
 :CUSTOM_ID: embedded-load-provenance-record
 :END:
 
+#+name: versions-sparql
 #+begin_src sparql
 SELECT ?p ?o WHERE {
 build:prov ?p ?o .
 }
 #+end_src
 
+#+name: versions-cypher
 #+begin_src cypher :results drawer
 MATCH
 (p)-[i:build:id]-(),
@@ -6900,7 +6902,19 @@ matched strings in man buffer."
 #+name: tests
 #+begin_src elisp
 (defun test-config ()
-(message "TODO test config")
+  (message "TODO test config")
+
+  (ow-babel-eval "versions-sparql")
+  (org-babel-goto-named-result "versions-sparql")
+  (let ((start (point)))
+    (org-forward-element)
+    (message "%s" (buffer-substring-no-properties start (point))))
+
+  (ow-babel-eval "versions-cypher")
+  (org-babel-goto-named-result "versions-cypher")
+  (let ((start (point)))
+    (org-forward-element)
+    (message "%s" (buffer-substring-no-properties start (point))))
   )
 
 (defun test-neurons ()
