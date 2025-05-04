@@ -430,41 +430,47 @@ note of course that you don't get dynamic binding with version since it is not t
     (oa-user-config-path)))
 
 (define (init-paths!)
+  (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
+                  [oa-current-auth-config (oa-read-auth-config)]
+                  [oa-current-user-config (oa-read-user-config)]
+                  [oa-current-secrets (oa-read-secrets)])
+    (init-paths-int!)))
+
+(define (init-paths-int!)
   "initialize or reset the file system paths to cache, export, and source directories"
   ; FIXME 'cache-dir is NOT what we want for this as it is ~/.racket/
   ; FIXME more cryptic errors if sparcur.simple isn't tangled
   ; FIXME it should be possible for the user to configure path-source-dir
-  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
-    (define ac (oa-read-auth-config))
-    (path-config (build-path (expand-user-path (user-config-path "sparcur")) "viewer.rktd"))
-    ; FIXME sppsspps stupidity
-    (path-source-dir (expand-user-path ; redundant but avoids #f contract violation
-                      (or (oa-get-path ac 'data-path #:exists? #f)
-                          (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))))
-    (path-log-dir (build-path
+  (define ac (oa-current-auth-config))
+  (path-config (build-path (expand-user-path (user-config-path "sparcur")) "viewer.rktd"))
+  ; FIXME sppsspps stupidity
+  (path-source-dir (expand-user-path ; redundant but avoids #f contract violation
+                    (or (oa-get-path ac 'data-path #:exists? #f)
+                        (build-path (find-system-path 'home-dir) "files" "sparc-datasets"))))
+  (path-log-dir (build-path
+                 (expand-user-path
+                  (or (oa-get-path ac 'log-path #:exists? #f)
+                      (user-log-path "sparcur")))
+                 "datasets"))
+  (path-cache-dir (build-path
                    (expand-user-path
-                    (or (oa-get-path ac 'log-path #:exists? #f)
-                        (user-log-path "sparcur")))
-                   "datasets"))
-    (path-cache-dir (build-path
-                     (expand-user-path
-                      (or (oa-get-path ac 'cache-path #:exists? #f)
-                          (user-cache-path "sparcur")))
-                     "racket"))
-    (path-cache-push
-     (build-path ; must match python or sparcur.simple.utils won't be able to find {push-id}/paths.sxpr
-      (expand-user-path
-       (or (oa-get-path ac 'cache-path #:exists? #f)
-           (user-cache-path "sparcur")))
-      "push"))
-    (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
-    (path-cleaned-dir (expand-user-path
-                       (or (oa-get-path ac 'cleaned-path #:exists? #f)
-                           (user-data-path "sparcur" "cleaned"))))
-    (path-export-dir (expand-user-path
-                      (or (oa-get-path ac 'export-path #:exists? #f)
-                          (user-data-path "sparcur" "export"))))
-    (path-export-datasets (build-path (path-export-dir) "datasets"))))
+                    (or (oa-get-path ac 'cache-path #:exists? #f)
+                        (user-cache-path "sparcur")))
+                   "racket"))
+  (path-cache-push
+   (build-path ; must match python or sparcur.simple.utils won't be able to find {push-id}/paths.sxpr
+    (expand-user-path
+     (or (oa-get-path ac 'cache-path #:exists? #f)
+         (user-cache-path "sparcur")))
+    "push"))
+  (path-cache-datasets (build-path (path-cache-dir) "datasets-list.rktd"))
+  (path-cleaned-dir (expand-user-path
+                     (or (oa-get-path ac 'cleaned-path #:exists? #f)
+                         (user-data-path "sparcur" "cleaned"))))
+  (path-export-dir (expand-user-path
+                    (or (oa-get-path ac 'export-path #:exists? #f)
+                        (user-data-path "sparcur" "export"))))
+  (path-export-datasets (build-path (path-export-dir) "datasets")))
 
 (define (save-config!)
   (with-output-to-file (path-config)
@@ -486,68 +492,82 @@ note of course that you don't get dynamic binding with version since it is not t
     [else (error '*->string "unknown object type ~s" maybe-string)]))
 
 (define (load-config!)
+  (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
+                  [oa-current-auth-config (oa-read-auth-config)]
+                  [oa-current-user-config (oa-read-user-config)]
+                  [oa-current-secrets (oa-read-secrets)])
+    (load-config-int!)))
+
+(define (load-config-int!)
   ; TODO various configuration options
-  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")])
-    (define config (oa-read-auth-config))
-    (let ([org (oa-get config 'remote-organization)] ; TODO make sure in orgs
-          [orgs (oa-get config 'remote-organizations)]
-          [never-update (oa-get config 'never-update)])
-      (allow-update? (not never-update))
-      (send menu-item-update-viewer enable (allow-update?))
-      (let* ([pc (path-config)]
-             [cfg (if (and pc (file-exists? pc))
-                      (with-input-from-file pc
-                        (λ ()
-                          (read)))
-                      '())])
-        (define (obfus str [ends 4])
-          (let ([ls (string-length str)])
-            (string-append
-             (substring str 0 ends)
-             (make-string (- ls (* 2 ends)) #\*)
-             (substring str (- ls ends) ls))))
-        ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
-        (send choice-prefs-remote-organization clear)
-        (let ([rok '()])
-          (for ([o (or orgs (list org))])
-            ; FIXME TODO append org name
-            (send choice-prefs-remote-organization append (*->string o))
-            (set! rok
-              (cons
-               (cons
-                ; FIXME confusing error message from a make-string contract if the key or secret are too short
-                (obfus (*->string (oa-get-sath 'pennsieve o 'key)))
-                (obfus (*->string (oa-get-sath 'pennsieve o 'secret))))
-               rok)))
-          (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
-          (remote-org-keys (reverse rok))
-          (cb-select-remote-org choice-prefs-remote-organization #f))
-        #;
-        (send text-prefs-path-? set-value "egads")
-        (send text-prefs-path-config set-value (path->string (path-config)))
-        (send text-prefs-path-user-config set-value (oa-user-config-path))
-        (send text-prefs-path-idlib-cfg set-value (python-module-user-config-path "idlib"))
-        (send text-prefs-path-ontqu-cfg set-value
-              (python-module-user-config-path "ontquery.plugins.services"))
-        (send text-prefs-path-pyont-cfg set-value (python-module-user-config-path "pyontutils"))
-        (send text-prefs-path-secrets set-value (oa-secrets-path))
-        (send text-prefs-path-data set-value (path->string (path-source-dir)))
-        (send text-prefs-path-logs set-value (path->string (path-log-dir)))
-        (let* ([config-exists (assoc 'viewer-mode cfg)]
-               [power-user-a (assoc 'power-user? cfg)]
-               [power-user (and power-user-a (cdr power-user-a))])
-          (if config-exists
-              (begin
-                ; set-selection does not trigger the callback
-                (send radio-box-viewer-mode set-selection
-                      ; prevent contract violation of viewer-mode was somehow #f when config was written
-                      (or (cdr config-exists) 0))
-                (cb-viewer-mode radio-box-viewer-mode #f)
-                (power-user? (not power-user))
-                ; cb does the toggle interinally so we set the opposite of what we want first
-                (cb-power-user check-box-power-user #f))
-              (set-current-mode-panel! panel-validate-mode)))
-        (send frame-preferences refresh)))))
+  (let ([org (oa-get (oa-current-auth-config) 'remote-organization)] ; TODO make sure in orgs
+        [orgs (oa-get (oa-current-auth-config) 'remote-organizations)]
+        [never-update (oa-get (oa-current-auth-config) 'never-update)])
+    (allow-update? (not never-update))
+    (send menu-item-update-viewer enable (allow-update?))
+    (let* ([pc (path-config)]
+           [cfg (if (and pc (file-exists? pc))
+                    (with-input-from-file pc
+                      (λ ()
+                        (read)))
+                    '())])
+      (define (obfus str [ends 4])
+        (let ([ls (string-length str)])
+          (string-append
+           (substring str 0 ends)
+           (make-string (- ls (* 2 ends)) #\*)
+           (substring str (- ls ends) ls))))
+      ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
+      (send choice-prefs-remote-organization clear)
+      (let ([rok '()])
+        (for ([o (or orgs (list org))])
+          ; FIXME TODO append org name
+          (send choice-prefs-remote-organization append (*->string o))
+          (set! rok
+            (cons
+             (cons
+              ; FIXME confusing error message from a make-string contract if the key or secret are too short
+              (obfus (*->string (oa-get-sath 'pennsieve o 'key)))
+              (obfus (*->string (oa-get-sath 'pennsieve o 'secret))))
+             rok)))
+        (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
+        (remote-org-keys (reverse rok))
+        (cb-select-remote-org choice-prefs-remote-organization #f))
+      #;
+      (send text-prefs-path-? set-value "egads")
+      (send text-prefs-path-config set-value (path->string (path-config)))
+      (send text-prefs-path-user-config set-value (oa-user-config-path))
+      (send text-prefs-path-idlib-cfg set-value (python-module-user-config-path "idlib"))
+      (send text-prefs-path-ontqu-cfg set-value
+            (python-module-user-config-path "ontquery.plugins.services"))
+      (send text-prefs-path-pyont-cfg set-value (python-module-user-config-path "pyontutils"))
+      (send text-prefs-path-secrets set-value (oa-secrets-path))
+      (send text-prefs-path-data set-value (path->string (path-source-dir)))
+      (send text-prefs-path-logs set-value (path->string (path-log-dir)))
+      (let* ([config-exists (assoc 'viewer-mode cfg)]
+             [power-user-a (assoc 'power-user? cfg)]
+             [power-user (and power-user-a (cdr power-user-a))])
+        (if config-exists
+            (begin
+              ; set-selection does not trigger the callback
+              (send radio-box-viewer-mode set-selection
+                    ; prevent contract violation of viewer-mode was somehow #f when config was written
+                    (or (cdr config-exists) 0))
+              (cb-viewer-mode radio-box-viewer-mode #f)
+              (power-user? (not power-user))
+              ; cb does the toggle interinally so we set the opposite of what we want first
+              (cb-power-user check-box-power-user #f))
+            (set-current-mode-panel! panel-validate-mode)))
+      (send frame-preferences refresh))))
+
+(define (init-paths-load-config!)
+  ; minimize disk reads
+  (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
+                  [oa-current-auth-config (oa-read-auth-config)]
+                  [oa-current-user-config (oa-read-user-config)]
+                  [oa-current-secrets (oa-read-secrets)])
+    (init-paths-int!)
+    (load-config-int!)))
 
 (define refresh-dataset-metadata-semaphore (make-semaphore 1))
 (define (refresh-dataset-metadata text-search-box)
@@ -1453,8 +1473,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (cb-toggle-prefs o e)
   (let ([do-show? (not (send frame-preferences is-shown?))])
     (when do-show? ; resync with any external changes
-      (init-paths!)
-      (load-config!))
+      (init-paths-load-config!))
     (send frame-preferences show do-show?)
     (for ([sigh (list text-prefs-api-key text-prefs-api-sec)])
       ; FIXME HACK workaround for text-field% value not updating if frame is not shown
@@ -3044,8 +3063,7 @@ switch to that"
   (current-mode-panel panel))
 
 (module+ main
-  (init-paths!)
-  (load-config!)
+  (init-paths-load-config!)
   (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
   (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
