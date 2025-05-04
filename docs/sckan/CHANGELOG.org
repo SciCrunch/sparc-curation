@@ -16,6 +16,11 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2025-05-02
+- ApiNATOMY refine =ilxtr:hasPhenotype= to =ilxtr:hasAnatomicalSystemPhenotype= where appropriate (e.g. for =ilxtr:EntericPhenotype=)
+- NPO femrep, kidney, liver, and sensory motor populations updated
+- NPO NLP gastro-intestinal populations (composer 257 261 262 264 265 267-269 272 273 276-285)
+- Fix missing curies in sckan-data docker image
 * RC 2024-09-21
 - NPO NLP all neurons =rdfs:label= is now =prefix id=.
   The old =rdfs:label= is now under =ilxtr:origLabel= and =skos:prefLabel=.
