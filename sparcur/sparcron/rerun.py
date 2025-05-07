@@ -57,7 +57,8 @@ def main():
     args = sys.argv[1:]
     if args:
         if '--all' in args:
-            to_run = dataset_fails(conn)
+            _to_run, to_rerun = dataset_fails(conn)
+            to_run = _to_run + to_rerun
         else:
             to_run = [PennsieveId('dataset:' + rawid.split(':')[-1]) for rawid in args]
 

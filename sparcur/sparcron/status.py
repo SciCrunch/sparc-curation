@@ -30,7 +30,14 @@ def dataset_fails(conn):
     _ukeys = ['updated-N:dataset:' + i.uuid for i, _ in _fails]
     uvals = [v for v in conn.mget(_ukeys)]
     fails = [i for (i, f), u in zip(_fails, uvals) if not u or f > u]
-    return fails
+    refails = [i for (i, f), u in zip(_fails, uvals) if not u or f <= u]
+    # there should never be f < u cases, it means a state machine invariant was
+    # violated but for sanity we use f <= u so we will see them if they happen
+    dangerzone = [i for (i, f), u in zip(_fails, uvals) if not u or f < u]
+    if dangerzone:
+        log.error(f'fail clearing invariant violated for {dangerzone}')
+
+    return fails, refails
 
 
 def _dataset_thinging(conn, thing):
@@ -53,12 +60,12 @@ def main():
     import sys
     from pprint import pprint
     conn = get_redis_conn()
-    fails = dataset_fails(conn)
+    fails, refails = dataset_fails(conn)
     running = dataset_running(conn)
     queued = dataset_queued(conn)
     if '--summary' in sys.argv:
         print(
-            f':n-fails {len(fails)}\n'
+            f':n-fails {len(fails)} + {len(refails)}\n'
             f':n-running {len(running)}\n'
             f':n-queued {len(queued)}'
         )
@@ -68,6 +75,11 @@ def main():
         _f = '\n'.join(sorted([f.uuid for f in fails]))
         print(f':fails (\n{_f}\n)')
         pprint(dataset_status(conn, fails[0].uuid))
+
+    if refails:
+        _f = '\n'.join(sorted([f.uuid for f in refails]))
+        print(f':refails (\n{_f}\n)')
+        pprint(dataset_status(conn, refails[0].uuid))
 
     if running:
         _r = '\n'.join(sorted([r.uuid for r in running]))
