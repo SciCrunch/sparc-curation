@@ -870,7 +870,7 @@ class Tabular(HasErrors):
                 # or something like that
                 stem_temp = stems[self.path.stem]
                 patterns_rem = stem_temp['remove'] if 'remove' in stem_temp else tuple()
-                adds = stem_temp['add'] if 'add' in stem_temp else tuple()
+                adds = stem_temp['add'] if 'add' in stem_temp else {}
                 appends = {k: v for k, v in adds.items() if k != 'header'}
                 to_add = adds['header'] if 'header' in adds else tuple()
                 # TODO handle non :header cases which also require append but
