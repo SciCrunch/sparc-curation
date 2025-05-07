@@ -307,6 +307,16 @@ class Derives:
         return subjects,
 
     @staticmethod
+    def code_desc(blob):
+        out = copy.deepcopy(blob)
+        tsr = out['ten_simple_rules'] = {}
+        for k in list(out.keys()):
+            if k.startswith('tsr'):
+                tsr[k] = out.pop(k)
+
+        return out
+
+    @staticmethod
     def validate_structure(path, template_schema_version, dir_structure, path_metadata, # manifests,
                            performances, subjects, samples, sites):
         he = HasErrors(pipeline_stage='Derives.validate_structure')
@@ -498,6 +508,12 @@ class Derives:
             if len(blob) > 1:
                 non_unique_samples = True
                 break
+
+        if template_schema_version is None:
+            # can happen if DatasetDecriptionFile throws a MalformedHeader error
+            msg = f'template_schema_version was None for {path}'
+            log.warning(msg)
+            template_schema_version = '0.0.dvs'
 
         template_version_less_than_2 = template_schema_version.startswith('1.')
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita

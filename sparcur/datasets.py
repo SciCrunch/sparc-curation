@@ -1558,6 +1558,21 @@ class MetadataFile(HasErrors):
 
                     cant_go_wrong[nh] = v
 
+                if i == 0:
+                    no_values = not [
+                        nh for nh in self.norm_to_orig_header
+                        if nh != self.record_type_key_header
+                        and nh not in self.ignore_header]
+                    if no_values:
+                        # FIXME not sure if this is really the right place
+                        # might be better to force add values if they are
+                        # absent and missing_add is not fasly
+                        nvk = 'value_0'
+                        cant_go_wrong[nvk] = value
+                        self.norm_to_orig_header[nvk] = nvk
+                        for _o in objects:
+                            _o[nvk] = None
+
                 #{nh:(value if number == numberN or i <= number else '')
                  #for i, nh in enumerate(self.norm_to_orig_header)
                  #if nh != self.record_type_key_header}
@@ -1864,19 +1879,57 @@ class SubmissionFilePath(ObjectPath):
     obj = SubmissionFile
 
 
+_props = sc.CodeDescriptionSchema.schema['properties']
+_ncdfes = [k for k, v in _props.items() if isinstance(v, dict) and sc.not_array(v)]
+_ncdfes = sorted(set(_ncdfes))
+
+
 class CodeDescriptionFile(MetadataFile):
     default_record_type = COLUMN_TYPE
-    renames_header = {'description': 'description_header'}
-    renames_alt = {'annotations': 'annotations_section_header'}
+    _expect_single = _ncdfes
+    renames_header = {
+        'description': 'description_header',
+    }
+    renames_alt = {
+        'annotations': 'annotations_section_header',
+
+        'tsr1__clearly_defined_context':           'tsr1_clearly_defined_context',
+        'tsr2__use_of_appropriate_data':           'tsr2_use_of_appropriate_data',
+        'tsr3a__verification':                     'tsr3a_verification',
+        'tsr3b__verification_results':             'tsr3b_verification_results',
+        'tsr3c__evaluation_within_context':        'tsr3c_evaluation_within_context',
+        'tsr4__explicitly_listed_limitations':     'tsr4_explicitly_listed_limitations',
+        'tsr5__version_control':                   'tsr5_version_control',
+        'tsr6__adequate_documentation':            'tsr6_adequate_documentation',
+        'tsr7a__broad_dissemination__releases':    'tsr7a_broad_dissemination_releases',
+        'tsr7b__broad_dissemination__issues':      'tsr7b_broad_dissemination_issues',
+        'tsr7c__broad_dissemination__license':     'tsr7c_broad_dissemination_license',
+        'tsr7d__broad_dissemination__packages':    'tsr7d_broad_dissemination_packages',
+        'tsr7e__broad_dissemination__interactive': 'tsr7e_broad_dissemination_interactive',
+        'tsr8a__independent_reviews':              'tsr8a_independent_reviews',
+        'tsr8b__external_certification':           'tsr8b_external_certification',
+        'tsr9__competing_implementation_testing':  'tsr9_competing_implementation_testing',
+        'tsr10a__relevant_standards':              'tsr10a_relevant_standards',
+        'tsr10b__standards_adherence':             'tsr10b_standards_adherence',
+
+                   }
     record_type_key_alt = 'metadata_element'
     record_type_key_header = record_type_key_alt
-    ignore_header = 'metadata_element', 'description_header', 'example'
+    ignore_header = (
+        'metadata_element',
+        'description_header',
+        'example',
+    )
     ignore_alt = (
         ('_hyperlink_https___www_imagwiki_nibib_nih_gov_content'
          '_10_simple_rules_conformance_rubric____ten_simple_rules_tsr_'),
         'ten_simple_rules__tsr_',
         'annotations_section_header',
+        # 3
+        'ten_simple_rules_tsr',
+        'input_output_information',
     )
+
     groups_alt_2 = {
         'ten_simple_rules': (
             'tsr1__define_context_clearly_rating_0_4',
@@ -1923,8 +1976,72 @@ class CodeDescriptionFile(MetadataFile):
             'ontological_identifier',
         ),
     }
+
     groups_alt_3 = {
+        'rrids': (
+            'rrid_term',
+            'rrid_identifier',
+        ),
+        'terms': (
+            'ontology_term',
+            'ontology_identifier',
+        ),
+        'inputs': (
+            'input_parameter_name',
+            'input_parameter_type',
+            'input_parameter_description',
+            'input_units',
+            'input_default_value',
+            'input_constraints',
+
+        ),
+        'outputs': (
+            'output_parameter_name',
+            'output_parameter_type',
+            'output_parameter_description',
+            'output_units',
+            'output_constraints'
+        ),
     }
+
+    join_alt_using_header = {
+        ('tsr_column_type',):  (
+            'tsr1_clearly_defined_context',
+            'tsr2_use_of_appropriate_data',
+            'tsr3a_verification',
+            'tsr3b_verification_results',
+            'tsr3c_evaluation_within_context',
+            'tsr4_explicitly_listed_limitations',
+            'tsr5_version_control',
+            'tsr6_adequate_documentation',
+            'tsr7a_broad_dissemination_releases',
+            'tsr7b_broad_dissemination_issues',
+            'tsr7c_broad_dissemination_license',
+            'tsr7d_broad_dissemination_packages',
+            'tsr7e_broad_dissemination_interactive',
+            'tsr8a_independent_reviews',
+            'tsr8b_external_certification',
+            'tsr9_competing_implementation_testing',
+            'tsr10a_relevant_standards',
+            'tsr10b_standards_adherence',
+        )
+    }
+    join_alt_exclude_using_header = {
+        ('tsr_column_type',): {
+            # header: (key-value, no-warn-value)
+            'tsr3b_verification_results': (('Rating', 'All TSR3 items are covered by the rating on the TSR3a row'),),
+            'tsr3c_evaluation_within_context': (('Rating', ),),
+
+            'tsr7b_broad_dissemination_issues': (('Rating', 'All TSR7 items are covered by the rating on the TSR7a row'),),
+            'tsr7c_broad_dissemination_license': (('Rating', ),),
+            'tsr7d_broad_dissemination_packages': (('Rating', ),),
+            'tsr7e_broad_dissemination_interactive': (('Rating', ),),
+
+            'tsr8b_external_certification': (('Rating', 'All TSR8 items are covered by the rating on the TSR8a row'),),
+            'tsr10b_standards_adherence': (('Rating', 'All TSR10 imets are covered by the rating of the TSR10a row'),),
+        }
+    }
+    normalization_class = nml.NormCodeDescriptionFile
 
     @property
     def groups_alt(self):
@@ -1933,6 +2050,89 @@ class CodeDescriptionFile(MetadataFile):
             return self.groups_alt_2
         else:
             return self.groups_alt_3
+
+    def _cull_rtk(self):
+        # FIXME TODO make this declarative instead of prodecural here
+        # it seems clear that this is similar to a subschema or something
+        # like that ...
+        c = super()._cull_rtk()
+
+        def cleanup(o, outer_fields):
+            out = {}
+            for k, v in o.items():
+                if k in outer_fields:
+                    out[k] = v
+                elif 'value' in out:
+                    'there should only be a single value here right now?'
+                    raise NotImplementedError(msg)
+                else:
+                    out['value'] = v
+
+            if 'value' in out:
+                return out
+
+        class _REMOVE: pass
+        REMOVE  = _REMOVE()
+
+        t = copy.deepcopy(c)  # FIXME what do we return and what do we keep unmodified ??
+
+        # FIXME this loop is absolutely insanity inducing and should be
+        # rewritten once there are some established tests and behavior that can
+        # be used for reference
+        for outer_fields, overs in self.join_alt_using_header.items():
+            if outer_fields in self.join_alt_exclude_using_header:
+                excludes = self.join_alt_exclude_using_header[outer_fields]
+
+            for over in overs:
+                out = []
+                for k in self._header.normalized:
+                    if over not in c:
+                        # XXX tsv < 3 causes this i think
+                        #log.warning(f'file missing {over} not in {list(c)} {self.path}')
+                        continue
+
+                    co = c[over]
+                    if k in co:
+                        outi = {}
+                        for i, field in enumerate(outer_fields):  # FIXME this loop can be done once and copied in
+                            cf = c[field]
+                            if k in cf:
+                                outi[field] = cf[k]
+                                if over in excludes:  # FIXME bad loc should be handled for all k
+                                    fmatch, *nowarn = excludes[over][i]
+                                    if cf[k] == fmatch:
+                                        outi[k] = REMOVE, nowarn
+                            else:
+                                outi[field] = None
+                                log.warning(f'should not be missing from outer_fields ... {k}')
+
+                        if k in outi and isinstance(outi[k], tuple) and outi[k][0] == REMOVE:
+                            _, nowarn = outi.pop(k)
+                            if co[k] not in nowarn:
+                                log.warning(f'unxpected value {co[k]} in {k}')
+                        else:
+                            outi[k] = co[k]
+
+                        nouti = cleanup(outi, outer_fields)
+                        if nouti is not None:
+                            out.append(nouti)
+
+                t[over] = out
+
+            for of in outer_fields:
+                t.pop(of)
+
+        return t
+
+    def _keyed(self):
+        k = super()._keyed()
+        #breakpoint()
+        return k
+
+    @property
+    def data(self):
+        data = super().data
+        return data
 
 
 class CodeDescriptionFilePath(ObjectPath):

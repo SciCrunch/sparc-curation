@@ -838,6 +838,12 @@ class NormDatasetDescriptionFile(NormValues):
         yield from values
 
 
+class NormCodeDescriptionFile(NormValues):
+
+    number_of_inputs = NormDatasetDescriptionFile.number_of_subjects
+    number_of_outputs = number_of_inputs
+
+
 class NormSubjectsFile(NormValues):
 
     _protocol_url_or_doi = NormDatasetDescriptionFile._protocol_url_or_doi

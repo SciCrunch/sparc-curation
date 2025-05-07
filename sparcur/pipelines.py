@@ -462,8 +462,7 @@ hasSchema = sc.HasSchema()
 class CodeDescriptionFilePipeline(PathPipeline):
     data_transformer_class = dat.CodeDescriptionFile
 
-    #@hasSchema(sc.CodeDescriptionSchema)  # TODO
-    @property
+    @hasSchema(sc.CodeDescriptionSchema)
     def data(self):
         return super().data
 
@@ -1244,6 +1243,8 @@ class SDSPipeline(JSONPipeline):
               *copy_all(['dataset_description_file'], ['meta'],
                         'template_schema_version',
                         'dataset_type',  # 2.0.0
+                        'standards',  # XXX 3
+
                         'species',  # TODO validate all source paths against schema
                         'organ',
                         'modality',
@@ -1251,6 +1252,7 @@ class SDSPipeline(JSONPipeline):
 
                         'completeness_of_data_set',
                         'funding_freetext',
+                        'funding',  # XXX 3 changes
                         'description',
                         #'additional_links',  # FIXME internal rename
                         'keywords',
@@ -1412,6 +1414,9 @@ class SDSPipeline(JSONPipeline):
                 De.study_description,  # FIXME probably temporary and may klobber/conflict
                 [['meta', 'description']]],
 
+               [[['inputs', 'code_description_file']],  # FIXME check that we are a scaffold
+                DT.BOX(De.code_desc),
+                [['code_description']]],
     )
 
     # replace lifters with proper upstream pipelines (now done with DatasetMetadata)
@@ -1682,7 +1687,7 @@ class PipelineExtras(JSONPipeline):
          # to move away from using derives entirely, too limited in expressivity
          De.validate_structure,
          [['entity_dirs']],
-         lambda p: ('0.0.0' if p == ['meta', 'template_schema_version'] else [])],
+         lambda p: ('0.0.pex' if p == ['meta', 'template_schema_version'] else [])],
 
     )
 

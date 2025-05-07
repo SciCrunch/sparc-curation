@@ -3,10 +3,12 @@ import json
 import pprint
 import unittest
 import pytest
+import git
 import augpathlib as aug
 from .common import examples_root, template_root, project_path, temp_path, dpie_path
 from sparcur.datasets import (Tabular,
                               DatasetDescriptionFile,
+                              CodeDescriptionFile,
                               CurationFile,
                               SubmissionFile,
                               SubjectsFile,
@@ -106,8 +108,19 @@ class Helper:
                 file = self.file
                 version = ref.rsplit('-', 1)[-1]
 
+            try:
+                fbytes = file.show(ref)
+            except git.exc.GitCommandError as e:
+                if e.status == 128 and ('does not exist in' in e.stderr or 'exists on disk, but not in' in e.stderr):
+                    # the metadata file did not exist in this version
+                    # TODO add a way to state the first expected version
+                    # for a sanity check
+                    continue
+                else:
+                    raise e
+
             with open(tf, 'wb') as f:
-                f.write(file.show(ref))
+                f.write(fbytes)
 
             obj = self.metadata_file_class(tf, template_schema_version=version)
             if self.use_examples:
@@ -274,6 +287,17 @@ class TestDatasetDescription(Helper, unittest.TestCase):
             pass
 
 
+class TestCodeDescriptionFile(Helper, unittest.TestCase):
+    template = 'code_description.xlsx'
+    use_examples = 2
+    metadata_file_class = CodeDescriptionFile
+    pipe = pipes.CodeDescriptionFilePipeline
+    _cry_base = 'cd-pie.csv'
+
+    def test_versions(self):
+        self._versions()
+
+
 class TestCurationFile(Helper, unittest.TestCase):
     template = 'curation.xlsx'
     metadata_file_class = CurationFile
@@ -293,6 +317,9 @@ class TestCurationFile(Helper, unittest.TestCase):
         data = pipeline.data
         pprint.pprint(data)
         ser_deser(data)
+
+    def test_versions(self):
+        self._versions()
 
 
 class TestSubjectsFile(Helper, unittest.TestCase):

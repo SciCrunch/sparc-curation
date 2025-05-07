@@ -727,14 +727,14 @@ sds3_path_almost_pattern = '^[A-Za-z0-9.,-_]([A-Za-z0-9.,-_ ]*[A-Za-z0-9.,-_])?$
 
 #_id_suffix = '[A-Za-z0-9][A-Za-z0-9-]*$'
 _id_suffix = '[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$'  # don't allow trailing separator
-entity_prefix_pattern = '^(sub|sam|site|perf)'
+entity_prefix_pattern = '^(pop-)?(sub|sam|site|perf)'
 entity_prefix_no_pattern = entity_prefix_pattern + '[-_]'  # don't allow prefix_
 entity_id_pattern = entity_prefix_pattern + '-' + _id_suffix
-specimen_id_pattern = '^(sub|sam)-' + _id_suffix
-sub_id_pattern = '^sub-' + _id_suffix
-sam_id_pattern = '^sam-' + _id_suffix
-site_id_pattern = '^site-' + _id_suffix
-perf_id_pattern = '^perf-' + _id_suffix
+specimen_id_pattern = '^(pop-)?(sub|sam)-' + _id_suffix
+sub_id_pattern = '^(pop-)?sub-' + _id_suffix
+sam_id_pattern = '^(pop-)?sam-' + _id_suffix
+site_id_pattern = '^(pop-)?site-' + _id_suffix
+perf_id_pattern = '^(pop-)?perf-' + _id_suffix
 
 # NOTE don't use builtin date-time format due to , vs . issue
 iso8601pattern =     '^[0-9]{4}-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-6][0-9](:[0-6][0-9](,[0-9]{1,9})?)?(Z|[+-][0-2][0-9]:[0-6][0-9])$'
@@ -1589,6 +1589,62 @@ class DatasetDescriptionSchema(JSONSchema):
     schema = JApplyRecursive(
         EIS._to_pattern, __schema,
         alternates={'Orcid': idlib.Orcid._id_class.local_regex})
+
+
+tsr_props =  {
+    'tsr1_clearly_defined_context': {'type': 'array', 'minItems': 1,},
+    'tsr2_use_of_appropriate_data': {'type': 'array', 'minItems': 1,},
+    'tsr3a_verification': {'type': 'array', 'minItems': 1,},
+    'tsr3b_verification_results': {'type': 'array', 'minItems': 1,},
+    'tsr3c_evaluation_within_context': {'type': 'array', 'minItems': 1,},
+    'tsr4_explicitly_listed_limitations': {'type': 'array', 'minItems': 1,},
+    'tsr5_version_control': {'type': 'array', 'minItems': 1,},
+    'tsr6_adequate_documentation': {'type': 'array', 'minItems': 1,},
+    'tsr7a_broad_dissemination_releases': {'type': 'array', 'minItems': 1,},
+    'tsr7b_broad_dissemination_issues': {'type': 'array', 'minItems': 1,},
+    'tsr7c_broad_dissemination_license': {'type': 'array', 'minItems': 1,},
+    'tsr7d_broad_dissemination_packages': {'type': 'array', 'minItems': 1,},
+    'tsr7e_broad_dissemination_interactive': {'type': 'array', 'minItems': 1,},
+    'tsr8a_independent_reviews': {'type': 'array', 'minItems': 1,},
+    'tsr8b_external_certification': {'type': 'array', 'minItems': 1,},
+    'tsr9_competing_implementation_testing': {'type': 'array', 'minItems': 1,},
+    'tsr10a_relevant_standards': {'type': 'array', 'minItems': 1,},
+    'tsr10b_standards_adherence': {'type': 'array', 'minItems': 1,},
+}
+
+
+class CodeDescriptionSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'required': [*tsr_props.keys()],  # XXX not strictly required but if missing we want to use this to warn
+        'properties': {
+            'rrids': {'type': 'array',},
+            'terms': {'type': 'array',},
+            'inputs': {'type': 'array',},
+            'outputs': {'type': 'array',},
+            'number_of_inputs': {'type': 'integer',},
+            'number_of_outputs': {'type': 'integer',},
+            **tsr_props,
+        }
+    }
+
+
+class CodeDescriptionExportSchema(JSONSchema):
+    schema = {
+        'type': 'object',
+        'properties': {
+            'rrids': {'type': 'array',},
+            'terms': {'type': 'array',},
+            'ten_simple_rules': {
+                'type': 'object',
+                'required': [*tsr_props.keys()],  # XXX not strictly required but if missing we want to use this to warn
+                'properties': tsr_props,},
+            'inputs': {'type': 'array',},
+            'outputs': {'type': 'array',},
+            'number_of_inputs': {'type': 'integer',},
+            'number_of_outputs': {'type': 'integer',},
+        }
+    }
 
 
 class SubmissionSchema(JSONSchema):
@@ -2508,6 +2564,7 @@ class DatasetOutExportSchema(JSONSchema):
         'resources': {'type': 'array',
                       'items': {'type': 'object'},},
         'submission': {'type': 'object',},
+        'code_description': CodeDescriptionExportSchema.schema,
         'specimen_dirs': {'type': 'object',  # FIXME unnest this
                           'required': ['records',],
                           'properties':

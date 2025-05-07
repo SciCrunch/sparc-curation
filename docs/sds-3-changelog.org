@@ -8,6 +8,33 @@ update the template version to indicate that a backward compatible subset of 3.0
 ** Overview
 This change log provides a summary of the changes in SDS 3.0.0.
 See commit message x for the full change log that includes a full explication.
+
+** Populations
+SDS supports populations for any sds entity.  Id structure
+is ~pop-sub-~, ~pop-sam-~, ~pop-site-~, ~pop-perf-~, etc.
+A ~pop-{ent}-~ id can be used anywhere that a ~{ent}-~ id
+could be used. Populations represent collective entities
+instead of singular entities and thus have rather different
+types of metadata. This will be dealt with in the future.
+For now we are establishing the composition rules for ids.
+Populations are strictly typed and members must have the
+same type as ~{ent}~ in ~pop-{ent}~, said another way, no
+mixing entity types in populations.
+
+** Internal json structure changes
+- Moves
+  - ~#/specimen_dirs -> #/entity_dirs~
+  - ~#/specimen_dirs/-1/specimen_id -> #/specimen_dirs/-1/entity_id~
+  - ~#/meta/funding -> #/meta/funding_freetext~
+  - ~#/meta/funding~ is now structured data
+- Adds
+  - ~#/meta/standards~
+  - ~#/meta/license~
+  - ~#/code_description~
+  - ~#/data_dictionary~
+  - ~#/device~
+  - ~#/sites~
+
 ** Validation changes added for SDS 3.0.0 datasets
 These are changes that are not literal changes to the template itself,
 but are validation changes that will be enforced for any datasets
