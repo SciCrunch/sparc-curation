@@ -1,5 +1,6 @@
 from sparcur.utils import PennsieveId
 from sparcur.sparcron import get_redis_conn, state_lut, _qed, _run, _qed_run
+from sparcur.sparcron.core import log
 
 
 def dataset_status(conn, rawid):
