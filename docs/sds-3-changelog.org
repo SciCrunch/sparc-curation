@@ -577,6 +577,9 @@ A male patient skipped pregnancy related questions on a form. \\
 A female patient did not answer a question about previous pregnancies but answered another question indicating that this is her first pregnancy. \\
 
 ** Changes from 3.0.1 to 3.0.2 for dataset_description
+- Change =Data standard version= for =SPARC= to =2025.05.01=.
+  This is to avoid confusion with the SDS template version and to
+  be consistent with other data standard versions e.g. for HEAL.
 - Change =Contributor role= =Description= to clarify that =Creator= is not a role by itself.
 - Add new relationType =UsedResource= to support dataset to resource relations.
   - Change =Relation type= =Description= to include =UsedResource=
