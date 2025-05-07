@@ -2056,6 +2056,8 @@ class CodeDescriptionFile(MetadataFile):
         # it seems clear that this is similar to a subschema or something
         # like that ...
         c = super()._cull_rtk()
+        if c is None:
+            return c
 
         def cleanup(o, outer_fields):
             out = {}
@@ -2120,7 +2122,8 @@ class CodeDescriptionFile(MetadataFile):
                 t[over] = out
 
             for of in outer_fields:
-                t.pop(of)
+                if of in t:
+                    t.pop(of)
 
         return t
 
