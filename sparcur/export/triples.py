@@ -292,7 +292,43 @@ class TriplesExportDataset(TriplesExport):
         yield from self.triples_sites
         yield from self.triples_subjects
         yield from self.triples_samples
-        yield from self.triples_specimen_dirs
+        yield from self.triples_entity_dirs
+        yield from self.triples_specimen_dirs  # legacy
+
+    def _ped(self, rec, dsi):
+        type = rec['type']
+        ent_id = rec['entity_id']
+        if type == 'SampleDirs':
+            eid = self.primary_key(ent_id)
+        elif type == 'SubjectDirs':
+            eid = self.subject_id(ent_id)
+        elif type == 'SiteDirs':
+            eid = self.site_id(ent_id)
+        elif type == 'PerfDirs':
+            eid = self.performance_id(ent_id)
+        else:
+            raise NotImplementedError(f'wat {type}')
+
+        for drp in rec['dirs']:
+            path_record = dsi[drp]
+            collection_id = path_record['remote_id']
+            cid = OntId(collection_id).u
+            yield eid, TEMP.hasFolderAboutIt, cid
+
+    @property
+    def triples_entity_dirs(self):
+        ds = self.data['dir_structure']
+        dsi = {b['dataset_relative_path']:b for b in ds}
+
+        if 'entity_dirs' in self.data:
+            # not everyone has these, and sometimes if the metadata
+            # files are mangled enough they don't even have subjects
+            # or samples that would cause errors
+            sd = self.data['entity_dirs']
+            if 'records' in sd:
+                recs = sd['records']
+                for rec in recs:
+                    yield from self._ped(rec, dsi)
 
     def _psd(self, rec, dsi):
         type = rec['type']
