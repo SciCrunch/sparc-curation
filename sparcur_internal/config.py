@@ -11,3 +11,4 @@ class Config(object):
     TEST_DATASET_ID = os.environ.get("TEST_DATASET_ID", "")
     TEST_PACKAGE_ID = os.environ.get("TEST_PACKAGE_ID", "")
     SPARC_API = os.environ.get("SPARC_API", "https://api.sparc.science/")
+    DATASET_UUID = os.environ.get("DATASET_UUID", "")

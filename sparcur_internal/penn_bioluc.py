@@ -240,7 +240,7 @@ def process_files(dataset_id, skipped, extensions=("jpx", "jp2"), bioluc_usernam
 
 
 def main():
-    dataset_id = "N:dataset:aa43eda8-b29a-4c25-9840-ecbd57598afc"  # f001
+    dataset_id = Config.DATASET_UUID  # f001
     skipped = []
     try:
       f = open('input.json', 'rb')

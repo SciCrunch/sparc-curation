@@ -5,9 +5,12 @@ PENNSIEVE_API_TOKEN
 PENNSIEVE_ORGANIZATION
 BIOLUCIDA_USERNAME
 BIOLUCIDA_PASSWORD
+DATASET_UUID
 
 First run the penn_bioluc.py script:
-1. For the dataset of interest, get the dataset UUID, replace the dataset_id value.
+1. For the dataset of interest, get the dataset UUID and set it with the DATASET_UUID environment variable.
+
+Steps 2 to 7 are details in the penn_bioluc.py script:
 
 2. Using the dataset UUID, get metadata and path metadata information from SciCrunch? - 
 "https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/curation-export.json" and "https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/path-metadata.json". Information required are pennsieve dataset id, published id, package id, filename and filesize.
