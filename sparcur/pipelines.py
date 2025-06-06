@@ -1691,7 +1691,7 @@ class PipelineExtras(JSONPipeline):
 
     )
 
-    #adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]  # FIXME TODO construct a fake curation file if one does not exist
+    adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]  # FIXME TODO construct a fake curation file if one does not exist XXX this must be maintained otherwise no techniques are included from field alignment
 
     filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         # FIXME this is silly, there only needs to be a single lambda for this DUH
