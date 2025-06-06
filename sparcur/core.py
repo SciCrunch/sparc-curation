@@ -1772,3 +1772,5 @@ register_type(None, 'removal')
 # needed in derives and needed when loading from ir
 register_type(None, 'SampleDirs')
 register_type(None, 'SubjectDirs')
+register_type(None, 'SiteDirs')
+register_type(None, 'PerfDirs')

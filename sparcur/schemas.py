@@ -2565,6 +2565,20 @@ class DatasetOutExportSchema(JSONSchema):
                       'items': {'type': 'object'},},
         'submission': {'type': 'object',},
         'code_description': CodeDescriptionExportSchema.schema,
+        'entity_dirs': {'type': 'object',  # FIXME unnest this
+                          'required': ['records',],
+                          'properties':
+                          {'records': {'type': 'array',  # FIXME records vs contents we use both in manifests
+                                       'items': {
+                                           'type': 'object',
+                                           'required': ['dirs'],  # FIXME TODO to *_id
+                                           'properties': {
+                                               'type': {'type': 'string',  # FIXME seems wrong
+                                                        'enum': ('SampleDirs', 'SubjectDirs', 'SiteDirs', 'PerfDirs'),},
+                                               #'specimen_id': {'type': 'string'},  # foreign key to subject or sample id
+                                               'dirs': {'type': 'array',
+                                                        'minItems': 1,},},},},
+                           'errors': ErrorSchema.schema,},},
         'specimen_dirs': {'type': 'object',  # FIXME unnest this
                           'required': ['records',],
                           'properties':
