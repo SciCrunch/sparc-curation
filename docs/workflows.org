@@ -104,6 +104,30 @@ to indicate that a snapshot points to archived data ... possibly
 by adding an extension to the uuid, or maybe the content type will
 be sufficient?
 
+** Archive pull index
+#+begin_src bash
+#set -e -o pipefail
+
+function archive-pull-index () {
+local d dp toarch archname torm
+pushd ~/files/sparc-datasets-test
+for d in $(ls); do
+    dp=${d}/SPARC/.operations/index/pull/${d}
+    if [ -d ${dp} ]; then
+        pushd ${dp}
+        toarch=$(ls *Z)
+        archname=archive-through-$(echo ${toarch} | awk '{ print $NF }').tar.xz
+        torm=$(echo ${toarch} | awk 'BEGIN{FS=OFS=" "}{NF--; print}')
+        tar c ${toarch} | \
+        xz -9e > "${archname}" && \
+        [ "${torm}" ] && rm ${torm}
+        popd
+    fi
+done
+popd
+}
+#+end_src
+
 ** Dataset modification statistics
 I'm sure there is another way to get this data from pennsieve
 that would make more sense and that would make it possible to
