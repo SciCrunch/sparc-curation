@@ -32,4 +32,6 @@ Based on my experience, the script may need to be rerun multiple names.
 
 10. The output_with_id.json should contain the basename, collection id, pennsieve package id and biolucida image id for each of the uploaded images. It may take some time for the biolucida server to process all the files and the biolucida image id may be missing for some entries in the json file, in that case please rerun step 9 again after a few hours.
 
+11. Once all image ids have been collected, with the output_with_id.json file in the directory; set the environment variable DISCOVER_ID then run bioluc_imagemap.py to map the images on biolucida server.
+
 The script does not create a new collection, move the images to the new collection then make the collection public. However, this can be done using the image id in the output_with_id.json file.
