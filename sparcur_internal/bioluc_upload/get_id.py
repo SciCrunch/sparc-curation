@@ -24,12 +24,15 @@ def get_biolucida_token():
             return content['token']
     return None
 
-def get_biolucida_id(item, token):
-    print(item, token)
+def get_biolucida_id(item, token, collection_id):
+    print("original data:", item, token)
+    col_id = collection_id
+    if not col_id:
+      col_id=item['collection_id']
     url_bl_colandbasename = f"{Config.BIOLUCIDA_ENDPOINT}/image/colandbasename"
     resp = requests.post(url_bl_colandbasename,
                         data=dict(
-                            col_id=item['collection_id'],
+                            col_id=col_id,
                             basename=item['basename'],
                             ),
                         headers=dict(token=token))
@@ -39,11 +42,13 @@ def get_biolucida_id(item, token):
         print(content)
         if content['status'] == 'success' and 'image_id' in content:
             item['img_id'] = content['image_id']
+            item['collection_id'] = col_id
     return item
 
 
 def main():
     dataset_id = Config.DATASET_UUID  # f001
+    collection_id = Config.COLLECTION_ID
     bp_list = []
     try:
       f = open('input.json', 'rb')
@@ -52,10 +57,7 @@ def main():
         data = json.load(f)
         for item in data:
           if item['status'] == 'successful':
-            if not 'img_id' in item:
-              bp_list.append(get_biolucida_id(item, token))
-            else:
-              bp_list.append(item)
+            bp_list.append(get_biolucida_id(item, token, collection_id))
          
     except OSError:
       print("No input file")
