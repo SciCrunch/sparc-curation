@@ -719,6 +719,7 @@ class Derives:
         def_not_done_specs = not_done_specs - maybe_not_done_specs
 
         double_done_ents = done_dirs & ent_done_by_manifest
+        ent_only_manifest = ent_done_by_manifest - ( set(subs) | set(samps) | set(sites) | set(perfs) )
         # TODO in a nested setting there are cases where a path mapped to an entity might contain
         # multiple parent structures so we want to detect those cases because things get a bit tricky
         # with multiple nesting and I don't have a complete understanding of all the cases yet
@@ -773,6 +774,14 @@ class Derives:
             # this is not necessarily a problem but is good to catch
             msg = ('There are entities with double mapping via directory name and manifest!'
                    f'\n{double_done_ents}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if ent_only_manifest:
+            msg = ('There are entities that appear only in a manifest!'
+                   f'\n{ent_only_manifest}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
