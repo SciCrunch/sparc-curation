@@ -454,6 +454,25 @@ class DatasetDescriptionFilePipeline(PathPipeline):
                              #'template version at this point. If they do not '
                              #'it means that the input pipeline is broken.')
             out['template_schema_version'] = None
+        elif isinstance(out['template_schema_version'], tuple):
+            stsv = set(out['template_schema_version'])
+            if len(stsv) != 1:
+                # we use the max value because newer standards or more
+                # restrictive but also have more features
+                maxv = sorted(stsv)[-1]
+                msg = f'multiple distinct entries for template_schema_version detected {stsv} using maximum {maxv}'
+            else:
+                maxv = list(stsv)[0]
+                msg = f'multiple entries for template_schema_version {maxv}'
+
+            out['template_schema_version'] = maxv
+
+            he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.data')
+            if he.addError(msg, path=self.path):
+                logd.error(msg)
+
+            he.embedErrors(out)
+
         return out
 
 

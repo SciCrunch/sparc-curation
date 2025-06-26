@@ -76,11 +76,12 @@ class Helper:
     def tearDown(self):
         temp_path.rmtree()
 
-    def _cry(self, tfn, rcfs, should_embed=True):
+    def _cry(self, tfn, rcfs, should_embed=True, version=None):
         base = examples_root / self._cry_base
         tf = temp_path / tfn
         change_rcs(base, tf, rcfs)
-        obj = self.metadata_file_class(tf)
+        version = '9999.9.9' if version is None else version
+        obj = self.metadata_file_class(tf, template_schema_version=version)
         try:
             value = obj.data
             if should_embed:
@@ -106,7 +107,10 @@ class Helper:
                 version = None
             else:
                 file = self.file
-                version = ref.rsplit('-', 1)[-1]
+                if ref == 'HEAD':
+                    version = '9999.9.9'
+                else:
+                    version = ref.rsplit('-', 1)[-1]
 
             try:
                 fbytes = file.show(ref)
@@ -398,7 +402,13 @@ class TestSamplesFile(Helper, unittest.TestCase):
         assert len([h for h in derp if h.startswith('header_1')]) > 1, 'silent overwrite happening'
 
     def test_sa_cry_null_pk_0(self):
-        self._cry('sa-cry-null-pk-0.csv', [[4, 0, lambda _: '']])
+        # FIXME the behavior for non-primary key is to skip the offending row and continue embedding an error
+        self._cry('sa-cry-null-pk-0.csv', [[4, 0, lambda _: '']], version='1.2.3')
+        # this will no longer fail in >= 2 because all the sample ids are unique
+        # not that this will fail in >= 2 for many other reasons, but this particular
+        # test will not fail because the header isn't malformed since subject_id is
+        # not part of the primary key in >= 2
+        #self._cry('sa-cry-null-pk-0.csv', [[4, 0, lambda _: '']], version='2.0.0')
 
     def test_sa_cry_null_pk_1(self):
         self._cry('sa-cry-null-pk-1.csv', [[4, 1, lambda _: '']])
