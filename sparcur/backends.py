@@ -796,7 +796,7 @@ class BlackfynnRemote(aug.RemotePath):
 
         if parent:
             parent_cache = (
-                self.cache.parent if self.cache is not None else None)
+                self.cache.parent if self.cache is not None and hasattr(self.cache, 'parent') else None)
             self._c_parent = self.__class__(parent, cache=parent_cache)
             return self._c_parent
 
