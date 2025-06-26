@@ -915,6 +915,16 @@ class AtomicDictOperations:
             else:
                 try:
                     value = onfail(target[target_key], value)
+                    if isinstance(value, dict) and 'errors' in value:
+                        # move the error to the top level
+                        errs = value.pop('errors')
+                        for _e in errs:
+                            _e['path'] = target_path
+                        if 'errors' not in data:
+                            data['errors'] = []
+
+                        data['errors'].extend(errs)
+
                     log.warning(msg)
                 except Exception as e:
                     raise exc.TargetPathExistsError(msg) from e

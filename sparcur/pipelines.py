@@ -1577,21 +1577,32 @@ class SDSPipeline(JSONPipeline):
 
 
 def meta_tech_failfun(target_value, value):
-    if is_list_or_tuple(target_value) and is_list_or_tuple(value):
+    if target_value and not value:
+        return target_value
+    elif not target_value and value:
+        return value
+    elif is_list_or_tuple(target_value) and is_list_or_tuple(value):
         a, b = sorted(target_value), sorted(value)
         if a == b:
             return target_value
         else:
-            msg = 'mismatch between target_value and value'
+            msg = f'mismatch between target_value and value {target_value} != {value}'
             return {'errors':
                     [{'message': msg,
+                      'pipeline_stage': 'meta_tech_failfun',
+                      'blame': 'pipeline',
                       'target_value': target_value,
                       'value': value,}],}
     elif target_value == value:
         return target_value
     else:
         msg = f'target_value != value {target_value} != {value}'
-        raise ValueError(msg)
+        return {'errors':
+                [{'message': msg,
+                  'pipeline_stage': 'meta_tech_failfun',
+                  'blame': 'pipeline',
+                  'target_value': target_value,
+                  'value': value,}],}
 
 
 class PipelineExtras(JSONPipeline):
@@ -1909,6 +1920,11 @@ class PipelineEnd(JSONPipeline):
 
     previous_pipeline_classes = PipelineExtras,
 
+    filter_failures = (
+        lambda e, p: (
+            'pipeline_stage' in e and e['pipeline_stage'] == 'meta_tech_failfun'
+        ),
+    )
     # FIXME HasErrors needs to require a level specification
     # and not define these here because they have to be maintained
     # and of course my workaround was simply to error on unhandled
