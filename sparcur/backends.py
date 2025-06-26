@@ -916,7 +916,7 @@ class BlackfynnRemote(aug.RemotePath):
                 yield child
                 yield from child._rchildren(create_cache=create_cache)
         elif isinstance(self.bfobject, self._Dataset):
-            sparse = sparse or self.cache.is_sparse()
+            sparse = sparse or (hasattr(self.cache, 'is_sparse') and self.cache.is_sparse())
             deleted = []
             if sparse:
                 filenames = [s + '.' + ext
