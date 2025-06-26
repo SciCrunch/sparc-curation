@@ -368,7 +368,12 @@ class Derives:
                 if av} 
 
         eit_drps = set()
-        ent_by_manifest = {}
+        _dd_ent_by_manifest = defaultdict(list)
+        # XXX NOTE we populate this from path_metadata NOT from the manifest
+        # directly to ensure that we ONLY pull in entities that are mapped
+        # to files that actually exist, if there are entities mapped to files
+        # that do not exist we do not count them to avoid confusion, manifest
+        # issues must be fixed first otherwise the error messages are confusing
         for pmr in path_metadata:
             if 'manifest_record' in pmr:
                 pmrmr = pmr['manifest_record']
@@ -379,15 +384,23 @@ class Derives:
                         isinstance(eig_raw, str) and eit_raw.lower() == 'true'):
                         eit_drps.add(pmr['dataset_relative_path'])
 
+                # FIXME TODO if there are multiple columns in the
+                # manifest make sure the values are consistent with
+                # the relations from the metadata files
                 for field in ('entity', 'specimen', 'subject', 'sample', 'site', 'performance',):
                     if field in pmrmr:
                         fv = pmrmr[field]
                         for ent_id in fv:
-                            ent_by_manifest[ent_id] = (
+                            _dd_ent_by_manifest[ent_id].append((
                                 pmr['dataset_relative_path'],
-                                (pmr['remote_id'] if 'remote_id' in pmr else None),)
+                                (pmr['remote_id'] if 'remote_id' in pmr else None),))
 
+        ent_by_manifest = dict(_dd_ent_by_manifest)
         ent_done_by_manifest = set(ent_by_manifest)
+        man_sub = set(e for e in ent_done_by_manifest if e.startswith('sub-') or e.startswith('pop-sub-'))
+        man_sam = set(e for e in ent_done_by_manifest if e.startswith('sam-') or e.startswith('pop-sam-'))
+        man_site = set(e for e in ent_done_by_manifest if e.startswith('site-') or e.startswith('pop-site-'))
+        man_perf = set(e for e in ent_done_by_manifest if e.startswith('perf-') or e.startswith('pop-perf-'))
         # FIXME TODO the next step is accounting for every single
         # _file_ not just every folder, this means we have to handle
         # the non-transitive case so we don't count parent folders
@@ -396,10 +409,14 @@ class Derives:
 
         perfs = {p['performance_id']:p for p in performances}
         metadata_only_perfs = set(k for k, v in perfs.items() if 'metadata_only' in v and v['metadata_only'])
+        # TODO missing entity from perfs
 
         site_records = sites
         sites = {p['site_id']:p for p in site_records}
         metadata_only_sites = set(k for k, v in sites.items() if 'metadata_only' in v and v['metadata_only'])
+        specs_from_sites = set(p['specimen_id'] for p in site_records)
+        samps_from_sites = set([s for s in specs_from_sites if s.startswith('sam-')])
+        subs_from_sites = set([s for s in specs_from_sites if s.startswith('sub-')])
 
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
@@ -409,6 +426,10 @@ class Derives:
         for s in samples:
             dd[s['sample_id']].append(s)
         samps = dict(dd)
+        subs_from_samps = set(p['subject_id'] for p in samples)
+        missing_subs_from_samps = subs_from_samps - set(subs)
+        missing_subs_from_sites = subs_from_sites - set(subs)
+        missing_samps_from_sites = samps_from_sites - set(samps)
 
         ### pools
         metadata_only_specs = set()  # TODO also need metadata_only sites and perfs etc.
@@ -438,41 +459,50 @@ class Derives:
         records = []
         done_dirs = set()
         done_specs = set()
+        sdirs = set(dirs)
 
         ### performances
-        union_perf = set(dirs) | set(perfs)
-        inter_perf = set(dirs) & set(perfs)
+        sperfs = set(perfs)
+        union_perf = sdirs | sperfs
+        inter_perf = sdirs & sperfs
+        iman_perf = man_perf & sperfs
         done_dirs.update(inter_perf)
-        # FIXME TODO perf_done_by_manifest ?
-        not_done_perfs = set(perfs) - (inter_perf | metadata_only_perfs | ent_done_by_manifest)
+        not_done_perfs = sperfs - (inter_perf | metadata_only_perfs | ent_done_by_manifest)
+        not_actually_metadata_only_perfs = (inter_perf | iman_perf) & metadata_only_perfs
         for perf in perfs:
             ent_dirs(perf, 'PerfDirs', metadata_only_perfs, records)
 
         ### sites
-        union_site = set(dirs) | set(sites)
-        inter_site = set(dirs) & set(sites)
+        ssites = set(sites)
+        union_site = sdirs | ssites
+        inter_site = sdirs & ssites
+        iman_site = man_site & ssites
         done_dirs.update(inter_site)
-        # FIXME TODO site_done_by_manifest ?
-        not_done_sites = set(sites) - (inter_site | metadata_only_sites | ent_done_by_manifest)
+        not_done_sites = ssites - (inter_site | metadata_only_sites | ent_done_by_manifest)
+        not_actually_metadata_only_sites = (inter_site | iman_site) & metadata_only_sites
         for site in sites:
             ent_dirs(site, 'SiteDirs', metadata_only_sites, records)
 
         ### subject pools
-        inter_sub_pool = set(dirs) & set(sub_pools)
+        inter_sub_pool = sdirs & set(sub_pools)
         pooled_subjects = set(s for p, ss in sub_pools.items() if p in inter_sub_pool for s in ss)
         done_dirs.update(inter_sub_pool)
 
         ### subjects
-        union_sub = set(dirs) | set(subs)
-        inter_sub = set(dirs) & set(subs)
+        ssubs = set(subs)
+        union_sub = sdirs | ssubs
+        inter_sub = sdirs & ssubs
+        iman_sub = man_sub & ssubs
         inter_pool_sub = inter_sub & pooled_subjects
+        metadata_only_subs = set(e for e in metadata_only_specs if e.startswith('sub-') or e.startswith('pop-sub-'))
+        not_actually_metadata_only_subjects = (inter_sub | iman_sub) & metadata_only_subs
 
         #if inter_sub | pooled_subjects == (set(subs) - (metadata_only_specs | ent_done_by_manifest)):
-        if inter_sub | pooled_subjects == (set(subs) - metadata_only_specs):  # FIXME exact equality here causing issues
+        ok_sub_ids = inter_sub | pooled_subjects | iman_sub | metadata_only_subs
+        if ok_sub_ids == ssubs:  # FIXME exact equality here causing issues
             ok_subs = subs
         else:
-            ok_ids = inter_sub | pooled_subjects
-            ok_subs = {k:v  for k, v  in subs.items() if k in ok_ids}
+            ok_subs = {k:v  for k, v  in subs.items() if k in ok_sub_ids}
             # FIXME not all subjects have folders there may be samples
             # that have folders but not subjects ??? don't wan't to force
             # metadata structure onto folder structure but it complicates
@@ -490,18 +520,21 @@ class Derives:
 
             done_specs.add(subject_id)
 
-            ent_dirs(subject_id, 'SubjectDirs', metadata_only_specs, records, pool_id=pool_id)
+            ent_dirs(subject_id, 'SubjectDirs', metadata_only_subs, records, pool_id=pool_id)
 
         ### sample pools
-        inter_sam_pool = set(dirs) & set(sam_pools)
+        inter_sam_pool = sdirs & set(sam_pools)
         pooled_samples = set(s for p, ss in sam_pools.items() if p in inter_sam_pool for s in ss)
         done_dirs.update(inter_sam_pool)
 
         ### samples
-        union_sam = set(dirs) | set(samps)
-        inter_sam = set(dirs) & set(samps)
+        ssamps = set(samps)
+        union_sam = sdirs | ssamps
+        inter_sam = sdirs & ssamps
+        iman_sam = man_sam & ssamps
         inter_pool_sam = inter_sam & pooled_samples
-
+        metadata_only_samps = set(e for e in metadata_only_specs if e.startswith('sam-') or e.startswith('pop-sam-'))
+        not_actually_metadata_only_samples = (inter_sam | iman_sam) & metadata_only_samps
 
         non_unique_samples = False
         for sample_id, blob in samps.items():
@@ -518,9 +551,81 @@ class Derives:
         template_version_less_than_2 = template_schema_version.startswith('1.')
         # FIXME this is where non-uniqueness of sample ids becomes a giant pita
         #if inter_sam | pooled_samples == (set(samps) - (metadata_only_specs | ent_done_by_manifest)):
-        if (inter_sam | pooled_samples == (set(samps) - metadata_only_specs)  # FIXME exact equality here causing issues
-            and not non_unique_samples):  # FIXME consider just not using this branch in less than 2 ...
-            for sample_id, blob in samps.items():
+        ok_sam_ids = inter_sam | pooled_samples | iman_sam | metadata_only_samps  # NOTE we deal with double mo cases elsewhere
+        if ok_sam_ids == ssamps:
+            ok_samps = samps
+        else:
+            ok_samps = {k:v  for k, v  in subs.items() if k in ok_sam_ids}
+            logd.warning('miscount sample dirs, TODO')
+
+        if template_version_less_than_2 and non_unique_samples:
+            # we only need to special case tsv < 2 when there are non unique samples
+            # otherwise we can use the standard approach, with a note that if someone
+            # uses an old template and adds a non-unique sample id then the way that
+            # all samples are identified will change, this is expected behavior and
+            # is not a bug, if users want consistent behavior they should upgrade
+            bad_dirs = []
+            # handle old aweful nonsense
+            # 1. construct subject sample lookups using tuple
+            # 2. try to construct subject sample id pairs
+            for sample_id, blobs in ok_samps.items():
+                for blob in blobs:
+                    if sample_id in dirs:
+                        candidates = dirs[sample_id]
+                        # TODO zero candidates error
+                        actual = []
+                        for level, drp, rparts in candidates:
+                            if level < 2:
+                                msg = (f'Bad location for specimen folder! {drp}')
+                                if he.addError(msg,
+                                                blame='submission',
+                                                path=path):
+                                    logd.error(msg)
+                                bad_dirs.append(dirs.pop(sample_id))
+                                continue
+                            p_sample_id, p_subject_id, *p_rest = rparts
+                            if level < 3:
+                                # p_subject_id will be primary derivatie or source
+                                log.warning(f'TODO new structure {drp}')
+
+                            assert sample_id == p_sample_id  # this should always be true
+                            subject_id = blob['subject_id'] if 'subject_id' in blob else None
+                            if subject_id == p_subject_id:
+                                id = blob['primary_key']
+                                if '_' in id:  # composite primary key
+                                    done_dirs.add((subject_id, p_sample_id))
+                                else:
+                                    done_dirs.add(p_sample_id)
+
+                                done_specs.add(id)
+                                actual.append(drp)
+
+                        if actual:
+                            records.append(
+                                {'type': 'SampleDirs',
+                                # have to split the type because we can't recover
+                                # the type using just the specimen id (sigh)
+                                # and we need it to set the correct prefix (sigh)
+                                'entity_id': id,
+                                #'specimen_id': id,
+                                'dirs': actual,
+                                })
+                    else:
+                        if sample_id in ent_done_by_manifest:
+                            logd.info(f'done by manifest {sample_id}')
+                            continue
+
+                        msg = f'No folder for sample {sample_id}'
+                        if he.addError(msg, blame='submission', path=path):
+                            logd.error(msg)
+
+        else:
+            if non_unique_samples:
+                msg = 'non-unique-samples'
+                if he.addError(msg, blame='submission', path=path):
+                    logd.error(msg)
+
+            for sample_id, blob in ok_samps.items():
                 if sample_id in pool_sams:  # FIXME assumes 1:1 which is incorrect
                     pool_id = pool_sams[sample_id]
                 else:
@@ -560,68 +665,7 @@ class Derives:
                     done_specs.add(sample_id)
                     id = sample_id  # FIXME need ttl export suport for this
 
-                ent_dirs(id, 'SampleDirs', metadata_only_specs, records, pool_id=pool_id, entity_id_for_dirs_lookup=sample_id)
-
-        else:
-            # TODO handle case where metadata only spec has a folder or is mapped in the manifest
-            logd.warning('miscount sample dirs, TODO')
-            bad_dirs = []
-            if template_version_less_than_2:
-                # handle old aweful nonsense
-                # 1. construct subject sample lookups using tuple
-                # 2. try to construct subject sample id pairs
-                for sample_id, blobs in samps.items():
-                    for blob in blobs:
-                        if sample_id in dirs:
-                            candidates = dirs[sample_id]
-                            # TODO zero candidates error
-                            actual = []
-                            for level, drp, rparts in candidates:
-                                if level < 2:
-                                    msg = (f'Bad location for specimen folder! {drp}')
-                                    if he.addError(msg,
-                                                   blame='submission',
-                                                   path=path):
-                                        logd.error(msg)
-                                    bad_dirs.append(dirs.pop(sample_id))
-                                    continue
-                                p_sample_id, p_subject_id, *p_rest = rparts
-                                if level < 3:
-                                    # p_subject_id will be primary derivatie or source
-                                    log.warning(f'TODO new structure {drp}')
-
-                                assert sample_id == p_sample_id  # this should always be true
-                                subject_id = blob['subject_id'] if 'subject_id' in blob else None
-                                if subject_id == p_subject_id:
-                                    id = blob['primary_key']
-                                    if '_' in id:  # composite primary key
-                                        done_dirs.add((subject_id, p_sample_id))
-                                    else:
-                                        done_dirs.add(p_sample_id)
-
-                                    done_specs.add(id)
-                                    actual.append(drp)
-
-                            if actual:
-                                records.append(
-                                    {'type': 'SampleDirs',
-                                    # have to split the type because we can't recover
-                                    # the type using just the specimen id (sigh)
-                                    # and we need it to set the correct prefix (sigh)
-                                    'entity_id': id,
-                                    #'specimen_id': id,
-                                    'dirs': actual,
-                                    })
-                        else:
-                            if sample_id in ent_done_by_manifest:
-                                logd.info(f'done by manifest {sample_id}')
-                                continue
-
-                            msg = f'No folder for sample {sample_id}'
-                            if he.addError(msg, blame='submission', path=path):
-                                logd.error(msg)
-            else:
-                pass  # TODO that's an error!
+                ent_dirs(id, 'SampleDirs', metadata_only_samps, records, pool_id=pool_id, entity_id_for_dirs_lookup=sample_id)
 
         # handle nesting where parents may not have separate data
         # and this is why we want all ids to be unique per dataset
@@ -690,6 +734,10 @@ class Derives:
             else:
                 raise TypeError(f'unknown blob types {blob}')
 
+        # find cases where a metadata only entity also has no children with data
+        # this isn't fatal but it is weird so we want to warn about it
+        metadata_only_no_children = set()  # TODO
+
         # for all done specs
         # check if there is a parent spec
         # and add it to the maybe done spec list
@@ -718,12 +766,24 @@ class Derives:
 
         def_not_done_specs = not_done_specs - maybe_not_done_specs
 
-        double_done_ents = done_dirs & ent_done_by_manifest
-        ent_only_manifest = ent_done_by_manifest - ( set(subs) | set(samps) | set(sites) | set(perfs) )
+        # find paths where entities are mapped twice
+        # entities themselves can't be mapped twice in the sense that if any
+        # one of 1000 paths is is mapped twice then fixing the 1 in 1000 has
+        # to be done for a specific path and cannot be fixed at the entity level
+        maybe_double_done_ents = done_dirs & ent_done_by_manifest
+        _dd = defaultdict(set)
+        for d in maybe_double_done_ents:
+            for path, remote in ent_by_manifest[d]:
+                if d in path.parts:
+                    _dd[d].add(path)
+
+        double_done_ent_paths = dict(_dd)
+
+        ent_only_manifest = ent_done_by_manifest - ( ssubs | ssamps | ssites | sperfs )
         # TODO in a nested setting there are cases where a path mapped to an entity might contain
         # multiple parent structures so we want to detect those cases because things get a bit tricky
         # with multiple nesting and I don't have a complete understanding of all the cases yet
-        ent_possibly_mismatched = set((k, p) for k, (a, b) in ent_by_manifest.items() for p in a.parts if p in done_dirs)
+        ent_possibly_mismatched = set((k, p) for k, _abs in ent_by_manifest.items() for (a, b) in _abs for p in a.parts if p in done_dirs)
         # we want to catch cases where there are any done parent paths that are not exactly mapped to the entity
         # because we need to use them for comparison against the hierarchy from the metadata sheets, nesting in
         # folders that does not match the metadata is critical to catch
@@ -731,9 +791,15 @@ class Derives:
         # we also want to detect cases where a dir sub-1 has a manifest record e.g. sam-1
         # not just a case where a file sub-1/file-1.ext has a manifest record sam-1 and for that
         # we need the more restrictive case checking just the name of the manifest record
-        ent_dir_mismatch = set((k, a.name) for k, (a, b) in ent_by_manifest.items() if a.name in done_dirs and a.name != k)
+        ent_dir_mismatch = set((k, a.name) for k, _abs in ent_by_manifest.items() for (a, b) in _abs if a.name in done_dirs and a.name != k)
 
         not_actually_metadata_only = (metadata_only_specs | metadata_only_sites | metadata_only_perfs) & (done_dirs | ent_done_by_manifest)
+        namo2 = (
+            not_actually_metadata_only_subjects |
+            not_actually_metadata_only_samples |
+            not_actually_metadata_only_sites |
+            not_actually_metadata_only_perfs )
+        assert namo2 == not_actually_metadata_only, f'sigh {namo2 - not_actually_metadata_only} {not_actually_metadata_only - namo2}'
 
         obj = {}
 
@@ -743,6 +809,32 @@ class Derives:
             pass # TODO embed an error
 
         # FIXME TODO dirs without files case
+
+        # TODO handle missing_ent_from_perfs
+
+        if missing_subs_from_samps:
+            msg = ('There are subjects listed in samples that are not in subjects!'
+                   f'\n{missing_subs_from_samps}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if missing_subs_from_sites:
+            msg = ('There are subjects listed in sites that are not in subjects!'
+                   f'\n{missing_subs_from_sites}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
+
+        if missing_samps_from_sites:
+            msg = ('There are samples listed in sites that are not in samples!'
+                   f'\n{missing_samps_from_sites}')
+            if he.addError(msg,
+                           blame='submission',
+                           path=path):
+                logd.error(msg)
 
         if inter_pool_sub:
             # the semantics for pools means that specimens are counted
@@ -770,10 +862,10 @@ class Derives:
                            path=path):
                 logd.error(msg)
 
-        if double_done_ents:
+        if double_done_ent_paths:
             # this is not necessarily a problem but is good to catch
-            msg = ('There are entities with double mapping via directory name and manifest!'
-                   f'\n{double_done_ents}')
+            msg = ('There are paths with double mapped entities via directory name and manifest!'
+                   f'\n{double_done_ent_paths}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
@@ -913,7 +1005,12 @@ class Derives:
                         [f'{dist:>3} {s:<{align[d]}} {source}' for dist, s, source in
                          # unfortunately we can't limit the total number of entries because
                          [(dist, s, so) for dist, s, so in dists[d]
-                          if dist < 10 or so == ' ' and dist < 15]])
+                          if ((dist < len(so) or  # don't look at cases where everything changes
+                               (dist <= (         # but do check for missing ent- prefixes
+                                   len(s.split('-', 2)[1]) + 5  # pop--
+                                  if s.startswith('pop-') else
+                                  len(s.split('-')[0]) + 1)))
+                              and dist < 10) or so == ' ' and dist < 15]])
                      for d in sorted(sot[-1] if isinstance(sot, tuple) else sot
                                      for sot in not_done_after_eit_dirs)])
                 msg = ('There are directories that have no corresponding '
