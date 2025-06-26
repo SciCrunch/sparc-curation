@@ -826,7 +826,7 @@ class AtomicDictOperations:
             raise e
 
     @staticmethod
-    def add(data, target_path, value, fail_on_exists=True, update=False):
+    def add(data, target_path, value, *failfun, fail_on_exists=True, update=False):
         """ Note on semantics when target_path contains the type int.
             Normally when adding a path all the parents are added because
             we are expecting a direct path down. However, if the path
@@ -837,6 +837,11 @@ class AtomicDictOperations:
             but if their value is a list it must not be empty. Thus we abort
             so that we don't go around creating a bunch of empty lists that
             will show up later as errors when validating the schema. """
+        if failfun:
+            onfail = failfun[0]
+        else:
+            onfail = None
+
         # type errors can occur here ...
         # e.g. you try to go to a string
         if not [_ for _ in (list, tuple) if isinstance(target_path, _)]:
@@ -899,7 +904,14 @@ class AtomicDictOperations:
                 # make sure this error propagates as expected
                 pass
 
-            raise exc.TargetPathExistsError(msg)
+            if onfail is None:
+                raise exc.TargetPathExistsError(msg)
+            else:
+                try:
+                    value = onfail(target[target_key], value)
+                    log.warning(msg)
+                except Exception as e:
+                    raise exc.TargetPathExistsError(msg) from e
 
         target[target_key] = value
 
@@ -1060,10 +1072,14 @@ class _DictTransformer:
     @staticmethod
     def add(data, adds):
         """ adds is a list (or tuples) with the following structure
-            [[target-path, value], ...]
+            [[target-path, value[, failfun]], ...]
+
+            failfun is a function of two arguments
+            ff(current_value_at_target, new_value_to_be_inserted)
+            it should return the value to be inserted or raise an error
         """
-        for target_path, value in adds:
-            adops.add(data, target_path, value)
+        for target_path, value, *failfun in adds:
+            adops.add(data, target_path, value, *failfun)
 
     @staticmethod
     def update(data, updates, source_key_optional=False):

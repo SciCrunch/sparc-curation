@@ -33,7 +33,8 @@ from sparcur.core import json_identifier_expansion, dereference_all_identifiers
 from sparcur.core import JApplyRecursive, resolve_context_runtime, get_nested_by_key
 from sparcur.core import adops
 from sparcur.paths import Path, PathL
-from sparcur.utils import PennsieveId  # XXXXX FIXME
+from sparcur.utils import is_list_or_tuple
+from sparcur.utils import PennsieveId as RemoteId
 from sparcur.state import State
 from sparcur.config import auth
 from sparcur.derives import Derives
@@ -229,7 +230,7 @@ class ContributorsPipeline(DatasourcePipeline):
 
             if member is not None:
                 _base_uri = State.blackfynn_local_instance.bf._api._host  # FIXME XXX
-                userid = PennsieveId(_base_uri + '/users/' + member.id)
+                userid = RemoteId(_base_uri + '/users/' + member.id)
                 #contributor['blackfynn_user_id'] = userid
                 contributor['data_remote_user_id'] = userid
 
@@ -980,7 +981,7 @@ class JSONPipeline(Pipeline):
             pipelines failed or not """
 
         data = self.pipeline_end
-        adds = [[path, function(self)] for path, function in self.adds]
+        adds = [[path, function(self), *failfun] for path, function, *failfun in self.adds]
         DictTransformer.add(data, adds)
         return data
 
@@ -1575,6 +1576,24 @@ class SDSPipeline(JSONPipeline):
         return data
 
 
+def meta_tech_failfun(target_value, value):
+    if is_list_or_tuple(target_value) and is_list_or_tuple(value):
+        a, b = sorted(target_value), sorted(value)
+        if a == b:
+            return target_value
+        else:
+            msg = 'mismatch between target_value and value'
+            return {'errors':
+                    [{'message': msg,
+                      'target_value': target_value,
+                      'value': value,}],}
+    elif target_value == value:
+        return target_value
+    else:
+        msg = f'target_value != value {target_value} != {value}'
+        raise ValueError(msg)
+
+
 class PipelineExtras(JSONPipeline):
     # subclassing allows us to pop additional steps
     # before or after their super()'s name
@@ -1710,7 +1729,8 @@ class PipelineExtras(JSONPipeline):
 
     )
 
-    adds = [[['meta', 'techniques'], lambda self: self.lifters.techniques]]  # FIXME TODO construct a fake curation file if one does not exist XXX this must be maintained otherwise no techniques are included from field alignment
+    adds = [[['meta', 'techniques'], (lambda self: self.lifters.techniques),
+             meta_tech_failfun]]  # FIXME TODO construct a fake curation file if one does not exist XXX this must be maintained otherwise no techniques are included from field alignment
 
     filter_failures = (  # XXX TODO implement this for other pipelines as well ?
         # FIXME this is silly, there only needs to be a single lambda for this DUH
@@ -2657,7 +2677,7 @@ class ProtcurPipeline(Pipeline):
                 pass
 
             page_notes = [p for p in pannos if p._anno.is_page_note()]
-            data['datasets'] = sorted(set([PennsieveId(fixbf(t)) for p in page_notes
+            data['datasets'] = sorted(set([RemoteId(fixbf(t)) for p in page_notes
                                            for t in p.tags if 'dataset:' in t
                                            and t not in bad_tags]))
             self._process_tags(data, page_notes)
@@ -2686,7 +2706,7 @@ class ProtcurPipeline(Pipeline):
                 if (t.startswith('dataset:') or
                     t.startswith('N:dataset:') or
                     t.startswith('BF:N:dataset:') or
-                    re.match(PennsieveId.uuid4_regex, t)):
+                    re.match(RemoteId.uuid4_regex, t)):
                     pass
                 elif t.startswith('anat:'): data['sparc-anatomy'].append(t)
                 elif t.startswith('mod:'): data['sparc-approach'].append(t.replace('mod:', 'apro:'))
