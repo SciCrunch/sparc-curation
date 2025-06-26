@@ -1,4 +1,5 @@
 import copy
+from pprint import pformat
 from typing import Tuple
 from functools import wraps
 from collections import defaultdict
@@ -868,7 +869,7 @@ class Derives:
         if double_done_ent_paths:
             # this is not necessarily a problem but is good to catch
             msg = ('There are paths with double mapped entities via directory name and manifest!'
-                   f'\n{double_done_ent_paths}')
+                   f'\n{pformat(double_done_ent_paths)}')
             if he.addError(msg,
                            blame='submission',
                            path=path):
@@ -1017,7 +1018,7 @@ class Derives:
                      for d in sorted(sot[-1] if isinstance(sot, tuple) else sot
                                      for sot in not_done_after_eit_dirs)])
                 msg = ('There are directories that have no corresponding '
-                       f'metadata record!\n{not_done_after_eit_dirs}')
+                       f'metadata record!\n{pformat(not_done_after_eit_dirs)}')
                 msg_report = msg + f'\nreport:\n{report}'
                 if he.addError(msg_report,
                                blame='submission',

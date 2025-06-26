@@ -896,7 +896,13 @@ class AtomicDictOperations:
         elif fail_on_exists and target_key in target:
             msg = f'A value already exists at path {target_path}'
             try:
-                _ljd = lj(data)
+                dne = copy.deepcopy(data)
+                def remove_errors(obj, key, *args, path=None, **kwargs):
+                    if isinstance(obj, dict) and 'errors' in obj:
+                        obj.pop('errors')
+
+                JApplyRecursive(remove_errors, dne)
+                _ljd = lj(dne)
                 msg = f'{msg} in\n{_ljd}'
             except Exception as e:
                 # lj can sometimes fail if data contatins an object
