@@ -421,15 +421,20 @@ class Derives:
         # subject_id could be missing, but we filter failures on all of
         # those so in theory we shouldn't need to handle it as this stage
         subs = {s['subject_id']:s for s in subjects}
+        ssubs = set(subs)
 
         dd = defaultdict(list)
         for s in samples:
             dd[s['sample_id']].append(s)
         samps = dict(dd)
-        subs_from_samps = set(p['subject_id'] for p in samples)
-        missing_subs_from_samps = subs_from_samps - set(subs)
-        missing_subs_from_sites = subs_from_sites - set(subs)
-        missing_samps_from_sites = samps_from_sites - set(samps)
+        ssamps = set(samps)
+        subs_from_samps = set(
+            p['subject_id'] for p in samples
+            if 'subject_id' in p)
+
+        missing_subs_from_samps = subs_from_samps - ssubs
+        missing_subs_from_sites = subs_from_sites - ssubs
+        missing_samps_from_sites = samps_from_sites - ssamps
 
         ### pools
         metadata_only_specs = set()  # TODO also need metadata_only sites and perfs etc.
@@ -489,7 +494,6 @@ class Derives:
         done_dirs.update(inter_sub_pool)
 
         ### subjects
-        ssubs = set(subs)
         union_sub = sdirs | ssubs
         inter_sub = sdirs & ssubs
         iman_sub = man_sub & ssubs
@@ -528,7 +532,6 @@ class Derives:
         done_dirs.update(inter_sam_pool)
 
         ### samples
-        ssamps = set(samps)
         union_sam = sdirs | ssamps
         inter_sam = sdirs & ssamps
         iman_sam = man_sam & ssamps
