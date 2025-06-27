@@ -559,7 +559,7 @@ class Derives:
         if ok_sam_ids == ssamps:
             ok_samps = samps
         else:
-            ok_samps = {k:v  for k, v  in subs.items() if k in ok_sam_ids}
+            ok_samps = {k:v  for k, v  in samps.items() if k in ok_sam_ids}
             logd.warning('miscount sample dirs, TODO')
 
         if template_version_less_than_2 and non_unique_samples:
@@ -645,13 +645,10 @@ class Derives:
 
                         continue
 
-                if sample_id in metadata_only_specs:
-                    if sample_id in inter_sam:
-                        # TODO embed this one probably?
-                        breakpoint()
-                        logd.error(f'metadata only sample has a folder??? {sample_id}')
-
-                    continue
+                # this is handled via not_actually_metadata_only and friends now
+                #if sample_id in metadata_only_specs:
+                #    if sample_id in inter_sam:
+                #        logd.error(f'metadata only sample has a folder??? {sample_id}')
 
                 if template_version_less_than_2:  # FIXME this is sure the cause an error at some point
                     if sample_id in inter_sam:  # dir is not done if doneness comes from a pool

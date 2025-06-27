@@ -81,13 +81,13 @@ distinct_file_gen = iter(range(9999))
 next(distinct_file_gen)
 
 def stuff(type_prefix, type_id_gen,
-          has_dir, has_dir_nam,
-          has_rec, has_rec_nam,
-          has_mta, has_mta_nam,
-          has_fil, has_fil_nam,
-          has_nmm, has_nmm_nam,
-          has_rod, has_rod_nam,
-          has_rof, has_rof_nam,
+          has_dir, has_dir_nam,  # has a directory matching name
+          has_rec, has_rec_nam,  # has a manifest record
+          has_mta, has_mta_nam,  # has a row in its type specific metadata file  # XXX TODO no parent case and parent missing case
+          has_fil, has_fil_nam,  # has a file  # FIXME that is mapped via manifest ??? XXX TODO th
+          has_nmm, has_nmm_nam,  # marked as metadata only ???
+          has_rod, has_rod_nam,  # has a manifest record pointing to a directory  # TODO that does not exist
+          has_rof, has_rof_nam,  # has a manifest record pointing to a file  # TODO that does not exist
           ):
 
     numeric = next(type_id_gen)
@@ -114,8 +114,8 @@ def stuff(type_prefix, type_id_gen,
 
             recs.append([would_dir, eid])
         if has_rof:
-            if not has_fil:
-                raise ValueError('rof but not file')
+            #if not has_fil:  # don't error here because people can create inconsistent manifests
+                #raise ValueError('rof but not file')
 
             would_file = mwf()
             recs.append([would_file, eid])
@@ -163,14 +163,17 @@ for type_prefix, prefix_header in zip(*(prefixes, headers)):
                                 if not has_mta and has_nmm:
                                     continue
 
-                                if (not has_rec and (has_rod or has_rof) or
+                                if (not has_rec and (has_rod or has_rof) # or
                                     # actually ... this case can happen ... where there is a dir included via manifest only
                                     #not has_dir and has_rod or
-                                    not has_fil and has_rof):
+                                    # this case can also happen if someone creates an inconsistent manifest
+                                    #not has_fil and has_rof
+                                    ):
                                     continue
 
                                 if (has_rec and not has_rod and not has_rof):
                                     # this case is essentially degenerate with not has_rec case
+                                    # because is file without a mapping but in manifest which we don't actually handle yet?
                                     continue
 
                                 stuff(type_prefix, type_id_gen,
@@ -213,6 +216,10 @@ if False:
 
 #+end_src
 
+#+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-combinatorics/.dss :mkdirp yes
+(sds 3.0.2)
+#+end_src
+
 #+begin_src csv :noweb yes :tangle ../test/examples/org/dataset-combinatorics/dataset_description.csv :mkdirp yes
 <<dd-1>>
 #+end_src
@@ -252,7 +259,7 @@ Curator notes,,,,
 #+name: dd-1
 #+begin_src csv
 Metadata element,Value,Value 2,Value 3,Value n
-Metadata version,3.0.1,,,
+Metadata version,3.0.2,,,
 Type,experimental,,,
 Standards information,,,,
     Data standard,SPARC,,,
@@ -311,7 +318,7 @@ Device information,,,,
 #+name: dd-2
 #+begin_src csv
 Metadata element,Value,Value 2,Value 3,Value n
-Metadata version,3.0.1,,,
+Metadata version,3.0.2,,,
 Type,device,,,
 Standards information,,,,
     Data standard,,,,
