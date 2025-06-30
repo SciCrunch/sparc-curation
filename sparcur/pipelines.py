@@ -1351,9 +1351,11 @@ class SDSPipeline(JSONPipeline):
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
-                 ['inputs', 'dataset_description_file', 'funding_freetext']],
+                 ['inputs', 'dataset_description_file', 'funding_freetext'],
+                 ['inputs', 'dataset_description_file', 'funding'],],
                 DT.BOX(De.award_number),
-                [['meta', 'award_number']]],
+                [['meta', 'award_number']],
+                (lambda source_path: None),],
 
                [[['contributors']],
                 (lambda cs: [DT.derive(c, [[[['contributor_name']],  # FIXME [['name]] as missing a nesting level

@@ -59,7 +59,21 @@ class Derives:
                 yield cont
 
     @staticmethod
-    def award_number(raw_award_number, funding) -> str:
+    def award_number(raw_award_number, funding_freetext, funding) -> str:
+        if raw_award_number is None:
+            # FIXME HACK temporary workaround, schema should be updated
+            # roughly try to preserve semantics of the old field
+            # but consumers should switch to the funding field
+            # however we will need to add a rule to translate
+            candidates = [
+                f for f in funding
+                if 'funding_agency' in f and f['funding_agency'] == 'NIH' and
+                'funding_consortium' in f and f['funding_consortium'] == 'SPARC' and
+                'award_number' in f and f['award_number']
+            ]
+            if candidates:
+                raw_award_number = candidates[0]['award_number']
+
         return nml.NormAward(nml.NormAward(raw_award_number))
 
     @staticmethod
