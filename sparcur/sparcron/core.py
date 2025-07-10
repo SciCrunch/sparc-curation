@@ -370,6 +370,7 @@ def argv_spc_find_meta(dataset_id):
         "--name", "manifest*",
         "--name", "resources*",
         "--name", "README*",
+        "--name", ".dss*",
         '--no-network',
         "--limit", "-1",
         "--fetch"]

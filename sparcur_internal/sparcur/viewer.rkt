@@ -215,6 +215,7 @@ note of course that you don't get dynamic binding with version since it is not t
    "--name" "manifest*"
    "--name" "resources*"
    "--name" "README*"
+   "--name" ".dss*"
    "--limit" "-1"
    "--fetch"))
 
