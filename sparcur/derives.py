@@ -68,13 +68,15 @@ class Derives:
             candidates = [
                 f for f in funding
                 if 'funding_agency' in f and f['funding_agency'] == 'NIH' and
-                'funding_consortium' in f and f['funding_consortium'] == 'SPARC' and
-                'award_number' in f and f['award_number']
+                'funding_consortium' in f and
+                f['funding_consortium'] in ('SPARC', 'HEAL', 'HEAL-PRECISION', 'HEAL-REJOIN')  # FIXME need a way to keep up to date
+                and 'award_number' in f and f['award_number']
             ]
             if candidates:
                 raw_award_number = candidates[0]['award_number']
 
-        return nml.NormAward(nml.NormAward(raw_award_number))
+        if raw_award_number is not None:
+            return nml.NormAward(nml.NormAward(raw_award_number))
 
     @staticmethod
     def pi(contributors):
