@@ -602,3 +602,37 @@ A female patient did not answer a question about previous pregnancies but answer
 - =Curator notes= section
   - Add =Notes=
 
+* changelog 3.0.3
+** Changes from 3.0.2 to 3.0.3 for entities
+- Add =also in dataset * id= for subjects, and samples. Optional.
+  Makes it possible to reference an entity in another dataset where
+  the local identifier for the entity is different than in the current
+  dataset. If the entity id is the same in both datasets the column
+  should be left blank. The one use case for this is when combining
+  data from different datasets that reuse e.g. sample ids. In the
+  dataset that references multiple datasets the sample ids must be
+  made unique. However, in making them unique the mapping in the other
+  datasets is broken. Therefor we add a column for the entity id in
+  the other dataset. =sam-f006-l= -> =N:dataset:2a3d...=, =sam-l=.
+
+  =also in dataset entity id= is accepted in all files but is not
+  included in the templates. Also accepted but not included in the
+  templates is =also in dataset site id= in sites, and =also in
+  dataset performance id= in performances.
+
+** Changes from 3.0.2 to 3.0.3 for .dss
+- Change version string from =3.0.1= to =3.0.3=. This was missed in
+  =3.0.2=, but there is no impact as it currently has no semantics.
+
+** Changes from 3.0.2 to 3.0.3 for subjects
+- Add =also in dataset subject id=. Optional.
+  See general changes for details.
+
+** Changes from 3.0.2 to 3.0.3 for samples
+- Add =also in dataset sample id=. Optional.
+  See general changes for details.
+
+** Changes from 3.0.2 to 3.0.3 for dataset description
+- Change =Contributor role= =Description= to split out sparc specific
+  and datacite roles and clarify mappings from sparc to datacite
+  fields, and to add info on PI/CoI and corresponding author.
