@@ -403,24 +403,27 @@ note of course that you don't get dynamic binding with version since it is not t
   ;; FIXME TODO this slows down startup time should probably be
   ;; deferred and/or cached
   (define ru (apply set (map id-uuid datasets-remote)))
-  (for/list ([uuid (map path->string (directory-list (path-export-datasets)))]
-             #:when (not (set-member? ru uuid)))
-    (define jp (build-path (path-export-datasets) uuid "LATEST" "curation-export.json"))
-    (define lej
-      (if (and (not fast?) (file-exists? jp))
-          (path->json jp)
-          #hash()))
-    (let* ([meta (hash-ref lej 'meta #hash())]
-           [folder-name (hash-ref meta 'folder_name "?")]
-           [timestamp-updated (hash-ref meta 'timestamp_updated "1970-01-01T00:00:00Z")]
-           [id-organization (hash-ref meta 'id_organization "?")])
-      (dataset
-       (string-append "N:dataset:" uuid)
-       folder-name
-       timestamp-updated
-       "?" ; the only thing I don't record is the dataset owner name
-       (string-append "N:" id-organization)
-       "no-access"))))
+  (define ped (path-export-datasets))
+  (if (and ped (directory-exists? ped))
+      (for/list ([uuid (map path->string (directory-list ped))]
+                 #:when (not (set-member? ru uuid)))
+        (define jp (build-path (path-export-datasets) uuid "LATEST" "curation-export.json"))
+        (define lej
+          (if (and (not fast?) (file-exists? jp))
+              (path->json jp)
+              #hash()))
+        (let* ([meta (hash-ref lej 'meta #hash())]
+               [folder-name (hash-ref meta 'folder_name "?")]
+               [timestamp-updated (hash-ref meta 'timestamp_updated "1970-01-01T00:00:00Z")]
+               [id-organization (hash-ref meta 'id_organization "?")])
+          (dataset
+           (string-append "N:dataset:" uuid)
+           folder-name
+           timestamp-updated
+           "?" ; the only thing I don't record is the dataset owner name
+           (string-append "N:" id-organization)
+           "no-access")))
+      '()))
 
 (define (ensure-directory! path-dir)
   (unless (directory-exists? path-dir)
