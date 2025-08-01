@@ -728,6 +728,7 @@ sds3_path_almost_pattern = '^[A-Za-z0-9.,-_]([A-Za-z0-9.,-_ ]*[A-Za-z0-9.,-_])?$
 #_id_suffix = '[A-Za-z0-9][A-Za-z0-9-]*$'
 _id_suffix = '[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$'  # don't allow trailing separator
 entity_prefix_pattern = '^(pop-)?(sub|sam|site|perf)'
+pop_id_pattern = '^pop-(sub|sam|site|perf)'
 entity_prefix_no_pattern = entity_prefix_pattern + '[-_]'  # don't allow prefix_
 entity_id_pattern = entity_prefix_pattern + '-' + _id_suffix
 specimen_id_pattern = '^(pop-)?(sub|sam)-' + _id_suffix
@@ -1990,6 +1991,9 @@ class SampleExportSchema(JSONSchema):
         {'anyOf': [
             {'required': ['subject_id'],},
             {'required': ['was_derived_from'],},
+            {'properties': {
+                'sample_id': {'type': 'string',
+                              'pattern': pop_id_pattern,},},},
         ]},
         _schema]}
 
