@@ -340,15 +340,20 @@ class MetaConverter(TripleConverter):
                     if isinstance(_i, idlib.Stream) and 'errors' not in rid:
                         yield from _i.triples_gen  # FIXME network sandbox violation
 
-                    p = TEMP[rid['relation_type']]  # FIXME TODO
-                    yield subject, p, i
                     yield bn0, rdf.type, owl.NamedIndividual
                     yield bn0, rdf.type, sparc.RelatedIdentifier
                     yield bn0, TEMP.aboutDataset, subject
                     yield bn0, TEMP.aboutIdentifier, i
-                    yield bn0, TEMP.identifierType, rdflib.Literal(rid['related_identifier_type'])  # FIXME redundant really ...
-                    yield bn0, TEMP.relationType, p
-                    yield bn0, TEMP.description, rdflib.Literal(rid['related_identifier_description'])
+
+                    if 'relation_type' in rid:
+                        p = TEMP[rid['relation_type']]  # FIXME TODO prefix
+                        yield subject, p, i
+                        yield bn0, TEMP.relationType, p
+
+                    if 'related_identifier_type' in rid:
+                        yield bn0, TEMP.identifierType, rdflib.Literal(rid['related_identifier_type'])  # FIXME redundant really ...
+                    if 'related_identifier_description' in rid:
+                        yield bn0, TEMP.description, rdflib.Literal(rid['related_identifier_description'])
 
             return comb
 
