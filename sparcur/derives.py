@@ -60,7 +60,7 @@ class Derives:
 
     @staticmethod
     def award_number(raw_award_number, funding_freetext, funding) -> str:
-        if raw_award_number is None:
+        if raw_award_number is None and funding:
             # FIXME HACK temporary workaround, schema should be updated
             # roughly try to preserve semantics of the old field
             # but consumers should switch to the funding field
