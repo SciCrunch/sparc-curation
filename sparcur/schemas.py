@@ -1371,16 +1371,15 @@ class DatasetDescriptionExportSchema(JSONSchema):
                         'related_identifier_type',
                         'related_identifier'],
                     'properties': {
-                        'related_identifier': {'type': 'string'},
+                        'related_identifier': _protocol_url_or_doi_schema,  # FIXME obviously this is dependent on type and relation but that means the actual schema is a long oneOf (or maybe anyOf) statement
                         'related_identifier_type': {
                             'type': 'string',
                             'enum': [
-                                # sds types
-                                'RRID',  # convert to URL when going to DataCite
                                 # datacite types
                                 'ARK',
                                 'arXiv',
                                 'bibcode',
+                                'CSTR',
                                 'DOI',
                                 'EAN13',
                                 'EISSN',
@@ -1393,6 +1392,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
                                 'LSID',
                                 'PMID',
                                 'PURL',
+                                'RRID',
                                 'UPC',
                                 'URL',
                                 'URN',
