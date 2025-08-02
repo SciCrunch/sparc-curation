@@ -63,7 +63,7 @@ def related_identifier_record(rid):
             # XXX we are missing the required context to produce an
             # understanable error here however the result will filter
             # fail later on pointing to the correct file
-            if he.addError(str(e)):
+            if he.addError(repr(e)):
                 log.exception(e)
             id = None
     else:
@@ -75,13 +75,35 @@ def related_identifier_record(rid):
     )
 
     if id is not None and id:
-        out['related_identifier'] = id
+        if isinstance(id, str):
+            try:
+                nid = related_identifier(type, id)
+            except Exception as e:
+                if he.addError(repr(e)):
+                    log.exception(e)
+                nid = id
+        else:
+            nid = id
+
+        out['related_identifier'] = nid
 
     if desc is not None and desc:
         out['related_identifier_description'] = desc
 
     he.embedErrors(out)
     return out
+
+
+def related_identifier(type, id):
+    if type == 'DOI':
+        return idlib.Doi(id)
+    elif type == 'URL':
+        return id
+    elif type == 'RRID':
+        return idlib.Rrid(id)
+    else:
+        log.debug(f'unhandled related identifier type {type}')
+        return id
 
 
 def description(value):

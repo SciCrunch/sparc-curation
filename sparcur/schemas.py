@@ -1304,6 +1304,12 @@ _protocol_url_or_doi_schema = {'anyOf':[EIS._allOf(DoiSchema),
                                          'pattern': simple_url_pattern,}]}
 
 
+_related_identifier_schema = {'anyOf':[EIS._allOf(DoiSchema),
+                                       EIS._allOf(PioSchema),
+                                       EIS._allOf(RridSchema),
+                                       {'type': 'string',
+                                        'pattern': simple_url_pattern,}]}
+
 ContributorExportSchema.schema['jsonld_include'] = {
     '@type': ['sparc:Person', 'owl:NamedIndividual']}
 
@@ -1371,7 +1377,7 @@ class DatasetDescriptionExportSchema(JSONSchema):
                         'related_identifier_type',
                         'related_identifier'],
                     'properties': {
-                        'related_identifier': _protocol_url_or_doi_schema,  # FIXME obviously this is dependent on type and relation but that means the actual schema is a long oneOf (or maybe anyOf) statement
+                        'related_identifier': _related_identifier_schema,  # FIXME obviously this is dependent on type and relation but that means the actual schema is a long oneOf (or maybe anyOf) statement
                         'related_identifier_type': {
                             'type': 'string',
                             'enum': [

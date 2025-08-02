@@ -1348,6 +1348,7 @@ class SDSPipeline(JSONPipeline):
           ('subject_id', 'pool_id', 'subject_experimental_group', 'member_of', 'laboratory_internal_id')],
         *[[['performances', int, field], norm.number_identifiers_to_string] for field in
           ('performance_id',)],
+        [['meta', 'related_identifiers'], norm.related_identifiers],  # XXX network sandbox violation
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
@@ -1425,7 +1426,7 @@ class SDSPipeline(JSONPipeline):
                 # into our internal idlib representation but then defer resolution and
                 # validation to the designated point that allows network access
                 DT.BOX(lambda rids: tuple(
-                    rid['related_identifier'] for rid in norm.related_identifiers(rids)  # XXX network sandbox violation
+                    rid['related_identifier'] for rid in rids #norm.related_identifiers(rids)
                     if 'relation_type' in rid and rid['relation_type'] == 'HasProtocol'
                     and 'related_identifier_type' in rid and rid['related_identifier_type']  # schema violation issue causing bug :/
                     and 'related_identifier' in rid)),

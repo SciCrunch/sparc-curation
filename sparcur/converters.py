@@ -327,6 +327,31 @@ class MetaConverter(TripleConverter):
             self.c = converter
             self.integrator = converter.integrator
 
+        def related_identifiers(self, value):
+            def comb(subject, rids=value):
+                for rid in rids:
+                    bn0 = rdflib.BNode()
+                    if 'related_identifier' not in rid:
+                        # likely an upstream schema failure
+                        continue
+
+                    _i = rid['related_identifier']
+                    i = self.c.l(_i)
+                    if isinstance(_i, idlib.Stream) and 'errors' not in rid:
+                        yield from _i.triples_gen  # FIXME network sandbox violation
+
+                    p = TEMP[rid['relation_type']]  # FIXME TODO
+                    yield subject, p, i
+                    yield bn0, rdf.type, owl.NamedIndividual
+                    yield bn0, rdf.type, sparc.RelatedIdentifier
+                    yield bn0, TEMP.aboutDataset, subject
+                    yield bn0, TEMP.aboutIdentifier, i
+                    yield bn0, TEMP.identifierType, rdflib.Literal(rid['related_identifier_type'])  # FIXME redundant really ...
+                    yield bn0, TEMP.relationType, p
+                    yield bn0, TEMP.description, rdflib.Literal(rid['related_identifier_description'])
+
+            return comb
+
         def award_number(self, value):
             _, s = self.c.award_number(value)
             yield s, rdf.type, owl.NamedIndividual
