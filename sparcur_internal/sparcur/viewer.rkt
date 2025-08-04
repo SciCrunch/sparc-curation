@@ -2112,13 +2112,6 @@ switch to that"
 
 ;; validate mode panel
 
-(define button-fexport (new (tooltip-mixin button%)
-                            [label "Fetch+Export"]
-                            [tooltip "Shortcut F5"] ; FIXME this should populate dynamically
-                            [tooltip-delay 100]
-                            [callback cb-fetch-export-dataset]
-                            [parent panel-validate-mode]))
-
 (define all-button-open-dataset-folder '()) ; we do it this way since these should enable/disable as a group
 (define (make-button-open-dataset-folder parent)
   (define butt
@@ -2129,6 +2122,13 @@ switch to that"
   (set! all-button-open-dataset-folder (cons butt all-button-open-dataset-folder)))
 
 (make-button-open-dataset-folder panel-validate-mode)
+
+(define button-fexport (new (tooltip-mixin button%)
+                            [label "Fetch+Export"]
+                            [tooltip "Shortcut F5"] ; FIXME this should populate dynamically
+                            [tooltip-delay 100]
+                            [callback cb-fetch-export-dataset]
+                            [parent panel-validate-mode]))
 
 ; FIXME there is currently no way to go back to viewing the local
 ; export without running export or restarting
@@ -2229,9 +2229,9 @@ switch to that"
   ; TODO this would have to be a macro because we need the exact name for the list
   (set! all-button-download-all-files (cons butt all-button-download-all-files)))
 
-(make-button-download-all-files panel-convert-mode)
-
 (make-button-open-dataset-folder panel-convert-mode)
+
+(make-button-download-all-files panel-convert-mode)
 
 (make-button-upload-changes panel-convert-mode)
 
