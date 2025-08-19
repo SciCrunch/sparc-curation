@@ -1430,8 +1430,9 @@ python -m sparcur.cli export protcur
 #+end_src
 ***** NPO
 #+begin_src bash
-python -m neurondm.build release
-python -m neurondm.models.apinat_pops_more
+pypy3 -m neurondm.build release
+pypy3 -m neurondm.models.apinat_pops_more
+pypy3 -m sparcur_internal.apinatomy_partial_orders
 #+end_src
 Super manual curation, identifier sync, review, merge, commit, push, etc.
 
@@ -1442,16 +1443,26 @@ is to run [[file:./queries.org::py-nbr-1]] and then [[file:./queries.org::apinat
 
 Below is the start of some code to extract the partial orders without
 having to load scigraph first.
-#+begin_src jupyter-python :session pys
-#ori = OntResIri('https://cassava.ucsd.edu/ApiNATOMY/ontologies/.ttl')
+#+begin_src jupyter-python :session pys :tangle ../sparcur_internal/apinatomy_partial_orders.py
 import rdflib
 from pathlib import Path
-from pyontutils.core import OntResPath, OntConjunctiveGraph
+from pyontutils.core import OntGraph, OntId, OntResPath, OntConjunctiveGraph, log
+from pyontutils.namespaces import rdf, ilxtr, PREFIXES
 from neurondm import orders as nord
+
 b = Path('/tmp/build')
 rp = sorted(b.glob('release-*-sckan'))[-1]
 orp = OntResPath(rp / "data/sparc-data.ttl")
-apinat_imports = [i for i in orp.imports if 'ApiNATOMY' in i.identifier]
+apinat_imports = [
+    i for i in orp.imports if 'ApiNATOMY' in i.identifier
+]
+local = True
+if local:
+    apinat_imports = [
+        OntResPath(Path(f'~/git/apinatomy-models/models/{model_id}/derived/{model_id}.ttl').expanduser())
+        for i in apinat_imports
+        if (model_id := i.identifier.rsplit('/', 1)[-1].split('.')[0])]
+
 # FIXME conjunctive graph has to conjoin by sharing a store ??? wat
 apinat_graphs = [i.graph for i in apinat_imports]
 ocg = OntConjunctiveGraph()
@@ -1460,7 +1471,6 @@ set(ocg.predicates())
 apinat = rdflib.Namespace('https://apinatomy.org/uris/readable/')
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 
-# TODO and the we have to recreate the neru-7 query
 ancsl = list(ocg[:apinat.nextChainStartLevels:])
 anext = list(ocg[:apinat.next:])
 
@@ -1475,12 +1485,12 @@ def soma_link_edges(soma):
         soma_links.add(link)
         for node_s in ocg[link:apinat.source:]:
             for other_link in ocg[node_s:apinat.sourceOf:]:  # FIXME only by convention that the direction matches
-                if other_link != link:
+                if other_link != link and (other_link, apinat.collapsible, rdflib.Literal(True)) not in ocg:
                     yield link, other_link
 
         for node_t in ocg[link:apinat.target:]:
             for other_link in ocg[node_t:apinat.sourceOf:]:  # FIXME only by convention that the direction matches
-                if other_link != link:
+                if other_link != link and (other_link, apinat.collapsible, rdflib.Literal(True)) not in ocg:
                     yield link, other_link
 
 
@@ -1494,8 +1504,18 @@ def get_neuron(link):
             for ot in ocg[group:apinat.ontologyTerms:]:
                 return ot
 
+        # multi-soma case (lol fixed everything except aacar 10a and 10v (and one other))
+        for group in ocg[:apinat.lyphs:lyph]:
+            if ((group, rdf.type, elements.Group) not in ocg or
+                (group, apinat.description, rdflib.Literal('dynamic')) not in ocg):
+                continue
 
-seeds = {l: neuron for l in soma_links if (neuron := get_neuron(l))}  # FIXME right now we always seed on soma, but that is not required
+            for glyph in ocg[group:apinat.lyphs]:
+                for ggroup in ocg[glyph:apinat.seedIn:]:
+                    for ot in ocg[ggroup:apinat.ontologyTerms:]:
+                        return ot
+
+    log.error(f'no connection found for {link}')
 
 
 link_lookup = {}
@@ -1540,6 +1560,8 @@ def link_to_ont_region_layer(link):
                 log.warning(f'multiple 0 ontology terms {i + 1} for {hl}')
 
             li = None
+            for co in ocg[hl:apinat.cloneOf:]:
+                pass
             for li in ocg[hl:apinat.layerIn:]:
                 j = None
                 for j, liot in enumerate(ocg[li:apinat.ontologyTerms:]):
@@ -1596,30 +1618,63 @@ def filter_for_neuron_parts(link):
 
 _l_adj = soma_edges + ancsl + anext
 l_adj = [(a, b) for (a, b) in _l_adj if filter_for_neuron_parts(a) or filter_for_neuron_parts(b)]
-l_skipped = set(_l_adj) - set(l_adj)  # TODO review to make sure there aren't lurking issues
+l_skipped = set(_l_adj) - set(l_adj)  # TODO review to make sure there aren't lurking issues (looks like we aren't skipping anything we want, mostly spinal cord and circulatory chains ...)
 torep = set(e for es in l_adj for e in es)
 _ = [link_to_ont_region_layer(link) for link in torep]
 
+seeds = {l: neuron for l in (soma_links | set(e for es in l_adj for e in es)) if (neuron := get_neuron(l))}
 
 l_nst = nord.adj_to_nst(l_adj)  # this is the ord over the links we may have to do this first and then replace because different neurons may converge, or do this first, get the distinct graphs per neuron, separate, replace and then h_adj -> h_nst
 l_split_nst = l_nst[1:]
 l_split_adj = [nord.nst_to_adj(n) for n in l_split_nst]
-h_split_adj = [[(link_lookup[a], link_lookup[b]) for a, b in s] for s in l_split_adj]
-h_split_nst = [nord.adj_to_nst(a) for a in h_split_adj]
-# h_adj = [(link_lookup[a], link_lookup[b]) for a, b in l_adj]  # can't do this only produces 52 distinct graphs
-# h_nst = nord.adj_to_nst(h_adj)
 
 nrns = [set(e for es in al for e in es) for al in l_split_adj]
 def get_seed_neuron(ns):
     key = ns & set(seeds)
-    assert len(key) <= 1, len(key)
+    knrns = set(seeds[k] for k in key)
+    assert len(knrns) <= 1, (len(knrns), knrns)
     if key:
-        return seeds[next(iter(key))]
+        return next(iter(knrns))
 
+    return rdflib.BNode()  # FIXME obvs an issue
 
 nrn_index = [get_seed_neuron(ns) for ns in nrns]
 
-results = list(zip(nrn_index, h_split_nst))
+_l_split_adj_merge = {}
+for n, sadj in zip(nrn_index, l_split_adj):
+    if n not in _l_split_adj_merge:
+        _l_split_adj_merge[n] = tuple()
+    _l_split_adj_merge[n] += sadj
+
+h_nrn_index, l_split_adj_merge = zip(*_l_split_adj_merge.items())
+
+ok_self = {
+ilxtr['neuron-type-aacar-2i'],
+ilxtr['neuron-type-aacar-2m'],
+ilxtr['neuron-type-aacar-10a'],
+ilxtr['neuron-type-aacar-10v'],
+ilxtr['neuron-type-sdcol-i'],
+ilxtr['neuron-type-sdcol-k'],
+}
+h_split_adj = [sorted(set(
+    (link_lookup[a], link_lookup[b]) for a, b in s if
+    n in ok_self or link_lookup[a] != link_lookup[b]
+)) for s, n in zip(l_split_adj_merge, h_nrn_index)]
+h_split_nst = [nord.adj_to_nst(a) for a in h_split_adj]
+# h_adj = [(link_lookup[a], link_lookup[b]) for a, b in l_adj]  # can't do this only produces 52 distinct graphs
+# h_nst = nord.adj_to_nst(h_adj)
+
+results = list(zip(h_nrn_index, h_split_nst))
+
+to_rdf, from_rdf = nord.bind_rdflib()
+
+g = OntGraph()
+g.namespace_manager.populate_from(PREFIXES)
+for n, nst in results:
+    bn = to_rdf(g, nst)
+    g.add(((rdflib.BNode() if n is None else n), ilxtr.neuronPartialOrder, bn))
+
+g.write(Path('~/git/NIF-Ontology/ttl/generated/neurons/apinat-partial-orders.ttl').expanduser())
 
 # TODO export to partial orders file for comparison
 # a quick spot check suggests that there are issues
