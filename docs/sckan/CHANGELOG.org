@@ -19,11 +19,17 @@
 * RC 2025-08-??
 - NPO NLP liver:132 liver:121 change =ilxtr:hasAxonPresynapticElementIn=
   to =ilxtr:hasForwardConnectionPhenotype= when the object is a cell type.
+- ApiNATOMY all models have been exported using updated ApiNATOMY conventions
+  unless noted below the source content of the models has not changed
 - ApiNATOMY aacar ilxtr:cardiac-interganglionic-nerve is not a layer of heart
 - ApiNATOMY aacar-4 remove spurious direct route from medulla to heart
 - ApiNATOMY aacar-5 add missing location for soma in rexed lamina VII of C8
 - ApiNATOMY aacar-10a remove spurious axon returning to AICG
 - ApiNATOMY aacar-10v fix missing axon to AICG
+- ApiNATOMY pancr-4 fix missing housing lyphs via reexport with updated wbrcm
+- ApiNATOMY splen fix housingLyphs/references mixup
+- ApiNATOMY wbrcm add missing gastric mucosa, and ontology id for gi serosa
+
 * RC 2025-05-02
 - ApiNATOMY refine =ilxtr:hasPhenotype= to =ilxtr:hasAnatomicalSystemPhenotype= where appropriate (e.g. for =ilxtr:EntericPhenotype=)
 - NPO femrep, kidney, liver, and sensory motor populations updated
