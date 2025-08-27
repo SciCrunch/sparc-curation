@@ -20,6 +20,7 @@
          racket/generic
          racket/pretty
          racket/runtime-path
+         net/base64
          framework
          compiler/compilation-path
          compiler/embed
@@ -281,6 +282,51 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (ident->dataset ident)
   (let ((uuid (car (reverse (string-split ident ":")))))
     (hash-ref uuid-dataset-hash uuid)))
+
+(define (uuid->bytes uuid-string)
+  (let* ([s (string-replace uuid-string "-" "")]
+         [ls (string-length s)])
+    (list->bytes ; surely there is a better way but I'm not going to hunt for it right now
+     (for/list ([sigh (in-range 0 ls 2)])
+       (string->number
+        (substring s sigh (+ sigh 2))
+        16)))))
+
+(define (base64-urlsafe-encode uuid-bytes)
+  (string-replace
+   (string-replace
+    (substring (bytes->string/utf-8 (base64-encode uuid-bytes #"")) 0 22)
+    "+" "-")
+   "/" "_"))
+
+(define (base64-urlsafe-decode b64-uuid)
+  ; FIXME hilariously inefficient
+  (string-join
+   (for/list
+  ([i (bytes->list
+       (base64-decode
+        (string->bytes/utf-8
+         (string-replace
+          (string-replace
+           b64-uuid
+           "-" "+")
+          "_" "/"))))]
+   [j (in-naturals)])
+     (let ([by (if (< i 16)
+                   (string-append "0" (number->string i 16))
+                   (number->string i 16))])
+       (if (member j '(4 6 8 10))
+           (string-append "-" by)
+           by
+           )
+       ))
+   ""))
+
+(define (uuid->b64-uuid uuid-string)
+  (base64-urlsafe-encode (uuid->bytes uuid-string)))
+
+(define (b64-uuid->uuid b64-uuid-string)
+  (base64-urlsafe-decode b64-uuid-string))
 
 (define --sigh (gensym))
 (define (py-system* exe #:set-pwd? [set-pwd? --sigh] . args)
@@ -951,6 +997,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (updated-short ds)
   (id-short ds)
   (id-uuid ds)
+  (id-uuid-b64 ds)
   (id-project ds)
   (uri-human ds)
   (uri-sds-viewer ds)
@@ -1215,6 +1262,8 @@ note of course that you don't get dynamic binding with version since it is not t
        ; must always be bound together so you can't just ignore later
        ; values if you want like in elisp or common lisp
        uuid))
+   (define (id-uuid-b64 ds)
+     (uuid->b64-uuid (id-uuid ds)))
    (define (is-current? ds)
      ; https://docs.racket-lang.org/guide/define-struct.html#(part._struct-equal)
      (let ([cd (current-dataset)])
@@ -2093,7 +2142,7 @@ switch to that"
 ; and remove the upper limit when if/when someone is dragging
 (send* lview
   (set-column-width 0 70 70 300)
-  (set-column-width 1 120 60 600)
+  (set-column-width 1 120 60 1200)
   (set-column-width 2 120 60 300)
   (set-column-width 3 140 60 9999)
   )
