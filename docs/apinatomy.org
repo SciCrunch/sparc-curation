@@ -734,7 +734,8 @@ add a new line to the second =owl:import= statement.
 :PROPERTIES:
 :visibility: folded
 :END:
-# file is in pyontutils/nifstd/resolver
+# file is in [[../../pyontutils/nifstd/resolver/apinatomy-resolver.conf]]
+See nginx config at https://github.com/tgbugs/pyontutils/blob/master/nifstd/resolver/apinatomy-resolver.conf
 ** Intro
 While an ApiNATOMY server has been on the roadmap for some time, there have not been
 clear requirements and use cases to drive the development in a way that is productive.
