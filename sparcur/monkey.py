@@ -550,7 +550,12 @@ def publishedMetadata(self):
                 raise e  # FIXME retry
 
             if j['totalCount'] == 1:
-                return j['datasets'][0]
+                cand = j['datasets'][0]
+                if (cand['sourceDatasetId'] == self.int_id and
+                    cand['organizationId'] == org_int_id):
+                    return cand
+                else:
+                    return
             elif j['totalCount'] == 0:
                 return
             else:
