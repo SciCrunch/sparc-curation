@@ -8,6 +8,37 @@
    *INSTEAD* use =rsync -X -u -v=. \\
    =cp= does not remove absent fields from xattrs of the file previously
    occupying that name! OH NO (is this a =cp= bug!?)
+** Export v6
+:PROPERTIES:
+:CUSTOM_ID: export-v6
+:END:
+
+# FIXME because archives are made in place they appear on the server before they are done
+#+begin_src bash
+source ~/files/venvs/sparcur-dev/bin/activate
+python -m sparcur.simple.combine
+
+echo Export complete. Check results at:
+echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/share/sparcur/export/summary/618*/LATEST)
+
+pushd ~/.local/share/sparcur/export/summary/618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0
+
+# tar.xz anything that doesn't have it (i.e. usually just the most recent)
+echo Archiving existing releases.
+find -maxdepth 1 -mindepth 1 -type d -not -exec test -f '{}.tar.xz' \; -print | \
+# FIXME TODO an actual archival approach needs a temporary manifest of sha256 checksums, we then sha256 the archive,
+# decompress it and make sure the contents checksums match then we know that the archive checksum is sufficient
+xargs -P4 -r -I{} sh -c 'XZ_OPT=-e9 tar -cvJf "{}.tar.xz" {} && { xz -t "{}.tar.xz" || { echo bad archive for {}; rm "{}.tar.xz"; }; }'
+
+# remove all but the last 2 (ie the one we just created and the one before it) make sure we only remove folders that already have an archive
+# XXX WARNING if the archiving step above fails OR THIS STEP IS RUN BEFORE THE PREVIOUS ONE FINISHES and a malformed or INCOMPLETE archive is
+# present then this will delete the only good copy ...
+echo Removing old archived releases.
+find -maxdepth 1 -mindepth 1 -type d -exec test -f '{}.tar.xz' \; -print | sort -u | head -n -2 | xargs rm -r
+popd
+
+#+end_src
+
 ** Export v5
 :PROPERTIES:
 :CUSTOM_ID: export-v5
@@ -97,7 +128,7 @@ python -m sparcur.simple.compact | xargs -P4 -r -I{} sh -c 'rm -r "{}"'
 
 See [[./developer-guide.org::#compact]] for the old workflow.
 
-TODO Implement =sparcur.simple.compact_snapshot= to elink older
+TODO Implement =sparcur.simple.compact_snapshot= to relink older
 snapshots to the archives so the folders can be removed. Need to
 figure out whether we need a different naming convention or a way
 to indicate that a snapshot points to archived data ... possibly
@@ -204,6 +235,8 @@ so ... zstd is faster than gzip by a wide margin ... like ... way faster
 xz still wins on the ratio though, for background stuff that isn't time
 sensitive, better to go higher ratio
 *** in place
+*This is deprecated in favor of archiving releases immediately after they are compiled.*
+
 Manually remove the echo after checking that you are removing what you expect.
 #+begin_src bash
 pushd /var/www/sparc/sparc/
