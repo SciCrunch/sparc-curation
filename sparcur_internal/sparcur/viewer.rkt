@@ -477,7 +477,8 @@ note of course that you don't get dynamic binding with version since it is not t
     (make-directory* path-dir)))
 
 (define (python-module-user-config-path pymod)
-  (parameterize ([oa-current-auth-config-path (python-mod-auth-config-path pymod)])
+  (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path pymod)]
+                  [oa-current-auth-config (oa-read-auth-config)])
     (oa-user-config-path)))
 
 (define (init-paths!)
