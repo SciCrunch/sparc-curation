@@ -549,6 +549,7 @@ def publishedMetadata(self):
                 log.critical(f'resp.ok but json malformed???\n{resp.text}')
                 raise e  # FIXME retry
 
+            org_int_id = self._api._context.int_id
             if j['totalCount'] == 1:
                 cand = j['datasets'][0]
                 if (cand['sourceDatasetId'] == self.int_id and
@@ -559,8 +560,6 @@ def publishedMetadata(self):
             elif j['totalCount'] == 0:
                 return
             else:
-                # FIXME this will fail to find datasets not published from sparc I think ???
-                org_int_id = self._api._context.int_id
                 cands = [d for d in j['datasets'] if
                         d['sourceDatasetId'] == self.int_id and
                         d['organizationId'] == org_int_id]
