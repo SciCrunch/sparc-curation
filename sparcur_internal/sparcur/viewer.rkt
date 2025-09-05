@@ -144,7 +144,8 @@ note of course that you don't get dynamic binding with version since it is not t
   (list (find-executable-path "cmd") "/c" "start"
         "powershell" "-NoLogo" "-WindowStyle" "normal" "-WorkingDirectory" path-string))
 
-(define (macos-vt path-string)
+(define/contract (macos-vt path-string)
+  (-> string any)
   ;; oh the horror ... racket -> osascript -> bash/zsh/whoevenknows
   ;; and yes, users put single quotes in their dataset names ALL THE TIME AAAAAAAAAAAAAAAAAAAAAAAAA
   (let* ([ps (string-replace (string-replace path-string "'" "\\'") "\"" "\\\"")]
@@ -231,7 +232,7 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (argv-open-dataset-shell ds)
   (let ([path (dataset-src-path ds)])
     (if (directory-exists? path)
-        (vt-at-path (dataset-working-dir-path ds))
+        (vt-at-path (path->string (dataset-working-dir-path ds)))
         (begin (println msg-dataset-not-fetched) #f))))
 
 (define (xopen-dataset-latest-log ds)
@@ -244,7 +245,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (python-mod-args
    "sparcur.simple.fetch_files"
    "--extension" "*"
-   (dataset-working-dir-path ds)))
+   (path->string (dataset-working-dir-path ds))))
 
 (define (argv-open-export-ipython ds)
   (let*-values ([(path) (dataset-export-latest-path ds)]
