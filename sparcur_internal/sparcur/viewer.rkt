@@ -145,7 +145,7 @@ note of course that you don't get dynamic binding with version since it is not t
         "powershell" "-NoLogo" "-WindowStyle" "normal" "-WorkingDirectory" path-string))
 
 (define/contract (macos-vt path-string)
-  (-> string any)
+  (-> string? any)
   ;; oh the horror ... racket -> osascript -> bash/zsh/whoevenknows
   ;; and yes, users put single quotes in their dataset names ALL THE TIME AAAAAAAAAAAAAAAAAAAAAAAAA
   (let* ([ps (string-replace (string-replace path-string "'" "\\'") "\"" "\\\"")]
