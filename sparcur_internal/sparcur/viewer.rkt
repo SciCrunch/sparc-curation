@@ -54,7 +54,7 @@
          (with-output-to-string
            (thunk
             (parameterize ([current-directory this-package-path])
-              (system* git-exe "rev-parse" "HEAD" #:set-pwd? #t)))))
+              (killable-system* git-exe "rev-parse" "HEAD" #:set-pwd? #t)))))
         #f)))
 
 (define (set-commit-hash!)
@@ -330,12 +330,40 @@ note of course that you don't get dynamic binding with version since it is not t
   (base64-urlsafe-decode b64-uuid-string))
 
 (define --sigh (gensym))
+(define hash-subprocess-control (make-hash))
+
+(define existing-exit-handler (exit-handler))
+(define (our-exit-handler v)
+  (define bad (gensym))
+  (for ([(pid control) (in-hash hash-subprocess-control bad)]
+        #:unless (eq? pid bad))
+    (when (eq? (control 'status) 'running)
+      (control 'interrupt) ; TODO kill vs interrupt
+      (when #f ; debug
+        (displayln (list "killed" pid)))))
+  (existing-exit-handler v))
+
+(exit-handler our-exit-handler)
+
+(define (killable-system* exe #:set-pwd? [set-pwd? --sigh] . args)
+  (define-values (out in pid err control)
+    (if (eq? set-pwd? --sigh)
+        (apply values (apply process* exe args))
+        (apply values (apply process* exe args #:set-pwd? set-pwd?))))
+  (hash-set! hash-subprocess-control pid control)
+  (control 'wait)
+  (hash-remove! hash-subprocess-control pid)
+  (when err (close-input-port err))
+  (when out (close-input-port out))
+  (when in (close-output-port in))
+  (eq? (control 'status) 'done-ok))
+
 (define (py-system* exe #:set-pwd? [set-pwd? --sigh] . args)
   (call-with-environment
    (λ ()
      (if (eq? set-pwd? --sigh)
-         (apply system* exe args)
-         (apply system* exe args #:set-pwd? set-pwd?)))
+         (apply killable-system* exe args)
+         (apply killable-system* exe args #:set-pwd? set-pwd?)))
    '(("PYTHONBREAKPOINT" . "0")
      ; silence error logs during pennsieve top level import issue
      ("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION" . "python"))))
@@ -762,7 +790,7 @@ note of course that you don't get dynamic binding with version since it is not t
                                     #f
                                     (λ () -1))])
                  (parameterize ()
-                   (system* raco-exe "pkg" "update" "--batch" this-package-path)
+                   (killable-system* raco-exe "pkg" "update" "--batch" this-package-path)
                    #;
                    (system* raco-exe "make" "-v" this-file))
                  #; ; raco exe issues ... i love it when abstractions break :/
@@ -782,7 +810,7 @@ note of course that you don't get dynamic binding with version since it is not t
                      (parameterize ()
                        (when (file-exists? this-file-exe)
                          (rename-file-or-directory this-file-exe this-file-exe-tmp))
-                       (system* raco-exe "exe" "-v" "++exf" gch "-o" this-file-exe this-file)
+                       (killable-system* raco-exe "exe" "-v" "++exf" gch "-o" this-file-exe this-file)
                        (unless (file-exists? this-file-exe) ; restore the old version on failure
                          (when (file-exists? this-file-exe-tmp)
                            (rename-file-or-directory this-file-exe-tmp this-file-exe))))
@@ -1209,13 +1237,11 @@ note of course that you don't get dynamic binding with version since it is not t
          (let ([status-1 #f]
                [cwd-resolved (resolve-relative-path cwd)])
            (parameterize ([current-directory (path-source-dir)])
-             (with-output-to-string (thunk (set! status-1
-                                                 (apply py-system* argv-1 #:set-pwd? #t)))
-               ))
+             (with-output-to-string
+               (thunk
+                (set! status-1 (apply py-system* argv-1 #:set-pwd? #t)))))
            (if status-1
-               (begin
-                 ; TODO open folder probably ?
-                 (println (format "cleaning metadata files completed for ~a" (dataset-id ds))))
+               (println (format "cleaning metadata files completed for ~a" (dataset-id ds)))
                (println (format "cleaning metadata files FAILED for ~a" (dataset-id ds)))))))))
    (define (dataset-latest-prod-url ds)
      (string-append (url-prod-datasets) "/" (id-uuid ds) "/LATEST/curation-export.json"))
@@ -1650,7 +1676,7 @@ note of course that you don't get dynamic binding with version since it is not t
                [(regexp-match #rx"^https?" path) (current-directory)]
                [else (error 'xopen-path "path-does-not-exist: ~s" path)])])
         (parameterize ([current-directory cwd])
-          (system* command (if (and is-win? is-dir?) "." path) #:set-pwd? #t)))))))
+          (killable-system* command (if (and is-win? is-dir?) "." path) #:set-pwd? #t)))))))
 
 #; ; no longer needed
 (define (xopen-folder path)
@@ -1845,9 +1871,7 @@ switch to that"
     (save-config!)))
 
 (define (cb-reload-config o e)
-  (init-paths!)
-  (load-config!)
-  )
+  (init-paths-load-config!))
 
 (define viewer-mode-state #f)
 (define (cb-viewer-mode o e)
