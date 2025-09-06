@@ -72,7 +72,7 @@ def main():
             f':n-queued {len(queued)}'
         )
         return
-    elif '--fail-logs':
+    elif '--fail-logs' in sys.argv:
         if fails:
             from sparcur.config import auth
             lp = auth.get_path('log-path') / 'datasets'
