@@ -72,6 +72,14 @@ def main():
             f':n-queued {len(queued)}'
         )
         return
+    elif '--fail-logs':
+        if fails:
+            from sparcur.config import auth
+            lp = auth.get_path('log-path') / 'datasets'
+            paths = '\n'.join((lp / f.uuid / 'LATEST/stdout.log').as_posix()
+                                 for f in fails)
+            print(paths)
+        return
 
     if fails:
         _f = '\n'.join(sorted([f.uuid for f in fails]))
