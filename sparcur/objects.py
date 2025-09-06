@@ -1151,7 +1151,7 @@ for this particular use case we may want to use epoch instead of a full timestam
                        f'can be <= {rem_count_p1} but instead is {nth}')
                 if nth > rem_count_p1:
                     breakpoint()
-                assert nth <= rem_count, msg
+                assert nth <= rem_count_p1, msg
                 break
 
         else:  # for loop else
