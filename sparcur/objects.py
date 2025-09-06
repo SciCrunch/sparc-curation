@@ -1137,17 +1137,21 @@ for this particular use case we may want to use epoch instead of a full timestam
         # directly because I think they have modified time for deleted files
         # which of course we don't track here
 
+        rem_count_p1 = 1  # plus 1 because we have dataset
         for nth, (o, p, u, n) in enumerate(previous_records):
             # FIXME there is another edge case where somehow this happens
-            # twice in a row where you get last updated delete and then
-            # second to last updated delete which means that the remove
-            # time is actually what we need
+            # at least twice in a row where you get last updated delete
+            # and then a second to last updated delete which means that
+            # the remove time is actually what we need
+            if o not in new_recs:
+                rem_count_p1 += 1
+
             if u == updated_cache_transitive:
-                msg = ("if it isn't an nth lud then the removed, dataset, and obj "
-                       f'can be first/second/third but instead is {nth}')
-                if nth >= 3:
+                msg = ("with an nth lud then with n removed and dataset the obj "
+                       f'can be <= {rem_count_p1} but instead is {nth}')
+                if nth > rem_count_p1:
                     breakpoint()
-                assert nth < 3, msg
+                assert nth <= rem_count, msg
                 break
 
         else:  # for loop else
