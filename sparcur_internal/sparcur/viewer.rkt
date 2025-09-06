@@ -346,10 +346,11 @@ note of course that you don't get dynamic binding with version since it is not t
 (exit-handler our-exit-handler)
 
 (define (killable-system* exe #:set-pwd? [set-pwd? --sigh] . args)
+  (define-values (cout cin cerr) (values (current-output-port) (current-input-port) (current-error-port)))
   (define-values (out in pid err control)
     (if (eq? set-pwd? --sigh)
-        (apply values (apply process* exe args))
-        (apply values (apply process* exe args #:set-pwd? set-pwd?))))
+        (apply values (apply process*/ports cout cin cerr exe args))
+        (apply values (apply process*/ports cout cin cerr exe args #:set-pwd? set-pwd?))))
   (hash-set! hash-subprocess-control pid control)
   (control 'wait)
   (hash-remove! hash-subprocess-control pid)
