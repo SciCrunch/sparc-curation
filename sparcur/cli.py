@@ -262,7 +262,7 @@ Options:
     --cache-path=PATH       folder where remote data is saved [default: {auth.get_path('cache-path')}]
     --export-path=PATH      base folder for exports           [default: {auth.get_path('export-path')}]
 
-    --project-id=PID        alternate way to pass project id  [default: {auth.get('remote-organization')}]
+    --project-id=PID        alternate way to pass project id
     --dataset-id=DID        pass did on cli to match simple.utils (currently a nop)
 
     --discover              work with pennsieve discover remote
