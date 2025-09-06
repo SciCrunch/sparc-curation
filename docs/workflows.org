@@ -24,10 +24,10 @@ echo https://cassava.ucsd.edu/sparc/preview/archive/summary/$(readlink ~/.local/
 pushd ~/.local/share/sparcur/export/summary/618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0
 
 # tar.xz anything that doesn't have it (i.e. usually just the most recent)
-echo Archiving existing releases.
-find -maxdepth 1 -mindepth 1 -type d -not -exec test -f '{}.tar.xz' \; -print | \
 # FIXME TODO an actual archival approach needs a temporary manifest of sha256 checksums, we then sha256 the archive,
 # decompress it and make sure the contents checksums match then we know that the archive checksum is sufficient
+echo Archiving existing releases.
+find -maxdepth 1 -mindepth 1 -type d -not -exec test -f '{}.tar.xz' \; -print | \
 xargs -P4 -r -I{} sh -c 'XZ_OPT=-e9 tar -cvJf "{}.tar.xz" {} && { xz -t "{}.tar.xz" || { echo bad archive for {}; rm "{}.tar.xz"; }; }'
 
 # remove all but the last 2 (ie the one we just created and the one before it) make sure we only remove folders that already have an archive
