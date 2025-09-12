@@ -26,7 +26,21 @@ apinat = rdflib.Namespace('https://apinatomy.org/uris/readable/')
 elements = rdflib.Namespace('https://apinatomy.org/uris/elements/')
 
 ancsl = list(ocg[:apinat.nextChainStartLevels:])
-anext = list(ocg[:apinat.next:])
+anext = list(ocg[:apinat.next:])  # vast majority of partial order info is in anext
+
+# XXX if the housing lyphs that correspond to a merging levelTargets
+# are not the same then apinatomy does not correctly generate next
+# there is only currently one case where that happens in aacar-5 not
+# all of the pairs pulled in here seem to be needed possibly because
+# the wind up in the same housing lyph
+_cands = [n for _, n in anext if
+          not list(ocg[n:apinat.next:]) and
+          not list(ocg[n:apinat.nextChainStartLevels:]) and
+          list(ocg[n:apinat.target])]
+alevtar = [(l, sof_link)
+           for l in _cands
+           for node in ocg[l:apinat.target]
+           for sof_link in ocg[node:apinat.sourceOf:]]
 
 _soma = OntId('NLX:154731').u
 somas = [s for s in ocg[:apinat.ontologyTerms:_soma] if (s, rdf.type, elements.Lyph) in ocg]
@@ -170,7 +184,7 @@ def filter_for_neuron_parts(link):
                 return iot
 
 
-_l_adj = soma_edges + ancsl + anext
+_l_adj = soma_edges + ancsl + anext + alevtar
 l_adj = [(a, b) for (a, b) in _l_adj if filter_for_neuron_parts(a) or filter_for_neuron_parts(b)]
 l_skipped = set(_l_adj) - set(l_adj)  # TODO review to make sure there aren't lurking issues (looks like we aren't skipping anything we want, mostly spinal cord and circulatory chains ...)
 torep = set(e for es in l_adj for e in es)
@@ -202,18 +216,43 @@ for n, sadj in zip(nrn_index, l_split_adj):
 
 h_nrn_index, l_split_adj_merge = zip(*_l_split_adj_merge.items())
 
-ok_self = {
-ilxtr['neuron-type-aacar-2i'],
-ilxtr['neuron-type-aacar-2m'],
-ilxtr['neuron-type-aacar-10a'],
-ilxtr['neuron-type-aacar-10v'],
-ilxtr['neuron-type-sdcol-i'],
-ilxtr['neuron-type-sdcol-k'],
-}
-h_split_adj = [sorted(set(
-    (link_lookup[a], link_lookup[b]) for a, b in s if
-    n in ok_self or link_lookup[a] != link_lookup[b]
-)) for s, n in zip(l_split_adj_merge, h_nrn_index)]
+
+hardcoded_fixes = True
+def fixes(n, adj):
+    if 'bolew-unbranched' in n:
+        intid = int(n.rsplit('-', 1)[-1])
+        if intid >= 13:
+            # neural tissue is implicit in the neurondm representation for these populations
+            neural_tissue = rdflib.URIRef('http://purl.obolibrary.org/obo/UBERON_0003714')
+            for es in adj:
+                for e in es:
+                    if isinstance(e, nord.rl) and e.layer == neural_tissue:
+                        e.layer = None
+
+    if 'pancr-5' in n:
+        cns_par = rdflib.URIRef('http://purl.obolibrary.org/obo/UBERON_0005158')
+        for es in adj:
+            for e in es:
+                if isinstance(e, nord.rl) and e.layer == cns_par:
+                    e.layer = None
+
+    return adj
+
+
+def self_only_all_self(s, n):
+    adj = set((link_lookup[a], link_lookup[b]) for a, b in s if link_lookup[a] != link_lookup[b])
+    if hardcoded_fixes:
+        adj = fixes(n, adj)
+        adj = set((a, b) for a, b in adj if a != b)  # refilter since mutated nodes
+
+    if not adj:
+        adj = set((link_lookup[a], link_lookup[b]) for a, b in s)
+
+
+    return adj
+
+
+h_split_adj = [sorted(self_only_all_self(s, n)) for s, n in zip(l_split_adj_merge, h_nrn_index)]
 h_split_nst = [nord.adj_to_nst(a) for a in h_split_adj]
 # h_adj = [(link_lookup[a], link_lookup[b]) for a, b in l_adj]  # can't do this only produces 52 distinct graphs
 # h_nst = nord.adj_to_nst(h_adj)
