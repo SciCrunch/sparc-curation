@@ -15,6 +15,7 @@ from augpathlib import RepoPath, LocalPath
 from pyontutils.utils_fast import TZLOCAL, utcnowtz, timeformat_friendly, isoformat
 from sparcur import backends
 from sparcur import exceptions as exc
+from sparcur.core import compact_errors
 from sparcur.utils import log, logd, GetTimeNow, register_type, unicode_truncate
 from sparcur.utils import transitive_dirs, transitive_files, transitive_paths, is_list_or_tuple
 from sparcur.utils import levenshteinDistance, symlink_latest
@@ -59,6 +60,7 @@ suffix_mimetypes = {
 banned_basenames = (
     '.DS_Store',
     'Thumbs.db',
+    '__pycache__',
 )
 
 
@@ -1337,6 +1339,9 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
 
         if he._errors_set:
             he.embedErrors(path_meta_blob)
+            path_errors = [(tuple(), e) for e in path_meta_blob['errors']]
+            c, per, bip, e = compact_errors(path_errors)
+            path_meta_blob['path_error_report'] = per
 
     def pull(self, *args,
              paths=None,
