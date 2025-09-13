@@ -3,7 +3,7 @@
 #+todo: DEV RC | PROD PLAN
 #+options: p:t
 
-* PLAN 2024-??-?? :future:
+* PLAN 2025-??-?? :future:
 - NPO adjacency issues
 - NPO cardinality issues
 
@@ -16,16 +16,37 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
-* RC 2025-08-??
+* RC 2025-09-??
+- TODO :: statistics for number of neurons, number of partial orders,
+  and number of nodes and edges in partial orders, this should be
+  implemented on top of the composer.py example file
+- TODO :: NPO DRG
+- TODO :: resolve inferred equiv issues between para/sym populations
+  with identical anatomy, e.g. =aacar-{7,8}{a,v}=, =kblad-{1,2}=
+- TODO :: resolve apinat-simple missing inferred subClass cases
+* RC 2025-09-13
 - NPO NLP liver:132 liver:121 change =ilxtr:hasAxonPresynapticElementIn=
   to =ilxtr:hasForwardConnectionPhenotype= when the object is a cell type.
+- NPO NLP sync all sheets
+- NPO/ApiNATOMY apinat-simple populations holding old NPO specific
+  axioms now have distinct identifiers
+- ApiNATOMY populations now source axioms from composer
 - ApiNATOMY all models have been exported using updated ApiNATOMY conventions
   unless noted below the source content of the models has not changed
 - ApiNATOMY aacar ilxtr:cardiac-interganglionic-nerve is not a layer of heart
+- ApiNATOMY aacar ilxtr:cardiac-interganglionic-nerve -> ILX:
+- ApiNATOMY aacar ilxtr:vago-sympathetic-trunk -> ILX:
+- ApiNATOMY aacar white matter to spinal cord instead of cns
+- ApiNATOMY aacar use aorta specific tunica adventitia for aorta
 - ApiNATOMY aacar-4 remove spurious direct route from medulla to heart
 - ApiNATOMY aacar-5 add missing location for soma in rexed lamina VII of C8
+- ApiNATOMY aacar-6 correct route, add housing lyph thoracic sympathetic nerve trunk
+- ApiNATOMY aacar-8 fix incorrect terminal node sharing
 - ApiNATOMY aacar-10a remove spurious axon returning to AICG
 - ApiNATOMY aacar-10v fix missing axon to AICG
+- ApiNATOMY aacar-11 remove incorrect duplicate terminals in right ventricle
+- ApiNATOMY bromo-1 fix T2 gray ramus id
+- ApiNATOMY kblad-19 fix VLPAG id
 - ApiNATOMY pancr-4 fix missing housing lyphs via reexport with updated wbrcm
 - ApiNATOMY splen fix housingLyphs/references mixup
 - ApiNATOMY wbrcm add missing gastric mucosa, and ontology id for gi serosa
