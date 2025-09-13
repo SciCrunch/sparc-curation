@@ -101,6 +101,7 @@ note of course that you don't get dynamic binding with version since it is not t
 ; true global variables that should not be thread local
 (define current-projects (make-lexical-parameter)) ; FIXME check that default value ???
 (define (current-blob) (hash-ref uuid-json-hash (id-uuid (current-dataset))))
+(define (current-path-meta-blob) (hash-ref uuid-path-meta-json-hash (id-uuid (current-dataset))))
 (define current-dataset (make-lexical-parameter))
 (define current-datasets (make-lexical-parameter)) ; FIXME check that default value ???
 (define current-datasets-view (make-lexical-parameter))
@@ -115,6 +116,11 @@ note of course that you don't get dynamic binding with version since it is not t
 (define allow-update?
   ; "don't set this, it should only be used to keep things in sync with the config"
   (make-lexical-parameter))
+
+(define jview-sort-new #t)
+(define key-rank-hash
+  (for/hash ([k (in-list '(id meta status rmeta |#/path-metadata| prov))]
+             [i (in-naturals)]) (values k i)))
 
 ;; TODO add check to make sure that the python modules are accessible as well
 
@@ -720,6 +726,28 @@ note of course that you don't get dynamic binding with version since it is not t
         (list->string (reverse l))
         str)))
 
+(define (fs-report)
+  (for-each (λ (m)
+              (displayln
+               (expand-abnormal-whitespace m))
+              (newline))
+            (let ([ihr (hash-ref
+                        (current-path-meta-blob)
+                        'errors
+                        #f)]
+                  [hah (make-hash)])
+              (if ihr
+                  (begin
+                    (for ([e ihr]
+                          #:when (hash-ref e 'file_path #f))
+                      (let* ([msg (hash-ref e 'message)]
+                             [l (hash-ref! hah msg '())])
+                        (hash-set! hah msg (cons (hash-ref e 'file_path) l))))
+                    (for/list
+                      ([k (sort (hash-keys hah) string<?)])
+                      (string-append k "\n    " (string-join (sort (hash-ref hah k) string<?) "\n    "))))
+                  '()))))
+
 (define (paths-report)
   (for-each (λ (m)
               (displayln
@@ -857,6 +885,8 @@ note of course that you don't get dynamic binding with version since it is not t
                            unclassified_errors
                            submission_errors
                            unclassified_stages
+                           ; path metadata
+                           errors
                            )))))
      (send item open))))
 
@@ -903,6 +933,7 @@ note of course that you don't get dynamic binding with version since it is not t
 ; reminder, use uuids as keys because the struct hash changes when the dataset list is refreshed
 (define jviews (make-hash))
 (define uuid-json-hash (make-hash))
+(define uuid-path-meta-json-hash (make-hash))
 
 (define (dataset-jview! dataset #:update [update #f])
   (let* ([uuid (id-uuid dataset)]
@@ -952,9 +983,17 @@ note of course that you don't get dynamic binding with version since it is not t
                                          ; XXX false, there are still performance issues
                                          #:when (member k include-keys))
                                 (values k v))])
+                  (let* ([path-meta-path (dataset-export-path-metadata-latest-path dataset)]
+                         [path-meta-json (and path-meta-path (path->json path-meta-path))])
+                    (when (and path-meta-json (hash-ref path-meta-json 'path_error_report #f))
+                      (set! jhash
+                        (hash-set jhash '|#/path-metadata|
+                                  (hash 'path_error_report (hash-ref path-meta-json 'path_error_report)
+                                        'errors (hash-ref path-meta-json 'errors)))))
+                    (when lp
+                      (hash-set! uuid-path-meta-json-hash uuid path-meta-json)
+                      (hash-set! uuid-json-hash uuid json)))
                   (hash-set! jviews uuid jview-inner)
-                  (when lp
-                    (hash-set! uuid-json-hash uuid json))
                   (set-jview-json! jview-inner jhash)
                   jview-inner)))])
     jview))
@@ -1037,6 +1076,7 @@ note of course that you don't get dynamic binding with version since it is not t
   (dataset-log-path ds)
   (dataset-latest-log-path ds)
   (dataset-export-latest-path ds)
+  (dataset-export-path-metadata-latest-path ds)
   (dataset-cleaned-latest-path ds)
   (dataset-project-name ds)
   (fetch-export-dataset ds)
@@ -1077,12 +1117,20 @@ note of course that you don't get dynamic binding with version since it is not t
      (if pair (cadr pair) "?"))
    (define (dataset-export-latest-path ds)
      (let* ([uuid (id-uuid ds)]
-            [lp (build-path (path-export-datasets)
-                            uuid "LATEST" "curation-export.json")]
+            [lp (build-path
+                 (path-export-datasets)
+                 uuid "LATEST" "curation-export.json")]
             #;
             [asdf (println lp)]
             [qq (and (file-exists? lp) (resolve-path lp))])
        ; FIXME not quite right?
+       qq))
+   (define (dataset-export-path-metadata-latest-path ds)
+     (let* ([uuid (id-uuid ds)]
+            [lp (build-path
+                 (path-export-datasets)
+                 uuid "LATEST" "path-metadata.json")]
+            [qq (and (file-exists? lp) (resolve-path lp))])
        qq))
    (define (dataset-cleaned-latest-path ds)
      (let* ([uuid (id-uuid ds)]
@@ -1246,6 +1294,8 @@ note of course that you don't get dynamic binding with version since it is not t
                (println (format "cleaning metadata files FAILED for ~a" (dataset-id ds)))))))))
    (define (dataset-latest-prod-url ds)
      (string-append (url-prod-datasets) "/" (id-uuid ds) "/LATEST/curation-export.json"))
+   (define (dataset-path-meta-latest-prod-url ds)
+     (string-append (url-prod-datasets) "/" (id-uuid ds) "/LATEST/path-metadata.json"))
    (define (load-remote-json ds)
      (let* ([uuid (id-uuid ds)]
             [hr-jview (hash-ref jviews uuid #f)]
@@ -1261,8 +1311,16 @@ note of course that you don't get dynamic binding with version since it is not t
                               ; XXX false, there are still performance issues
                               #:when (member k include-keys))
                      (values k v))])
-       (hash-set! jviews uuid jview-inner)
+       (let* ([path-meta-url (dataset-path-meta-latest-prod-url ds)]
+              [path-meta-json (url->json path-meta-url)])
+         (hash-set! uuid-path-meta-json-hash uuid path-meta-json)
+         (when (and path-meta-json (hash-ref path-meta-json 'path_error_report #f))
+           (set! jhash
+             (hash-set jhash '|#/path-metadata|
+                       (hash 'path_error_report (hash-ref path-meta-json 'path_error_report)
+                             'errors (hash-ref path-meta-json 'errors))))))
        (hash-set! uuid-json-hash uuid json)
+       (hash-set! jviews uuid jview-inner)
        (set-jview-json! jview-inner jhash)
        (set-button-status-for-dataset ds)
        jview-inner))
@@ -1428,13 +1486,19 @@ note of course that you don't get dynamic binding with version since it is not t
       (or (println (list tda tdb nda ndb)) #t)
       (or (not (or (symbol<? tda tdb) (symbol=? tda tdb)))
           (and (eq? tda tdb)
-               (or (and (eq? tda 'value)
+               (or (and (or (eq? tda 'value) (eq? tda 'hash))
                         ; really not sure how these can possibly show up at the same level but whatever
                         (or (and (symbol? nda)
                                  (symbol? ndb)
                                  #;
                                  (apply string<? (map symbol->string (list nda ndb)))
-                                 (symbol<? nda ndb))
+                                 (if (and (eq? tda 'hash) jview-sort-new)
+                                     (let ([ka (hash-ref key-rank-hash nda #f)]
+                                           [kb (hash-ref key-rank-hash ndb #f)])
+                                       (if (and ka kb)
+                                           (< ka kb)
+                                           (symbol<? nda ndb)))
+                                     (symbol<? nda ndb)))
                             (and (integer? nda)
                                  (integer? ndb)
                                  (< nda ndb)))))
@@ -1483,6 +1547,7 @@ note of course that you don't get dynamic binding with version since it is not t
               (send button-open-export-json-file enable export-enable?)
               (send button-open-export-ipython enable export-enable?)
               ; export dependent reports
+              (send button-fs-report enable cached-json?)
               (send button-paths-report enable cached-json?)
               (send button-manifest-report enable cached-json?)
               (send button-open-export-json-view enable cached-json?)
@@ -1731,6 +1796,9 @@ note of course that you don't get dynamic binding with version since it is not t
   (when show
     (send frame-upload show #t)))
 
+(define (cb-fs-report o e #:show [show #t])
+  (cb-x-report o e 'fs #:show show))
+
 (define (cb-paths-report o e #:show [show #t])
   (cb-x-report o e 'paths #:show show))
 
@@ -1744,6 +1812,7 @@ note of course that you don't get dynamic binding with version since it is not t
                  report-frame
                  report-edcanv)
                 (case type
+                  [(fs) (values fs-report frame-fs-report edcanv-fs-rep)]
                   [(paths) (values paths-report frame-paths-report edcanv-path-rep)]
                   [(manifest) (values manifest-report frame-manifest-report edcanv-man-rep)]
                   [(json-view) (values current-json-view-text frame-json-view edcanv-json-view)]
@@ -2218,22 +2287,37 @@ switch to that"
                                             [callback cb-open-dataset-sds-viewer]
                                             [parent panel-validate-mode]))
 
-(define button-manifest-report
+(define (make-button-manifest-report parent)
   (new button%
        [label "Manifest Rep"] ; used sometimes
        [callback cb-manifest-report]
-       [parent panel-validate-mode]))
+       [parent parent]))
 
-(define button-paths-report
+(define button-manifest-report (make-button-manifest-report panel-validate-mode))
+
+(define (make-button-paths-report parent)
   (new button%
        [label "Paths Report"] ; used sometimes
        [callback cb-paths-report]
-       [parent panel-validate-mode]))
+       [parent parent]))
 
-(define button-clean-metadata-files (new button%
-                                         [label "Clean Metadata"] ; 5 star
-                                         [callback cb-clean-metadata-files]
-                                         [parent panel-validate-mode]))
+(define button-paths-report (make-button-paths-report panel-validate-mode))
+
+(define (make-button-fs-report parent)
+  (new button%
+       [label "FS Report"]
+       [callback cb-fs-report]
+       [parent parent]))
+
+(define button-fs-report (make-button-fs-report panel-validate-mode))
+
+(define (make-button-clean-metadata-files parent)
+  (new button%
+       [label "Clean Metadata"] ; 5 star
+       [callback cb-clean-metadata-files]
+       [parent parent]))
+
+(define button-clean-metadata-files (make-button-clean-metadata-files panel-validate-mode))
 
 (define all-button-upload-changes '())
 (define (make-button-upload-changes parent)
@@ -2992,11 +3076,15 @@ switch to that"
 
 (define frame-paths-report (make-frame-report "sparcur report paths"))
 
+(define frame-fs-report (make-frame-report "sparcur report fs"))
+
 (define frame-json-view (make-frame-report "sparcur json view"))
 
 (define edcanv-man-rep (send frame-manifest-report get-canvas))
 
 (define edcanv-path-rep (send frame-paths-report get-canvas))
+
+(define edcanv-fs-rep (send frame-fs-report get-canvas))
 
 (define edcanv-json-view (send frame-json-view get-canvas))
 
