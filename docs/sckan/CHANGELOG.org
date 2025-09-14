@@ -24,7 +24,7 @@
 - TODO :: resolve inferred equiv issues between para/sym populations
   with identical anatomy, e.g. =aacar-{7,8}{a,v}=, =kblad-{1,2}=
 - TODO :: resolve apinat-simple missing inferred subClass cases
-* RC 2025-09-13
+* RC 2025-09-14
 - NPO NLP liver:132 liver:121 change =ilxtr:hasAxonPresynapticElementIn=
   to =ilxtr:hasForwardConnectionPhenotype= when the object is a cell type.
 - NPO NLP sync all sheets

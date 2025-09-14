@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 4002eb0fecda3407acfc2dbf0d607fa20819aeccbc7fd8b18a134d60d5ad0309; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: aebff222506408f41a29fefb8c39418dd3c98ac9ce8dc9c9efe42102bbfe3400; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -135,6 +135,7 @@ Yes this is make."
    (py-x)
    "-m"
    (if sckan-release "pyontutils.qnamefix" "ttlser.ttlfmt")
+   "--id-swap"
    merged-path))
 
 (defun get-ontology-py (iri merged-path)
@@ -339,6 +340,7 @@ culled.write(\"%s\")" iri merged-path)))
         (sml-path "data/sparc-missing-labels.ttl")
 
         (ch-path "data/chebi.ttl")
+        (tx-path "data/taxslim.ttl")
         (ub-path "data/uberon.ttl")
         (em-path "data/emapa.ttl")
         (ap-path "data/approach.ttl")
@@ -413,6 +415,9 @@ culled.write(\"%s\")" iri merged-path)))
     (unless-file-exists-p ch-path ; doesn't need to be reasoned
       (url-copy-file-safe
        (concat rguc "SciCrunch/NIF-Ontology/" ont-git-ref "/ttl/generated/chebislim.ttl") ch-path))
+    ;; taxslim
+    (unless-file-exists-p tx-path
+      (get-ontology "http://purl.obolibrary.org/obo/ncbitaxon/subsets/taxslim.owl" tx-path))
     ;; uberon
     (unless-file-exists-p ub-path
       (get-ontology "http://purl.obolibrary.org/obo/uberon.owl" ub-path))
@@ -443,33 +448,38 @@ culled.write(\"%s\")" iri merged-path)))
     ;; 7
     (unless (or no-load (file-exists-p journal-path))
       ;; FIXME if this ever runs as an update instead of load it might be tricky
-      ;; FIXME remove the path if we fail on this step?
-      (let (backtrace-on-error-noninteractive)
-        (apply
-         #'run-command
-         `("blazegraph-runner" ,(concat "--journal=" journal-path)
-           "load" "--use-ontology-graph" ,p-path ,ce-path
-           ;;"http://purl.obolibrary.org/obo/uberon.owl"
-           ,ch-path
-           ,em-path
-           ,ub-path
-           ,ap-path
-           ,me-path
-           ;;,npo-path
-           ,npo-merged-path
-           ,mis-path
-           ,sct-path
+      (condition-case err
+          (let (backtrace-on-error-noninteractive)
+            (apply
+             #'run-command
+             `("blazegraph-runner" ,(concat "--journal=" journal-path)
+               "load" "--use-ontology-graph" ,p-path ,ce-path
+               ;;"http://purl.obolibrary.org/obo/uberon.owl"
+               ,ch-path
+               ,em-path
+               ,tx-path
+               ,ub-path
+               ,ap-path
+               ,me-path
+               ;;,npo-path
+               ,npo-merged-path
+               ,mis-path
+               ,sct-path
 
-           ,em-r-path
-           ,ub-r-path
-           ,me-r-path
-           ;;,npo-r-path
-           ,npo-merged-r-path
-           ,mis-r-path
+               ,em-r-path
+               ,ub-r-path
+               ,me-r-path
+               ;;,npo-r-path
+               ,npo-merged-r-path
+               ,mis-r-path
 
-           ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)
+               ,@(mapcar (lambda (p) (concat "data/" p)) apinat-paths)
 
-           ,prov-path))))))
+               ,prov-path)))
+        (error
+         (when (file-exists-p journal-path)
+           (delete-file journal-path))
+         (signal (car err) (cdr err)))))))
 
 (defun step-add-prefixes-file ()
   "Get or create the latest prefix specification file."
