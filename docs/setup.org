@@ -16,7 +16,9 @@ As of =2022-12-21= the information in this file is somewhat out of date.
 Corrections for better and more up-to-date workflows have been made, but
 most users should not attempt to follow this guide unless they need to
 replicate the entirety of the primary development environment. There are
-now better options tailored to specific use cases.
+now better options tailored to specific use cases. For example see the
+curation viewer [[../sparcur_internal/sparcur/README.org][README]] for a
+focused installation guide and then return here for configuration.
 
 Reference build environments are linked in the [[#docker][docker]] section.
 If you need to create a development environment on a new system it is best
@@ -60,33 +62,42 @@ For managing a windows development/curation environment I highly recommend using
 the [[https://chocolatey.org/][chocolatey]] package manager.
 [[https://chocolatey.org/install#install-with-powershellexe][Install chocolatey]].
 
+Core curation viewer dependencies.
+#+begin_src powershell :exports code :eval never
+choco install `
+emacs `
+poshgit `
+python `
+racket
+#+end_src
+
+Helpful curation tools.
 #+begin_src powershell :exports code :eval never
 choco install `
 autohotkey `
-clisp `
-emacs `
 firefox `
 GoogleChrome `
-nodejs `
-poshgit `
+libreoffice `
 procexp `
-python `
-racket `
 rsync `
 vim `
+imagej `
+inkscape `
+powertoys
+#+end_src
+
+Additional runtimes for e.g. ontology development or sparcur development.
+#+begin_src powershell :exports code :eval never
+choco install `
+clisp `
+sbcl `
+nodejs `
 wsl2 `
 wsl-ubuntu-2204 `
 vcxsrv `
 docker-desktop `
-docker `
-imagej `
-powertoys
-
+docker-cli
 #+end_src
-
-# visualstudio2019community `
-# When installing Visual Studio you will likely need to install
-# additional tools via the visual studio installer.
 
 Update system Path to include packages that don't add themselves.
 This needs to be run as administrator.
@@ -294,7 +305,7 @@ rm brew-install.sh
 brew analytics off
 
 brew install --cask \
-emacs \
+emacs-app \
 firefox \
 gimp \
 google-chrome \
@@ -317,10 +328,12 @@ tree
 # additional packages
 
 brew install --cask \
-docker \
+docker-desktop \
 mactex
 
 brew install \
+docker \
+docker buildx \
 hunspell \
 pandoc \
 postgres \
@@ -996,7 +1009,9 @@ auth-variables:
   patch-config:
   resources:
   scigraph-api: https://scigraph.olympiangods.org/scigraph
+  #scigraph-api: https://scicrunch.org/api/1/sparc-scigraph  # backup if olympiangods is down
   scigraph-api-key:
+    path: scicrunch api key
   scigraph-graphload:
   scigraph-services:
   zip-location:
@@ -1035,6 +1050,7 @@ auth-variables:
   remote-organizations:
     - N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0  # sparc
     - N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f  # rejoin
+    - N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae  # precision
   resources:
   sparse-limit:
 #+end_src
@@ -1047,29 +1063,34 @@ Secrets template for full development setup.
 #+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
 pennsieve:
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
-    key: *replace-me-with:your-pennsieve-api-key*
-    secret: *replace-me-with:your-pennsieve-api-secret*
+    key: <rw:key>
+    secret: <rw:sec>
+  N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f:
+    key: <rw:key>
+    secret: <rw:sec>
+  N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae:
+    key: <rw:key>
+    secret: <rw:sec>
 google:
   api:
-    creds-file: *replace-me-with:/path/to/creds-file.json*
+    saro: <rw:service-account-read-only.json>
     store-file: google-api-token-rw.pickle
     store-file-readonly: google-api-token.pickle
   sheets:
-    sparc-consistency: *replace-me-with:document-hash-id*
-    sparc-master: *replace-me-with:document-hash-id*
-    sparc-affiliations: *replace-me-with:document-hash-id*
-    sparc-field-alignment: *replace-me-with:document-hash-id*
-    spc-reports: *replace-me-with:document-hash-id*
-    spc-reports-preview: *replace-me-with:document-hash-id*
-    anno-tags: *replace-me-with:document-hash-id*
+    sparc-affiliations: <rw:docid>
+    sparc-field-alignment: <rw:docid>
+    anno-tags: <rw:docid>
 hypothesis:
   api:
-    user-default-hypothesis: *replace-me-with:your-hypothesis-api-key*
+    user-default-hypothesis: <rw:key>
   group:
-    sparc-curation: *replace-me-with:sparc-curation-group-id*
+    sparc-curation: <rw:groupid>
 protocols-io:
   api:
-    client-token: replace-with-token
+    client-token: <rw:token>
+scicrunch:
+  api:
+    key: <rw:key>
 #+end_src
 
 Secrets template for minimal viewer setup.
@@ -1080,21 +1101,26 @@ Secrets template for minimal viewer setup.
 #+begin_src yaml
 pennsieve:
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
-    key: *replace-me-with:your-pennsieve-api-key*
-    secret: *replace-me-with:your-pennsieve-api-secret*
+    key: <rw:key>
+    secret: <rw:sec>
+  N:organization:f08e188e-2316-4668-ae2c-8a20dc88502f:
+    key: <rw:key>
+    secret: <rw:sec>
+  N:organization:98d6e84c-9a27-48f8-974f-93c0cca15aae:
+    key: <rw:key>
+    secret: <rw:sec>
 google:
   api:
-    saro: *replace-me-with:path-to-service-account.json*
+    saro: <rw:service-account-read-only.json>
   sheets:
-    sparc-field-alignment: *replace-me-with:document-hash-id*
-    sparc-affiliations: *replace-me-with:document-hash-id*
-    anno-tags: *replace-me-with:document-hash-id*
+    sparc-field-alignment: <rw:docid>
+    sparc-affiliations: <rw:docid>
 protocols-io:
-  # FIXME robobrowser not a dependency in some setup.py
-  # FIXME robobrowser has a broken werkzeug import that has to be fixed manually
   api:
-    creds-file: client_secret_protocols.io.json
-    store-file: protocols-io-api-token-rw.pickle
+    client-token: <rw:token>
+scicrunch:
+  api:
+    key: <rw:key>
 #+end_src
 
 Secrets template for minimal SODA =sparcur.simple.retrieve= setup.
@@ -1102,8 +1128,8 @@ Secrets template for minimal SODA =sparcur.simple.retrieve= setup.
 #+begin_src yaml
 pennsieve:
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
-    key: *replace-me-with:your-pennsieve-api-key*
-    secret: *replace-me-with:your-pennsieve-api-secret*
+    key: <rw:key>
+    secret: <rw:sec>
 #+end_src
 *** Bootstrap code
 :PROPERTIES:
