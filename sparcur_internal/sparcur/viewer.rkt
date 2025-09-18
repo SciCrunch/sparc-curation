@@ -82,6 +82,7 @@ note of course that you don't get dynamic binding with version since it is not t
 
 (define running? #t) ; don't use parameter, this needs to be accessible across threads
 (define update-running? #f)
+(define python-first-time? #f)
 
 (define debug-push (make-lexical-parameter #f))
 (define current-git-commit-hash (make-lexical-parameter #f))
@@ -117,6 +118,9 @@ note of course that you don't get dynamic binding with version since it is not t
 (define allow-update?
   ; "don't set this, it should only be used to keep things in sync with the config"
   (make-lexical-parameter))
+
+(define (str-not-set) "<not-set>")
+(define (str-path-does-not-exist) "<no-file-at-path>")
 
 (define jview-sort-new #t)
 (define key-rank-hash
@@ -518,19 +522,16 @@ note of course that you don't get dynamic binding with version since it is not t
     (oa-user-config-path)))
 
 (define (init-paths!)
-  (define missing-user #f)
-  (define missing-secrets #f)
   (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
                   [oa-current-auth-config (oa-read-auth-config)]
                   [oa-current-user-config
-                   (with-handlers
-                     ([exn? (λ (e) (set! missing-user #t) #hash())])
-                   (oa-read-user-config))]
+                   (with-handlers ([exn? (λ (e) (set! python-first-time? #t) #hash())])
+                     (oa-read-user-config))]
                   [oa-current-secrets
-                   (with-handlers ([exn? (λ (e) (set! missing-secrets #t) #hash())])
+                   (with-handlers ([exn? (λ (e) #hash())])
                      (oa-read-secrets))])
-    (unless (or missing-user missing-secrets)
-      (init-paths-int!))))
+    (init-paths-int!)
+    ))
 
 (define (init-paths-int!)
   "initialize or reset the file system paths to cache, export, and source directories"
@@ -569,7 +570,9 @@ note of course that you don't get dynamic binding with version since it is not t
   (path-export-datasets (build-path (path-export-dir) "datasets")))
 
 (define (save-config!)
-  (with-output-to-file (path-config)
+  (define pc (path-config))
+  (ensure-directory! (simplify-path (build-path pc 'up) #f))
+  (with-output-to-file pc
     #:exists 'replace
     (λ () (pretty-write
            (list
@@ -590,15 +593,24 @@ note of course that you don't get dynamic binding with version since it is not t
 (define (load-config!)
   (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
                   [oa-current-auth-config (oa-read-auth-config)]
-                  [oa-current-user-config (oa-read-user-config)]
-                  [oa-current-secrets (oa-read-secrets)])
+                  [oa-current-user-config
+                   (with-handlers ([exn? (λ (e) (set! python-first-time? #t) #hash())])
+                     (oa-read-user-config))]
+                  [oa-current-secrets
+                   (with-handlers ([exn? (λ (e) #hash())])
+                     (oa-read-secrets))])
     (load-config-int!)))
+
+(define (set-value-or-alt obj value alt)
+  (send obj set-value (or value alt)))
 
 (define (load-config-int!)
   ; TODO various configuration options
   (let ([org (oa-get (oa-current-auth-config) 'remote-organization)] ; TODO make sure in orgs
         [orgs (oa-get (oa-current-auth-config) 'remote-organizations)]
-        [never-update (oa-get (oa-current-auth-config) 'never-update)])
+        [never-update (oa-get (oa-current-auth-config) 'never-update)]
+        [not-set (str-not-set)]
+        [path-does-not-exist (str-path-does-not-exist)])
     (allow-update? (not never-update))
     (send menu-item-update-viewer enable (allow-update?))
     (let* ([pc (path-config)]
@@ -618,14 +630,14 @@ note of course that you don't get dynamic binding with version since it is not t
       (let ([rok '()] [missing-keys '()])
         (for ([o (or orgs (list org))])
           ; FIXME TODO append org name
-          (send choice-prefs-remote-organization append (*->string o))
+          (send choice-prefs-remote-organization append (if o (*->string o) not-set))
           (set! rok
             (cons
              (cons
               ; FIXME confusing error message from a make-string contract if the key or secret are too short
-              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) "not set")])
+              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) not-set)])
                 (obfus (*->string (oa-get-sath 'pennsieve o 'key))))
-              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) "not set")])
+              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) not-set)])
                 (obfus (*->string (oa-get-sath 'pennsieve o 'secret)))))
              rok)))
         (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
@@ -635,12 +647,18 @@ note of course that you don't get dynamic binding with version since it is not t
       #;
       (send text-prefs-path-? set-value "egads")
       (send text-prefs-path-config set-value (path->string (path-config)))
-      (send text-prefs-path-user-config set-value (oa-user-config-path))
-      (send text-prefs-path-idlib-cfg set-value (python-module-user-config-path "idlib"))
+      (set-value-or-alt text-prefs-path-user-config (oa-user-config-path) path-does-not-exist)
+      (set-value-or-alt text-prefs-path-idlib-cfg (python-module-user-config-path "idlib") path-does-not-exist)
       (send text-prefs-path-ontqu-cfg set-value
             (python-module-user-config-path "ontquery.plugins.services"))
-      (send text-prefs-path-pyont-cfg set-value (python-module-user-config-path "pyontutils"))
-      (send text-prefs-path-secrets set-value (oa-secrets-path))
+      (set-value-or-alt
+       text-prefs-path-ontqu-cfg (python-module-user-config-path "ontquery.plugins.services")
+       path-does-not-exist)
+      (set-value-or-alt text-prefs-path-pyont-cfg (python-module-user-config-path "pyontutils") path-does-not-exist)
+      (set-value-or-alt
+       text-prefs-path-secrets
+       (with-handlers ([exn? (lambda (e) not-set)]) (oa-secrets-path)) ; hash-ref failure will produce an error
+       path-does-not-exist)
       (send text-prefs-path-data set-value (path->string (path-source-dir)))
       (send text-prefs-path-logs set-value (path->string (path-log-dir)))
       (let* ([config-exists (assoc 'viewer-mode cfg)]
@@ -663,8 +681,12 @@ note of course that you don't get dynamic binding with version since it is not t
   ; minimize disk reads
   (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
                   [oa-current-auth-config (oa-read-auth-config)]
-                  [oa-current-user-config (oa-read-user-config)]
-                  [oa-current-secrets (oa-read-secrets)])
+                  [oa-current-user-config
+                   (with-handlers ([exn? (λ (e) (set! python-first-time? #t) #hash())])
+                     (oa-read-user-config))]
+                  [oa-current-secrets
+                   (with-handlers ([exn? (λ (e) #hash())])
+                     (oa-read-secrets))])
     (init-paths-int!)
     (load-config-int!)))
 
@@ -1575,7 +1597,9 @@ note of course that you don't get dynamic binding with version since it is not t
 
 (define (make-cb-open-path text-field)
   (λ (o e)
-    (xopen-path (send text-field get-value))))
+    (let ([path (send text-field get-value)])
+      (unless (or (string=? path (str-not-set)) (string=? path (str-path-does-not-exist)))
+        (xopen-path path)))))
 
 (define (cb-dataset-selection obj event)
   (let ([event-type (if event (send event get-event-type) #f)])
@@ -1734,11 +1758,20 @@ note of course that you don't get dynamic binding with version since it is not t
   (when show?
     (frame-to-front frame)))
 
+(define (path-to-program path)
+  ; in the unlikely event that xdg-open is not on the system fail over
+  ; to something to avoid an error
+  (define text-program (for/or ([p '("emacs" "vim" "nano" "drracket")]) (find-executable-path p)))
+  #; ; TODO if can't get xdg-open on some system maybe expand this a bit
+  (define ext (path-get-extension path))
+  text-program)
+
 (define (xopen-path path)
   (let* ([is-win? #f]
          [command (find-executable-path
                   (case (system-type 'os*)
-                    ((linux) "xdg-open") ; if firefox complains, make sure it matches firefox not firefox-bin xdg-settings get default-web-browser
+                    ((linux) (or (find-executable-path "xdg-open") ; if firefox complains, make sure it matches firefox not firefox-bin xdg-settings get default-web-browser
+                                 (path-to-program path)))
                     ((macosx) "open")
                     ((windows) (set! is-win? #t) "explorer.exe") ; requires an associated file type
                     (else (error "don't know xopen command for this os"))))])
@@ -1915,30 +1948,31 @@ the list to the top and if there is only a single match select and
 switch to that"
   (define text (string-trim (send obj get-value)))
   (define list-box (send obj list-box))
-  (thread
-   (thunk
-    ; adding this helps reduce the number of calls to set-datasets-view!
-    ; and the semaphore allows the sleep time to be short enough that we
-    ; don't have to worry about weird ordering issues
-    (sleep 0.08)
-    (call-with-semaphore
-     search-semaphore
+  (when (current-datasets)
+    (thread
      (thunk
-      (let ([wat (string-trim (send obj get-value))])
-        ; don't run this if the text has changed in the other thread
-        ; without this you get non deterministic behavior when typing
-        ; and sometimes the shorter result will supplant the long
-        (if (= 0 (string-length text))
-            (when (not (equal? (current-datasets) (current-datasets-view)))
-              (set-datasets-view! list-box (current-datasets)))
-            (let ([matching (match-datasets text (current-datasets))])
-              (when (string=? text wat)
-                (unless (or (null? matching)
-                            (eq? matching (or (current-datasets-view) (current-datasets))))
-                  (set-datasets-view! list-box matching)
-                  (when (= (length matching) 1)
-                    (send list-box set-selection 0)
-                    (cb-dataset-selection list-box #f))))))))))))
+      ; adding this helps reduce the number of calls to set-datasets-view!
+      ; and the semaphore allows the sleep time to be short enough that we
+      ; don't have to worry about weird ordering issues
+      (sleep 0.08)
+      (call-with-semaphore
+       search-semaphore
+       (thunk
+        (let ([wat (string-trim (send obj get-value))])
+          ; don't run this if the text has changed in the other thread
+          ; without this you get non deterministic behavior when typing
+          ; and sometimes the shorter result will supplant the long
+          (if (= 0 (string-length text))
+              (when (not (equal? (current-datasets) (current-datasets-view)))
+                (set-datasets-view! list-box (current-datasets)))
+              (let ([matching (match-datasets text (current-datasets))])
+                (when (string=? text wat)
+                  (unless (or (null? matching)
+                              (eq? matching (or (current-datasets-view) (current-datasets))))
+                    (set-datasets-view! list-box matching)
+                    (when (= (length matching) 1)
+                      (send list-box set-selection 0)
+                      (cb-dataset-selection list-box #f)))))))))))))
 
 (define (cb-power-user o e)
   ; this can be triggered by keypress as well so cannot use o
@@ -3242,8 +3276,16 @@ switch to that"
   (send panel reparent panel-ds-actions)
   (current-mode-panel panel))
 
+(define (python-first-time)
+  (when (let ([status #f])
+          (with-output-to-string
+            (thunk (set! status (apply py-system* (python-mod-args "sparcur.cli" "--help")))))
+          status)
+    (init-paths-load-config!)))
+
 (module+ main
   (init-paths-load-config!)
+  (when python-first-time? (python-first-time))
   (define ok-to-fetch
     (and (null? (missing-remote-org-keys))
          (not (null? (remote-org-keys)))))
@@ -3269,5 +3311,4 @@ switch to that"
       (begin
         (when (not (null? (missing-remote-org-keys)))
           (displayln (cons "missing remote org keys:" (missing-remote-org-keys))))
-        (displayln "Configuration incomplete please check Preferences"))
-    ))
+        (displayln "Configuration incomplete please check Preferences"))))
