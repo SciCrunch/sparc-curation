@@ -108,7 +108,8 @@ note of course that you don't get dynamic binding with version since it is not t
 (define current-jview (make-lexical-parameter))
 (define current-mode-panel ; TODO read from config/history
   (make-lexical-parameter))
-(define remote-org-keys (make-lexical-parameter))
+(define remote-org-keys (make-lexical-parameter '()))
+(define missing-remote-org-keys (make-lexical-parameter '()))
 
 (define overmatch (make-parameter #f))
 (define power-user? (make-parameter #f))
@@ -517,11 +518,19 @@ note of course that you don't get dynamic binding with version since it is not t
     (oa-user-config-path)))
 
 (define (init-paths!)
+  (define missing-user #f)
+  (define missing-secrets #f)
   (parameterize* ([oa-current-auth-config-path (python-mod-auth-config-path "sparcur")]
                   [oa-current-auth-config (oa-read-auth-config)]
-                  [oa-current-user-config (oa-read-user-config)]
-                  [oa-current-secrets (oa-read-secrets)])
-    (init-paths-int!)))
+                  [oa-current-user-config
+                   (with-handlers
+                     ([exn? (λ (e) (set! missing-user #t) #hash())])
+                   (oa-read-user-config))]
+                  [oa-current-secrets
+                   (with-handlers ([exn? (λ (e) (set! missing-secrets #t) #hash())])
+                     (oa-read-secrets))])
+    (unless (or missing-user missing-secrets)
+      (init-paths-int!))))
 
 (define (init-paths-int!)
   "initialize or reset the file system paths to cache, export, and source directories"
@@ -606,7 +615,7 @@ note of course that you don't get dynamic binding with version since it is not t
            (substring str (- ls ends) ls))))
       ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
       (send choice-prefs-remote-organization clear)
-      (let ([rok '()])
+      (let ([rok '()] [missing-keys '()])
         (for ([o (or orgs (list org))])
           ; FIXME TODO append org name
           (send choice-prefs-remote-organization append (*->string o))
@@ -614,11 +623,14 @@ note of course that you don't get dynamic binding with version since it is not t
             (cons
              (cons
               ; FIXME confusing error message from a make-string contract if the key or secret are too short
-              (obfus (*->string (oa-get-sath 'pennsieve o 'key)))
-              (obfus (*->string (oa-get-sath 'pennsieve o 'secret))))
+              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) "not set")])
+                (obfus (*->string (oa-get-sath 'pennsieve o 'key))))
+              (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) "not set")])
+                (obfus (*->string (oa-get-sath 'pennsieve o 'secret)))))
              rok)))
         (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
         (remote-org-keys (reverse rok))
+        (missing-remote-org-keys missing-keys)
         (cb-select-remote-org choice-prefs-remote-organization #f))
       #;
       (send text-prefs-path-? set-value "egads")
@@ -3232,17 +3244,30 @@ switch to that"
 
 (module+ main
   (init-paths-load-config!)
-  (define result (populate-datasets)) ; slow if not cached, but thus only on the very first run
+  (define ok-to-fetch
+    (and (null? (missing-remote-org-keys))
+         (not (null? (remote-org-keys)))))
+  (define result
+    (when ok-to-fetch
+      (populate-datasets))) ; slow if not cached, but thus only on the very first run
   (send frame-main show #t) ; show this first so that users know something is happening
   (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
   (send text-search-box focus)
   ; do this last so that if there is a 0th dataset the time to render the hierlist isn't obtrusive
-  (send lview select 0) ; first time to ensure current-dataset always has a value XXX callback is NOT invoked using select so we call it manually here
+  (when ok-to-fetch
+    (send lview select 0)) ; first time to ensure current-dataset always has a value XXX callback is NOT invoked using select so we call it manually here
   (void (cb-dataset-selection lview #f))
   (void (thread (thunk (set-commit-hash!))))
-  (void (thread (thunk (refresh-dataset-metadata text-search-box)))) ; refresh datasets in a separate thread to avoid delaying startup
-  (unless (eq? (system-type) 'unix)
-    ; do NOT run this when gtk is the windowing toolkit it will eat up
-    ; tens of gigs of memory, windows and macos don't have the issue
-    ; it also takes multiple minutes to run due to all the allocations?
-    (render-datasets)))
+  (if ok-to-fetch
+      (begin
+        (thread (thunk (refresh-dataset-metadata text-search-box))) ; refresh datasets in a separate thread to avoid delaying startup
+        (unless (eq? (system-type) 'unix)
+          ; do NOT run this when gtk is the windowing toolkit it will eat up
+          ; tens of gigs of memory, windows and macos don't have the issue
+          ; it also takes multiple minutes to run due to all the allocations?
+          (render-datasets)))
+      (begin
+        (when (not (null? (missing-remote-org-keys)))
+          (displayln (cons "missing remote org keys:" (missing-remote-org-keys))))
+        (displayln "Configuration incomplete please check Preferences"))
+    ))
