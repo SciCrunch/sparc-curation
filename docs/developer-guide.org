@@ -4387,9 +4387,13 @@ def main(id=None, **kwargs):
         from sparcur.config import auth
         from importlib import metadata
         d = metadata.distribution(sparcur.__package__)
-        rps = [p for p in [aug.RepoPath(d._path) for d in d.discover()] if p.working_dir]
-        setups = [p for p in [p.parent / 'setup.py' for p in rps] if p.exists()]
-        wds = sorted(set([p.working_dir for p in rps]))
+        ind = 8 if sys.platform == 'win32' else 7
+        packs = list(d.discover())
+        alt = [p for p in [aug.RepoPath(d.origin.url[ind:]).resolve() for d in packs if d.origin] if p.working_dir]
+        rps = [p.parent for p in [aug.RepoPath(d._path).resolve() for d in packs] if p.working_dir]
+        srps = set(alt) | set(rps)
+        setups = [p for p in [p / 'setup.py' for p in srps] if p.exists()]
+        wds = sorted(set([p.working_dir for p in srps]))
         never_update = auth.get('never-update')
         pretend=ik('pretend') or never_update
         if pretend:
