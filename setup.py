@@ -5,10 +5,15 @@ from pathlib import Path
 from setuptools import setup
 
 
+def abspath(relpath, _dir=os.path.dirname(__file__)):
+    return os.path.join(_dir, relpath)
+
+
 def find_version(filename):
+    abs_filename = abspath(filename)
     _version_re = re.compile(r"__version__ = ['\"](.*)['\"]")
     last = None  # match python semantics
-    for line in open(filename):
+    for line in open(abs_filename):
         version_match = _version_re.match(line)
         if version_match:
             last = version_match.group(1)
@@ -22,6 +27,7 @@ __version__ = find_version('sparcur/__init__.py')
 def tangle_files(*files):
     """ emacs org babel tangle blocks to files for release """
 
+    abs_files = [abspath(f.replace('/', os.path.sep)) for f in files]
     argv = [
         'emacs',
         '--batch',
@@ -30,9 +36,8 @@ def tangle_files(*files):
         '--load', 'org',
         '--load', 'ob-shell',
         '--load', 'ob-python',
-     ] + [arg
-          for f in files
-          for arg in ['--eval', f'"(org-babel-tangle-file \\"{f}\\")"']]
+        '--eval', '"(while argv (org-babel-tangle-file (pop argv)))"',
+     ] + abs_files
 
     os.system(' '.join(argv))
 
@@ -68,7 +73,6 @@ setup(name='sparcur',
       license='MIT',
       classifiers=[
           'Development Status :: 3 - Alpha',
-          'License :: OSI Approved :: MIT License',
           'Programming Language :: Python :: 3.7',
           'Programming Language :: Python :: 3.8',
           'Programming Language :: Python :: 3.9',
@@ -76,6 +80,7 @@ setup(name='sparcur',
           'Programming Language :: Python :: 3.11',
           'Programming Language :: Python :: 3.12',
           'Programming Language :: Python :: 3.13',
+          'Programming Language :: Python :: 3.14',
           'Programming Language :: Python :: Implementation :: CPython',
           'Programming Language :: Python :: Implementation :: PyPy',
           'Operating System :: POSIX :: Linux',
