@@ -391,7 +391,10 @@ class Derives:
         # to files that actually exist, if there are entities mapped to files
         # that do not exist we do not count them to avoid confusion, manifest
         # issues must be fixed first otherwise the error messages are confusing
+        _dd_path_by_all_files_children = defaultdict(set)
+        _dd_path_by_all_files_manifest = set()
         for pmr in path_metadata:
+            _dd_path_by_all_files_children[pmr['dataset_relative_path'].parent].add(pmr['dataset_relative_path'])
             if 'manifest_record' in pmr:
                 pmrmr = pmr['manifest_record']
                 if 'entity_is_transitive' in pmrmr:
@@ -408,9 +411,22 @@ class Derives:
                     if field in pmrmr:
                         fv = pmrmr[field]
                         for ent_id in fv:
+                            _dd_path_by_all_files_manifest.add(pmr['dataset_relative_path'])
                             _dd_ent_by_manifest[ent_id].append((
                                 pmr['dataset_relative_path'],
                                 (pmr['remote_id'] if 'remote_id' in pmr else None),))
+
+        incomplete = {}  # TODO log incomplete if relevant
+        path_done_by_all_files = set()
+        for _path, _children in _dd_path_by_all_files_children.items():
+            # all parent child pairs
+            # all children with mappings
+            # set difference child pairs is empty
+            unmapped = _children - _dd_path_by_all_files_manifest
+            if not unmapped:
+                path_done_by_all_files.add(_path)
+            else:
+                incomplete[_path] = unmapped
 
         ent_by_manifest = dict(_dd_ent_by_manifest)
         ent_done_by_manifest = set(ent_by_manifest)
@@ -988,8 +1004,9 @@ class Derives:
                     else:
                         eit_unmached_dirs[nd] = (allp - matched)
 
-
-            not_done_after_eit_dirs = not_done_dirs - eit_done_dirs
+            done_by_all_files_names = set(p.name for p in path_done_by_all_files)
+            not_done_after_path_all_files = not_done_dirs - done_by_all_files_names
+            not_done_after_eit_dirs = not_done_after_path_all_files - eit_done_dirs
 
             if eit_drps:
                 assert set(eit_unmached_dirs) == not_done_after_eit_dirs
