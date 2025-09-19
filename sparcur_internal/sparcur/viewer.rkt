@@ -343,13 +343,16 @@ note of course that you don't get dynamic binding with version since it is not t
 (define --sigh (gensym))
 (define hash-subprocess-control (make-hash))
 
+(define exit-control-signal ; windows has pipe issues unless kill is sent
+  (if (eq? (system-type 'os*) 'windows) 'kill 'interrupt))
+
 (define existing-exit-handler (exit-handler))
 (define (our-exit-handler v)
   (define bad (gensym))
   (for ([(pid control) (in-hash hash-subprocess-control bad)]
         #:unless (eq? pid bad))
     (when (eq? (control 'status) 'running)
-      (control 'interrupt) ; TODO kill vs interrupt
+      (control exit-control-signal)
       (when #f ; debug
         (displayln (list "killed" pid)))))
   (existing-exit-handler v))
