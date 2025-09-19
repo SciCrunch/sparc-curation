@@ -1061,7 +1061,7 @@ Secrets template for full development setup.
 #+caption: [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
 #+header: :tangle-mode (identity #o600)
 #+begin_src yaml :tangle (when (and (fboundp 'user-config-path) (not (file-exists-p (user-config-path "orthauth/secrets.yaml")))) (user-config-path "orthauth/secrets.yaml")) :mkdirp yes
-pennsieve:
+pennsieve: # https://discover.pennsieve.io/user/profile
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
     key: <rw:key>
     secret: <rw:sec>
@@ -1087,10 +1087,10 @@ hypothesis:
     sparc-curation: <rw:groupid>
 protocols-io:
   api:
-    client-token: <rw:token>
+    client-token: <rw:token> # https://www.protocols.io/developers
 scicrunch:
   api:
-    key: <rw:key>
+    key: <rw:key> # https://scicrunch.org/account/developer
 #+end_src
 
 Secrets template for minimal viewer setup.
@@ -1099,7 +1099,7 @@ Secrets template for minimal viewer setup.
 #+caption: [[file:${HOME}/.config/orthauth/secrets.yaml][~/.config/orthauth/secrets.yaml]]
 #+header: :tangle-mode (identity #o600)
 #+begin_src yaml
-pennsieve:
+pennsieve: # https://discover.pennsieve.io/user/profile
   N:organization:618e8dd9-f8d2-4dc4-9abb-c6aaab2e78a0:
     key: <rw:key>
     secret: <rw:sec>
@@ -1117,10 +1117,10 @@ google:
     sparc-affiliations: <rw:docid>
 protocols-io:
   api:
-    client-token: <rw:token>
+    client-token: <rw:token> # https://www.protocols.io/developers
 scicrunch:
   api:
-    key: <rw:key>
+    key: <rw:key> # https://scicrunch.org/account/developer
 #+end_src
 
 Secrets template for minimal SODA =sparcur.simple.retrieve= setup.
