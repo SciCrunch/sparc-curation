@@ -1286,6 +1286,13 @@ class Path(aug.XopenPath, aug.RepoPath, aug.LocalPath, PathHelper):  # NOTE this
                 path_meta['status'] = status
                 continue
 
+            if 'size_bytes' in path_meta and path_meta['size_bytes'] == 0:
+                source = 'size_bytes'
+                msg = 'zero byte file detect'
+                dsrp = path_meta['dataset_relative_path']
+                if he.addError(msg, path=dsrp, json_path=('data', i, source)):
+                    logd.error(msg)
+
             if 'magic_mimetype' in path_meta and 'mimetype' in path_meta:
                 # FIXME NOT clear whether magic_mimetype should be used by itself
                 # usually magic and file extension together work, magic by itself
