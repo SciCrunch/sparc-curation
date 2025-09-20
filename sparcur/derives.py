@@ -401,7 +401,7 @@ class Derives:
                     eit_raw = pmrmr['entity_is_transitive']
                     # FIXME bool/str -> bool should be handled during parsing
                     if (eit_raw is True or
-                        isinstance(eig_raw, str) and eit_raw.lower() == 'true'):
+                        isinstance(eit_raw, str) and eit_raw.lower() == 'true'):
                         eit_drps.add(pmr['dataset_relative_path'])
 
                 # FIXME TODO if there are multiple columns in the
