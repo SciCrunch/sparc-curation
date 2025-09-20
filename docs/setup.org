@@ -83,7 +83,8 @@ rsync `
 vim `
 imagej `
 inkscape `
-powertoys
+powertoys `
+7zip
 #+end_src
 
 Additional runtimes for e.g. ontology development or sparcur development.
