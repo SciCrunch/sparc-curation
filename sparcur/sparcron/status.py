@@ -73,11 +73,12 @@ def main():
         )
         return
     elif '--fail-logs' in sys.argv:
-        if fails:
+        if fails or refails:
+            all_fails = fails + refails
             from sparcur.config import auth
             lp = auth.get_path('log-path') / 'datasets'
             paths = '\n'.join((lp / f.uuid / 'LATEST/stdout.log').as_posix()
-                                 for f in fails)
+                                 for f in all_fails)
             print(paths)
         return
 
