@@ -663,7 +663,22 @@ class XmlFilePipeline(Pipeline):  # XXX FIXME temporary (HAH)
                 x = cls._path_to_json_meta(path)
                 blob['xml'].append(x)
         else:
-            blob['xml'] = Async(rate=False)(deferred(cls._do_subprocess)(path) for path in local_xmls)
+            xmls = Async(rate=False)(deferred(cls._do_subprocess)(path) for path in local_xmls)
+            # TODO fromJson should work here but isn't becuse these
+            # are still using the old 'path' type and we need 'pathmeta'
+            # from objects registered, but we aren't there yet, so for now
+            # we keep it this way
+            # xmlir = fromJson(xmls)  # TODO
+            for pm in xmls:
+                pm['dataset_id'] = Path(pm['dataset_id'])
+                pm['dataset_relative_path'] = Path(pm['dataset_relative_path'])
+                if 'contents' in pm and 'images' in pm['contents']:
+                    for imm in pm['contents']['images']:
+                        if 'path_mbf' in imm:
+                            npm = [pathlib.PureWindowsPath(p) for p in imm['path_mbf']]
+                            imm['path_mbf'] = npm
+
+            blob['xml'] = xmls
 
         return blob
 
