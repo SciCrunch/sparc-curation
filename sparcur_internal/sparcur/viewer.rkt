@@ -631,17 +631,25 @@ note of course that you don't get dynamic binding with version since it is not t
       ; FIXME very confusing error message if there is no value for org in sparcur config (i.e. it is #f)
       (send choice-prefs-remote-organization clear)
       (let ([rok '()] [missing-keys '()])
-        (for ([o (or orgs (list org))])
+        (for ([-o (or orgs (list org))])
           ; FIXME TODO append org name
+          (define backend 'pennsieve) ; default for backward compat
+          (define o
+            (if (hash? -o)
+                (begin
+                  (set! backend (car (hash-keys -o)))
+                  (car (hash-values -o)))
+                -o))
           (send choice-prefs-remote-organization append (if o (*->string o) not-set))
+          ; TODO if backend needs auth
           (set! rok
             (cons
              (cons
               ; FIXME confusing error message from a make-string contract if the key or secret are too short
               (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) not-set)])
-                (obfus (*->string (oa-get-sath 'pennsieve o 'key))))
+                (obfus (*->string (oa-get-sath backend o 'key))))
               (with-handlers ([exn? (lambda (e) (set! missing-keys (cons o missing-keys)) not-set)])
-                (obfus (*->string (oa-get-sath 'pennsieve o 'secret)))))
+                (obfus (*->string (oa-get-sath backend o 'secret)))))
              rok)))
         (send choice-prefs-remote-organization set-selection 0) ; reset selection to avoid stale ?
         (remote-org-keys (reverse rok))
