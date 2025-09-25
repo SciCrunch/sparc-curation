@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   id="logo-sparc-wave-primary"
+   data-name="logo-sparc-wave-primary"
+   viewBox="0 0 256 256"
+   version="1.1"
+   sodipodi:docname="sparcur-icon.svg"
+   inkscape:version="1.1.1 (3bf5ae0d25, 2021-09-20)"
+   width="256"
+   height="256"
+   inkscape:export-filename="/home/tom/ni/images/sparcur-icon-48.png"
+   inkscape:export-xdpi="18"
+   inkscape:export-ydpi="18"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <sodipodi:namedview
+     id="namedview22"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     showgrid="false"
+     inkscape:zoom="1.92"
+     inkscape:cx="78.645834"
+     inkscape:cy="85.677084"
+     inkscape:window-width="1920"
+     inkscape:window-height="1038"
+     inkscape:window-x="1200"
+     inkscape:window-y="405"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="logo-sparc-wave-primary"
+     width="256px" />
+  <defs
+     id="defs7">
+    <linearGradient
+       id="linear-gradient"
+       y1="96.350502"
+       x2="400"
+       y2="96.350502"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#0b00bf"
+         id="stop2" />
+      <stop
+         offset="1"
+         stop-color="#bc00fc"
+         id="stop4" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linear-gradient"
+       id="linearGradient5440"
+       x1="7.9816256"
+       y1="124.11741"
+       x2="221.6595"
+       y2="143.97057"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(1.0416667,0,0,1.0416667,-4.3325682,-4.1715588)" />
+  </defs>
+  <title
+     id="title9">SPARC Logo</title>
+  <ellipse
+     style="fill:none;fill-opacity:1;stroke:#fe7820;stroke-width:36.9819;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+     id="path2011"
+     cx="127.99998"
+     cy="128"
+     rx="109.50903"
+     ry="109.50905" />
+  <path
+     d="m 249.59036,167.92753 -56.20921,-4.48352 c -3.5272,-0.0787 -6.75199,1.9779 -8.16118,5.20462 l -0.0813,0.18661 -18.18039,41.71555 -36.71249,-200.596313 -0.0134,-0.09086 C 127.82261,-3.1228025 109.17369,-3.1348098 106.74728,9.848487 L 78.031942,163.62589 8.391196,168.80804 c -5.9028732,0.11092 -5.8677982,8.90191 0.03577,8.96599 l 77.140134,3.60235 c 4.152148,0.0654 7.780826,-2.78397 8.692357,-6.82571 l 0.07604,-0.33771 23.738883,-105.541638 36.52858,174.201158 0.0341,0.16487 c 1.83913,8.51773 13.54539,9.67766 17.02811,1.68728 l 27.66816,-63.48553 50.25716,-4.34587 c 5.8549,-0.13478 5.8549,-8.83114 0,-8.96596 z"
+     style="fill:url(#linearGradient5440);fill-opacity:1;stroke-width:1.32807;stroke-miterlimit:4;stroke-dasharray:none"
+     id="path11"
+     sodipodi:nodetypes="cccccccccccccccccccccc" />
+  <metadata
+     id="metadata839">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:title>SPARC Logo</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+</svg>
