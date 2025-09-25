@@ -35,8 +35,13 @@
          orthauth/utils
          )
 
-(define-runtime-path asdf "viewer.rkt")
-(define this-file (path->string asdf))
+(define-runtime-path icon-16 "resources/sparcur-icon-16.png")
+(define-runtime-path icon-32 "resources/sparcur-icon-32.png")
+(define-runtime-path icon-48 "resources/sparcur-icon-48.png")
+(define-runtime-path icon-ico "resources/sparcur-icon-48.ico")
+(define-runtime-path icon-icns "resources/sparcur-icon-48.icns")
+(define-runtime-path this-file-runtime-path "viewer.rkt")
+(define this-file (path->string this-file-runtime-path))
 (define this-file-compiled (with-handlers ([exn? (λ (e) this-file)]) (get-compilation-bytecode-file this-file)))
 (define this-file-exe (embedding-executable-add-suffix (path-replace-extension this-file "") #f))
 (define this-file-exe-tmp (path-add-extension this-file-exe "tmp"))
@@ -879,15 +884,19 @@ note of course that you don't get dynamic binding with version since it is not t
                                      (λ () -2))]
                        [gch (format "--commit=~a" (git-commit-hash))])
                    (when (not (= mtime-before mtime-after))
-                     (println (format "running raco exe -v -o ~a ~a "
-                                      this-file-exe this-file))
                      (parameterize ()
                        (when (file-exists? this-file-exe)
                          (rename-file-or-directory this-file-exe this-file-exe-tmp))
-                       (killable-system* raco-exe "exe" "-v" "++exf" gch "-o" this-file-exe this-file)
-                       (unless (file-exists? this-file-exe) ; restore the old version on failure
-                         (when (file-exists? this-file-exe-tmp)
-                           (rename-file-or-directory this-file-exe-tmp this-file-exe))))
+                       (let ([argv
+                              (append
+                               (list raco-exe "exe")
+                               (case (system-type 'os)
+                                 ((windows) (list "--ico" icon-ico))
+                                 ((macosx) (list "--icns" icon-icns))
+                                 (else '()))
+                               (list "-v" "++exf" gch "-o" this-file-exe this-file))])
+                         (println (string-join (cons "running" (map (λ (v) (if (path? v) (path->string v) v)) argv))))
+                         (apply killable-system* argv)))
                      #; ; this is super cool but an eternal pain for raco exe
                      (parameterize ([current-command-line-arguments
                                      (vector
@@ -902,7 +911,10 @@ note of course that you don't get dynamic binding with version since it is not t
              #; ; TODO issue this only if the viewer itself was updated and there was a success
              (println "Restart at your convenience.")
              )
-            (λ () (set! update-running? #f))))))))
+            (λ () ; restore the old version on failure
+              (when (and (not (file-exists? this-file-exe) (file-exists? this-file-exe-tmp)))
+                (rename-file-or-directory this-file-exe-tmp this-file-exe))
+              (set! update-running? #f))))))))
 
 ;; json view
 
@@ -3294,6 +3306,16 @@ switch to that"
           status)
     (init-paths-load-config!)))
 
+(define (set-icons frame)
+  (if (eq? (system-type 'os) 'unix)
+      (let ([sparcur-viewer-icon-16 (read-bitmap icon-16)]
+            [sparcur-viewer-icon-32 (read-bitmap icon-32)])
+        ; undocumented issue that icon sizes must be exact for gtk
+        (send frame set-icon sparcur-viewer-icon-16 #f 'small)
+        (send frame set-icon sparcur-viewer-icon-32 #f 'large))
+      (let ([sparcur-viewer-icon-48 (read-bitmap icon-48)])
+        (send frame set-icon sparcur-viewer-icon-48 #f 'both))))
+
 (module+ main
   (init-paths-load-config!)
   (when python-first-time? (python-first-time))
@@ -3303,6 +3325,7 @@ switch to that"
   (define result
     (when ok-to-fetch
       (populate-datasets))) ; slow if not cached, but thus only on the very first run
+  (set-icons frame-main)
   (send frame-main show #t) ; show this first so that users know something is happening
   (set-lview-column-state! lview *current-lview-column* #:view-only? #t)
   (send text-search-box focus)
