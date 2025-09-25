@@ -912,7 +912,7 @@ note of course that you don't get dynamic binding with version since it is not t
              (println "Restart at your convenience.")
              )
             (λ () ; restore the old version on failure
-              (when (and (not (file-exists? this-file-exe) (file-exists? this-file-exe-tmp)))
+              (when (and (not (file-exists? this-file-exe)) (file-exists? this-file-exe-tmp))
                 (rename-file-or-directory this-file-exe-tmp this-file-exe))
               (set! update-running? #f))))))))
 
