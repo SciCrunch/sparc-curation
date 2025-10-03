@@ -954,7 +954,8 @@ note of course that you don't get dynamic binding with version since it is not t
   (when old-root
     ; this is safe because we force selection at startup
     ; strangely this code this makes the interface less jerky when scrolling quickly
-    (send jhl delete-item old-root))
+    (with-handlers ([exn? (λ (e) #f)]) ; hopefully handle rare race condition
+      (send jhl delete-item old-root)))
   (send jview set-json! json)
   (define root (get-field root jhl))
   (send jhl sort json-list-item< #t)
