@@ -1480,8 +1480,8 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 # TODO add success steps for each of these probably?
 
 # release.org to retrieve
-~/git/sparc-curation/docs/release.org build --sckan --no-blaze --no-load
-# XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
+~/git/sparc-curation/docs/release.org build --sckan --no-blaze --no-load --no-annos
+# XXX remove --no-annos if ~/.ssh/config has cassava-sparc
 
 # we have a circular dependency issue here, which is that
 # we want to use the apinatomy models from blazegraph for scigraph
@@ -1492,8 +1492,8 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 # at which you usually want to deploy to dev scigraph and test
 
 # release.org
-~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume
-# XXX add --no-annos if ~/.ssh/config doesn't have cassava-sparc
+~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume --no-annos
+# XXX remove --no-annos if ~/.ssh/config has cassava-sparc
 
 
 ### docker image build
