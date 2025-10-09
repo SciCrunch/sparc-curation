@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0dee7caf276405a12ae6f60949deef58924ed0faf5e9677a1df624e13757959f; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 38f05027db941bf8d5e7ab5d3ee8abb6f7c403373c6f233b809c2e2888748d72; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -363,10 +363,13 @@ culled.write(\"%s\")" iri merged-path)))
          (hypothesis-annos "data/annotations.json")
          (protcur-path "data/protcur-sparc.rkt")
          (annos-zip-path (concat name "/" hypothesis-annos))
-         (protcur-zip-path (concat name "/" protcur-path)))
-    (run-command "unzip" "-j" release-zip-path annos-zip-path "-d" (expand-file-name "data" release-dir))
+         (protcur-zip-path (concat name "/" protcur-path))
+         (data-dir (expand-file-name "data" release-dir)))
+    (unless (file-exists-p (expand-file-name hypothesis-annos release-dir))
+      (run-command "unzip" "-j" release-zip-path annos-zip-path "-d" data-dir))
     (when do-protcur
-      (run-command "unzip" "-j" release-zip-path protcur-zip-path "-d" (expand-file-name "data" release-dir)))))
+      (unless (file-exists-p (expand-file-name protcur-path release-dir))
+        (run-command "unzip" "-j" release-zip-path protcur-zip-path "-d" data-dir)))))
 
 (defun step-load-store (path-br-bin &optional no-load build-time)
   "download latest ttl files and load into blazegraph"
