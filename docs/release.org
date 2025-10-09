@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: aebff222506408f41a29fefb8c39418dd3c98ac9ce8dc9c9efe42102bbfe3400; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 292ff357cc41764a3cd5fa0ea33a0fc6451e85f53091224b3d3cd0b2ba2729c5; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -326,6 +326,44 @@ culled.write(\"%s\")" iri merged-path)))
       ;; FIXME yeah, this is totally broken at this point trying to run in docker
       (run-command (py-x) "-m" "protcur.cli" "convert" "-t" "prot" hypothesis-annos protcur-path))))
 
+(defun step-fetch-latest-release-zip (&optional build-dir)
+  "fetch the previous release and pull what we need"
+  ;; annotations aren't changing right now
+  (let* ((url "https://api.github.com/repos/SciCrunch/NIF-Ontology/releases")
+         (json (reval-url->json url))
+         (latest-sckan
+          (car
+           (sort
+            (cl-loop
+             for h across-ref json
+             when (string-prefix-p "sckan-" (gethash "tag_name" h))
+             collect h)
+            (lambda (a b) (string> (gethash "tag_name" a) (gethash "tag_name" b))))))
+         (tag-name (gethash "tag_name" latest-sckan))
+         (release-asset
+          (car
+           (cl-loop
+            for asset across-ref (gethash "assets" latest-sckan)
+            when (and
+                  (string-prefix-p "release-" (gethash "name" asset))
+                  (string-suffix-p "-sckan.zip" (gethash "name" asset)))
+            collect asset)))
+         (release-name (gethash "name" release-asset))
+         (release-zip-path (expand-file-name release-name (or build-dir (build-dir)))) ; FIXME TODO build
+         (release-digest (gethash "digest" release-asset))
+         (release-cc (string-split release-digest ":"))
+         (release-cypher (intern (car release-cc)))
+         (release-checksum (cadr release-cc))
+         (release-url (gethash "browser_download_url" release-asset)))
+    (securl release-cypher release-checksum release-url release-zip-path)
+    release-zip-path))
+
+(defun step-annos-from-zip (release-zip-path release-dir)
+  (let* ((name (file-name-base release-zip-path))
+         (hypothesis-annos "data/annotations.json")
+         (annos-zip-path (concat name "/" hypothesis-annos)))
+    (run-command "unzip" "-j" release-zip-path annos-zip-path "-d" (expand-file-name "data" release-dir))))
+
 (defun step-load-store (path-br-bin &optional no-load build-time)
   "download latest ttl files and load into blazegraph"
   (let ((exec-path (cons path-br-bin exec-path))
@@ -546,7 +584,10 @@ culled.write(\"%s\")" iri merged-path)))
           (unless (file-directory-p "opt")
             (mkdir "opt"))
           (step-arrange-blazegraph build-dir path-jar))
-        (unless no-annos
+        (if no-annos
+            (let ((release-zip-path (step-fetch-latest-release-zip build-dir)))
+              (step-annos-from-zip release-zip-path release-dir)
+              (step-annotations))
           (step-annotations))
         (step-load-store (concat path "bin") no-load build-time)
         (step-add-prefixes-file)
