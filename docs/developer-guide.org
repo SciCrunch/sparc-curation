@@ -1445,7 +1445,7 @@ deploy to remote
 apinat-build --deploy  # XXX manual and not fully implemented
 #+end_src
 For new ApiNATOMY models also update [[../resources/scigraph/sparc-data.ttl]].
-***** NIF-Ontology dev branch
+***** NIF-Ontology sync
 Use [[~/git/prrequaestor/prcl.lisp]] with [[~/ni/sparc/sync-specs.lisp]].
 =prcl.lisp= is now published, still figuring out how to put all the
 cross-cutting processes that I oversee in one place, =sync-specs.lisp=
@@ -1461,6 +1461,15 @@ bin/prcl --specs ~/ni/sparc/sync-specs.lisp --fun nif-slim
 #+end_src
 
 For now manually pull the changes to the working repo.
+***** NIF-Ontology merge into dev branch
+The release always builds from the dev branch so any changes you want
+in a release should be merged from the various project branches into
+dev. Add additional branches as needed.
+#+begin_src bash
+pushd ~/git/NIF-Ontology
+git checkout dev
+git merge neurons master sparc
+#+end_src
 
 **** Blazegraph and SciGraph builds
 # SIGH set -e vs putting things in functions ... bash why are you so bad
@@ -1560,7 +1569,7 @@ critical checks:
 _archive=~/"nas/data/"
 _sckanrz="$(ls -d /tmp/build/release-*-sckan.zip | sort -u | tail -n 1)"
 _sckansz=/tmp/scigraph-build/sparc-sckan/$(readlink /tmp/scigraph-build/sparc-sckan/LATEST)
-_sckandz="$(ls -d /tmp/docker-sckan-data-*Z.tar.gz | sort -u | tail -n 1)"
+_sckandz="$(ls -d /tmp/build/docker-sckan-data-*Z.tar.gz | sort -u | tail -n 1)"
 declare -a _arts=(${_sckanrz} ${_sckansz} ${_sckandz})
 for _art in "${_arts[@]}"; do
 echo $(basename ${_art})
