@@ -1,4 +1,4 @@
-# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 292ff357cc41764a3cd5fa0ea33a0fc6451e85f53091224b3d3cd0b2ba2729c5; -*-
+# -*- orgstrap-cypher: sha256; orgstrap-norm-func-name: orgstrap-norm-func--dprp-1-0; orgstrap-block-checksum: 0dee7caf276405a12ae6f60949deef58924ed0faf5e9677a1df624e13757959f; -*-
 # [[orgstrap][jump to the orgstrap block for this file]]
 #+title: Knowledge base release
 #+property: header-args :eval no-export
@@ -358,11 +358,15 @@ culled.write(\"%s\")" iri merged-path)))
     (securl release-cypher release-checksum release-url release-zip-path)
     release-zip-path))
 
-(defun step-annos-from-zip (release-zip-path release-dir)
+(defun step-annos-from-zip (release-zip-path release-dir &optional do-protcur)
   (let* ((name (file-name-base release-zip-path))
          (hypothesis-annos "data/annotations.json")
-         (annos-zip-path (concat name "/" hypothesis-annos)))
-    (run-command "unzip" "-j" release-zip-path annos-zip-path "-d" (expand-file-name "data" release-dir))))
+         (protcur-path "data/protcur-sparc.rkt")
+         (annos-zip-path (concat name "/" hypothesis-annos))
+         (protcur-zip-path (concat name "/" protcur-path)))
+    (run-command "unzip" "-j" release-zip-path annos-zip-path "-d" (expand-file-name "data" release-dir))
+    (when do-protcur
+      (run-command "unzip" "-j" release-zip-path protcur-zip-path "-d" (expand-file-name "data" release-dir)))))
 
 (defun step-load-store (path-br-bin &optional no-load build-time)
   "download latest ttl files and load into blazegraph"
@@ -586,7 +590,7 @@ culled.write(\"%s\")" iri merged-path)))
           (step-arrange-blazegraph build-dir path-jar))
         (if no-annos
             (let ((release-zip-path (step-fetch-latest-release-zip build-dir)))
-              (step-annos-from-zip release-zip-path release-dir)
+              (step-annos-from-zip release-zip-path release-dir 'do-protcur) ; FIXME do-protcur option
               (step-annotations))
           (step-annotations))
         (step-load-store (concat path "bin") no-load build-time)
