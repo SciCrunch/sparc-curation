@@ -1497,8 +1497,6 @@ sh ~/git/pyontutils/nifstd/scigraph/README.org tangle
 # but we also want to use the configured NIF-Ontology repo from
 # scigraph for blazegraph, too many layers ...
 ~/git/pyontutils/nifstd/scigraph/bin/run-load-graph-sparc-sckan
-# if you are iterating hard on apinat model development, this is the point
-# at which you usually want to deploy to dev scigraph and test
 
 # release.org
 ~/git/sparc-curation/docs/release.org build --sckan --no-blaze --resume --no-annos
