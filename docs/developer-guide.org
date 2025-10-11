@@ -1473,8 +1473,9 @@ git merge neurons master sparc
 
 **** Blazegraph and SciGraph builds
 # SIGH set -e vs putting things in functions ... bash why are you so bad
+#+header: :shebang "#!/usr/bin/env sh"
 #+name: build-sckan-release
-#+begin_src bash
+#+begin_src bash :tangle ../bin/build-sckan-release
 set -e
 
 ### make sure all code is up-to-date
