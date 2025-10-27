@@ -891,7 +891,17 @@ class NormSubjectsFile(NormValues):
             return value
 
     def also_in_dataset(self, value):
-        return RemoteId(value)
+        if ' ' in value:
+            for v in value.split():
+                if ',' in v:
+                    # FIXME make sure this gets surfaced in path_error_report
+                    # (along with any/all other normalization errors ...)
+                    logd.error(f'comma in also_in_dataset {value!r}')
+                    v = v.replace(',', '')
+
+                yield RemoteId(v)
+        else:
+            yield RemoteId(value)
 
     def software_url(self, value):
         value, _j = self._deatag(value)
