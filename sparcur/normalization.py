@@ -109,6 +109,12 @@ def related_identifier(type, id):
 def description(value):
     # handle incorrectly doubly quoted descriptions
     # FIXME TODO issue an error/warning for this
+    if is_list_or_tuple(value):
+        # e.g. row shift of keywords to tuple
+        # foward bad value without normalization
+        # to be caught by json schema
+        return value
+
     if value.startswith('"') and value.endswith('"'):
         if '\n' in value:
             _value = '""' + value + '""'
