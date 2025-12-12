@@ -1176,7 +1176,7 @@ class NormCurationFile(NormValues):
                 label = _label.strip()
                 id = _id.strip()
                 if id:
-                    return OntId(id)
+                    yield id
 
             return value
         except Exception as e:

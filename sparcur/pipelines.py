@@ -1306,11 +1306,12 @@ class SDSPipeline(JSONPipeline):
                         'title',  # XXX 2
                         'subtitle',  # XXX 2
                         'related_identifiers',  # XXX 2
+
                         ),
 
               # new in 3.0.0 overrides or possibly appends to the existing fields
               # curation has priority for these
-              [['curation_file', 'organ'], ['meta', 'organ']],
+              [['curation_file', 'organ'], ['meta', 'organ']],  # FIXME missing a way to normalize/transform before copying in here :/
               [['curation_file', 'experimental_approach'], ['meta', 'modality']],  # FIXME -> approach
               [['curation_file', 'experimental_technique'], ['meta', 'techniques']],
 
@@ -1364,6 +1365,7 @@ class SDSPipeline(JSONPipeline):
         *[[['performances', int, field], norm.number_identifiers_to_string] for field in
           ('performance_id',)],
         [['meta', 'related_identifiers'], norm.related_identifiers],  # XXX network sandbox violation
+        #[['curation_file', 'organ'], OntTerm._loc_to_lot],  # FIXME does not work because we already copied :/
     ]
 
     derives = ([[['inputs', 'submission_file', 'submission', 'award_number'],
@@ -1706,6 +1708,7 @@ class PipelineExtras(JSONPipeline):
         #[['meta', 'species'], mapping.species],
         [['meta', 'model_of_species'], OntTerm._loc_to_lot],
         [['meta', 'model_of_organ'], OntTerm._loc_to_lot],
+        [['meta', 'organ'], OntTerm._loc_to_lot],  # FIXME double norm in gsheet case, single in curation case
 
         #[['meta', 'model_of_species'], mapping.species],  # this is incorrect, for manifest 99% of time should be curie
         [['meta', 'collected_from_species'], mapping.species],
