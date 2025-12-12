@@ -217,9 +217,9 @@ def rrid(value, self=None):
             msg = f'malformed RRID: {value}'
             if self is not None:
                 if self.addError(msg,
-                                pipeline_stage=self.__class__.__name__,
-                                blame='submission',
-                                path=self._path):
+                                 pipeline_stage=self.__class__.__name__,
+                                 blame='submission',
+                                 path=self._path):
                     log.error(msg)
 
             if not value.startswith('RRID:'):
@@ -1164,3 +1164,20 @@ class NormManifestFile(NormValues):
     subject = entity
     sample = entity
     site = entity
+
+
+class NormCurationFile(NormValues):
+
+    def organ(self, value):
+        sep = '|'
+        try:
+            if sep in value:
+                _label, _id = value.split(sep)
+                label = _label.strip()
+                id = _id.strip()
+                if id:
+                    return OntId(id)
+
+            return value
+        except Exception as e:
+            return value

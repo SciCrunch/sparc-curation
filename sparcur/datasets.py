@@ -2241,6 +2241,7 @@ class CurationFile(MetadataFile):
     # reminder, can't use groups_alt on whole file
     ignore_header = 'metadata_element',
     ignore_alt = 'controlled_fields', 'curator_notes'
+    normalization_class = nml.NormCurationFile
     normalize_mismatch_ok = 'metadata_element',
     normalize_alt_mismatch_ok = normalize_mismatch_ok
     allow_dupes_alt = False
