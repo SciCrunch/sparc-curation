@@ -1308,7 +1308,11 @@ _related_identifier_schema = {'anyOf':[EIS._allOf(DoiSchema),
                                        EIS._allOf(PioSchema),
                                        EIS._allOf(RridSchema),
                                        {'type': 'string',
-                                        'pattern': simple_url_pattern,}]}
+                                        'pattern': simple_url_pattern,},
+                                       {'type': 'string',  # FIXME really need type specific validation using anyOf on the whole related identifier schema but that is annoying to implement right now
+                                        #'pattern': sds_path_pattern,  # FIXME TODO
+                                        },
+                                       ]}
 
 ContributorExportSchema.schema['jsonld_include'] = {
     '@type': ['sparc:Person', 'owl:NamedIndividual']}
@@ -1381,6 +1385,8 @@ class DatasetDescriptionExportSchema(JSONSchema):
                         'related_identifier_type': {
                             'type': 'string',
                             'enum': [
+                                # sds types
+                                'local-path',  # used particularly to refer to e.g. protocols in the protocol/ folder
                                 # datacite types
                                 'ARK',
                                 'arXiv',

@@ -55,7 +55,7 @@ def related_identifier_record(rid):
     desc = (rid['related_identifier_description']
             if 'related_identifier_description' in rid else None)
 
-    if rel == 'HasProtocol':
+    if rel == 'HasProtocol' and type in ('URL', 'DOI'):
         try:
             nid = NormDatasetDescriptionFile._protocol_url_or_doi(id)
             id, = protocol_url_or_doi((nid,))  # XXX network sandbox violation
