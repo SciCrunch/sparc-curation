@@ -58,7 +58,7 @@ def related_identifier_record(rid):
     if rel == 'HasProtocol' and type in ('URL', 'DOI'):
         try:
             nid = NormDatasetDescriptionFile._protocol_url_or_doi(id)
-            id, = protocol_url_or_doi((nid,))  # XXX network sandbox violation
+            id, = protocol_url_or_doi((nid,), prop_error=True)  # XXX network sandbox violation
         except Exception as e:
             # XXX we are missing the required context to produce an
             # understanable error here however the result will filter
@@ -127,8 +127,7 @@ def description(value):
 
     return value
 
-
-def protocol_url_or_doi(value, __logged=set()):
+def protocol_url_or_doi(value, prop_error=False, __logged=set()):
     # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
@@ -157,6 +156,8 @@ def protocol_url_or_doi(value, __logged=set()):
                 resp.raise_for_status()
 
         except idlib.exc.MalformedIdentifierError as e:
+            if prop_error:
+                raise e
             logd.error(e)
             # XXX WARNING returning value here might cause unexpcted errors
             # however, normalization should never fail, if it does it should
@@ -164,6 +165,8 @@ def protocol_url_or_doi(value, __logged=set()):
             # will catch the error at a later stage
             return value
         except Exception as e:
+            if prop_error:
+                raise e
             se = str(e)
             if se not in __logged:
                 logd.error(e)
@@ -175,11 +178,17 @@ def protocol_url_or_doi(value, __logged=set()):
                 uh = normed.uri_human  # deal with new slugs
                 normed = uh.uri_api_int  # integer id preferred if available
             except idlib.exc.IdDoesNotExistError as e:
+                if prop_error:
+                    raise e
                 logd.error(e)  # we'll catch this again later too
             except idlib.exc.NotAuthorizedError as e:
+                if prop_error:
+                    raise e
                 logd.error(e)
             except Exception as e:
                 breakpoint()
+                if prop_error:
+                    raise e
                 log.exception(e)  # FIXME don't know what we will get here
 
         if not isinstance(normed, idlib.Pio) and isinstance(v, idlib.Doi):

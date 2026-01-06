@@ -335,10 +335,19 @@ class MetaConverter(TripleConverter):
                         # likely an upstream schema failure
                         continue
 
-                    _i = rid['related_identifier']
-                    i = self.c.l(_i)
-                    if isinstance(_i, idlib.Stream) and 'errors' not in rid:
-                        yield from _i.triples_gen  # FIXME network sandbox violation
+                    _i_wat = rid['related_identifier']
+                    i = self.c.l(_i_wat)
+                    if isinstance(_i_wat, idlib.Stream) and 'errors' not in rid:
+                        try:
+                            __l = list(_i_wat.triples_gen)  # FIXME network sandbox violation
+                        except Exception as e:
+                            # this can fail if e.g. a protocols.io url points
+                            # to something not shared with us that didn't get
+                            # filtered out in an earlier step
+                            loge.error(e)
+                            __l = list()
+
+                        yield from __l
 
                     yield bn0, rdf.type, owl.NamedIndividual
                     yield bn0, rdf.type, sparc.RelatedIdentifier
@@ -384,7 +393,7 @@ class MetaConverter(TripleConverter):
                 if isinstance(value, idlib.Doi):
                     try:
                         t = None
-                        for t in value.triples_gen:
+                        for t in value.triples_gen:  # FIXME network sandbox violation
                             yield t
                     except idlib.exc.RemoteError as e:
                         if t is None:
@@ -393,7 +402,7 @@ class MetaConverter(TripleConverter):
 
                     ds, _, _ = t
                     try:
-                        pioid = value.dereference(asType=idlib.Pio)
+                        pioid = value.dereference(asType=idlib.Pio)  # FIXME network sandbox violation
                         s = self.c.l(pioid)
                         yield ds, TEMP.dereferencesTo, s
                         yield s, TEMP.hasDoi, ds
