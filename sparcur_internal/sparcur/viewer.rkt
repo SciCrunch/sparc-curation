@@ -863,13 +863,13 @@ note of course that you don't get dynamic binding with version since it is not t
                       (apply py-system* argv-simple-git-repos-update))])
                ; TODO pull changes for racket dependent repos as well
                ; TODO raco pkg install local git derived packages as well
-               (println (format "running raco pkg update ~a" this-package-path))
+               (println (format "running raco pkg update --update-deps ~a" this-package-path))
                (let ([mtime-before (file-or-directory-modify-seconds
                                     this-file-compiled
                                     #f
                                     (λ () -1))])
                  (parameterize ()
-                   (killable-system* raco-exe "pkg" "update" "--batch" this-package-path)
+                   (killable-system* raco-exe "pkg" "update" "--update-deps" "--batch" this-package-path)
                    #;
                    (system* raco-exe "make" "-v" this-file))
                  #; ; raco exe issues ... i love it when abstractions break :/
@@ -964,6 +964,7 @@ note of course that you don't get dynamic binding with version since it is not t
   ; can't thread this because some part of it is not thread safe
   (apply-items-rec do-open root)
   (send jhl scroll-to 0 0 0 0 #t)
+  (send jhl scroll-to 0 0 0 0 #t) ; FIXME when the horizontal scroll bar is enabled we have to call scroll-to twice for some reason ???
 
   #;
   (define (by-name name items)
@@ -1000,7 +1001,7 @@ note of course that you don't get dynamic binding with version since it is not t
           (if (and hr-jview (not update))
               (begin
                 hr-jview)
-              (letrec ([hier-class json-hierlist%
+              (letrec ([hier-class json-hierlist-horiz%
                         #; ; too slow when doing recursive opens
                         (class json-hierlist% (super-new)
                           (rename-super [super-on-item-opened on-item-opened])
@@ -1360,7 +1361,7 @@ note of course that you don't get dynamic binding with version since it is not t
             [jview-inner
              (or hr-jview
                  (new json-view%
-                      [hier-class% json-hierlist%]
+                      [hier-class% json-hierlist-horiz%]
                       [parent frame-helper]))]
             [url (dataset-latest-prod-url ds)]
             [json (url->json url)]
@@ -2153,6 +2154,12 @@ switch to that"
 
 #;
 (send keymap call-function "test" 1 (new event%))
+
+;; class fixes
+
+(define json-hierlist-horiz%
+  (class json-hierlist%
+    (super-new [style '(auto-hscroll auto-vscroll)])))
 
 ;; gui setup
 
