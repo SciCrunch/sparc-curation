@@ -127,7 +127,13 @@ def description(value):
 
     return value
 
+_puod_cache = {}
+_puod_class_cache = {}
+_puod_cache_error = {}
 def protocol_url_or_doi(value, prop_error=False, __logged=set()):
+    if value in _puod_cache:
+        return _puod_cache[value]
+
     # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
@@ -174,22 +180,36 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
             return value
 
         if isinstance(normed, idlib.Pio):
-            try:
-                uh = normed.uri_human  # deal with new slugs
-                normed = uh.uri_api_int  # integer id preferred if available
-            except idlib.exc.IdDoesNotExistError as e:
+            resolve = True
+            _nowish = datetime.datetime.now()
+            if normed in _puod_cache_error:
+                resolve = False
+                e, at_time = _puod_cache_error[normed]
                 if prop_error:
                     raise e
-                logd.error(e)  # we'll catch this again later too
-            except idlib.exc.NotAuthorizedError as e:
-                if prop_error:
-                    raise e
-                logd.error(e)
-            except Exception as e:
-                breakpoint()
-                if prop_error:
-                    raise e
-                log.exception(e)  # FIXME don't know what we will get here
+                #logd.error(e)  # log only the 1st failure
+                cooldown = datetime.timedelta(seconds=300)  # 5 min cooldown TODO configable
+                resolve = _nowish > at_time + cooldown
+
+            if resolve:
+                try:
+                    uh = normed.uri_human  # deal with new slugs
+                    normed = uh.uri_api_int  # integer id preferred if available
+                except idlib.exc.IdDoesNotExistError as e:
+                    _puod_cache_error[normed] = e, _nowish
+                    if prop_error:
+                        raise e
+                    logd.error(e)  # we'll catch this again later too
+                except idlib.exc.NotAuthorizedError as e:
+                    _puod_cache_error[normed] = e, _nowish
+                    if prop_error:
+                        raise e
+                    logd.error(e)
+                except Exception as e:
+                    _puod_cache_error[normed] = e, _nowish
+                    if prop_error:
+                        raise e
+                    log.exception(e)  # FIXME don't know what we will get here
 
         if not isinstance(normed, idlib.Pio) and isinstance(v, idlib.Doi):
             # ensure that regular dois are returned, not their referents
@@ -212,6 +232,7 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
     if isinstance(value, tuple):
         out = tuple(out)  # preserve types prevent errors!
 
+    _puod_cache[value] = out
     return out
 
 
@@ -806,6 +827,11 @@ class NormDatasetDescriptionFile(NormValues):
 
     @staticmethod
     def _protocol_url_or_doi(value):
+        if value in _puod_class_cache:
+            return _puod_class_cache[value]
+
+        _value = value
+
         doi = False
         if 'doi' in value:
             doi = True
@@ -818,6 +844,7 @@ class NormDatasetDescriptionFile(NormValues):
         else:
             value = idlib.Pio(value)  # XXX possible encapsulation issue
 
+        _puod_class_cache[_value] = value
         return value
 
     def protocol_url_or_doi(self, value):
