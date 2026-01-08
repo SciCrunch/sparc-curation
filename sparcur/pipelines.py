@@ -2074,6 +2074,9 @@ class PipelineEnd(JSONPipeline):
                        if pe[-1]['pipeline_stage'] not in cls._shadowed]
         (compacted, path_error_report, by_invariant_path,
          errors) = compact_errors(path_errors)
+        # FIXME there are expansion steps for e.g. related identifiers
+        # that hide errors until after this step so they are not visible
+        # specifically those uncovered by json_identifier_expansion
         unclassified_stages = []
         submission_errors = []
         curation_errors = []

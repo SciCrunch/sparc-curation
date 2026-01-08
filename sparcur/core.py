@@ -1600,7 +1600,7 @@ def extract_errors(thing, path=None, skip_keys=tuple()):
             else:
                 yield from extract_errors(v, path + [k], skip_keys)
 
-    elif isinstance(thing, list):
+    elif isinstance(thing, list) or isinstance(thing, tuple):
         for i, v in enumerate(thing):
             yield from extract_errors(v, path + [i], skip_keys)
 
