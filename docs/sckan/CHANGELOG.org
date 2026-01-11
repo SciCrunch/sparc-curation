@@ -14,17 +14,23 @@
 - NPO connections from composer
 - NPO mmset1:11 fix the combinatorial paths explosion currently ~(expt 5 4)~
 
-- alpha :: NPO synaptic connectivity
-- stretch :: ApiNATOMY species variance for whole models where not covered by NPO
-* RC 2025-09-??
+- TODO :: NPO DRG
+- TODO :: resolve apinat-simple missing inferred subClass cases
+
 - TODO :: statistics for number of neurons, number of partial orders,
   and number of nodes and edges in partial orders, this should be
   implemented on top of the composer.py example file
-- TODO :: NPO DRG
-- TODO :: resolve inferred equiv issues between para/sym populations
-  with identical anatomy, e.g. =aacar-{7,8}{a,v}=, =kblad-{1,2}=
-- TODO :: modeling issues with =sstom-{11..14}=
-- TODO :: resolve apinat-simple missing inferred subClass cases
+
+- alpha :: NPO synaptic connectivity
+- stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2026-01-10
+- ApiNATOMY populations now source partial orders from composer
+- ApiNATOMY sdcol remove region/layer pairs in cases where the layer was already part of the region
+- ApiNATOMY sstom add full modelling for sstom-13 and sstom-14
+- ApiNATOMY =aacar-{7,8}{a,v}=, =kblad-{1,2}= fix entailed/equiv issues between para/sym populations with identical anatomy
+- NLP populations now source axioms and partial orders from composer
+- NLP remove femrep:81, liver:107, senmot:17, senmot:87, senmot:162
+- CMP add pain1 1-12 and portal 1-5
 * RC 2025-09-14
 - NPO NLP liver:132 liver:121 change =ilxtr:hasAxonPresynapticElementIn=
   to =ilxtr:hasForwardConnectionPhenotype= when the object is a cell type.
