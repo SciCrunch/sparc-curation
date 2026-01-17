@@ -23,6 +23,12 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2026-01-16
+- CMP remove in process populations femrep:40-1 kidney:145
+- CMP restore aacar:1
+- CMP include curator notes
+- CMP drop taxon for pain populations
+- ApiNATOMY fix subClassOf hierarchy for base classes in apinat-manual.ttl
 * RC 2026-01-10
 - ApiNATOMY populations now source partial orders from composer
 - ApiNATOMY sdcol remove region/layer pairs in cases where the layer was already part of the region
