@@ -23,6 +23,9 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
+* RC 2026-01-30
+- ApiNATOMY simple fix iris for internal object references
+- CMP fix bad values for expert consultant
 * RC 2026-01-16
 - CMP remove in process populations femrep:40-1 kidney:145
 - CMP restore aacar:1
