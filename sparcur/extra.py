@@ -173,7 +173,7 @@ def f_check_path_meta(j, f000, do_report_tar=False, do_multi_stems=False, do_ff=
         r_no_f = '\n\n  f '.join(['\n  f '.join(sorted([p.as_posix() for v in d.values() for p in v])) for d in no_f.values()]).replace(' source', '  source')
         log.info(f'\n{did} no f\n  f {r_no_f}{sep}')
 
-    if no_ff:# and do_ff:
+    if no_ff and do_ff:
         r_no_ff = '\n\n ff '.join(['\n ff '.join(sorted([p.as_posix() for v in d.values() for p in v])) for d in no_ff.values()]).replace(' source', '  source')
         log.info(f'\n{did} no tiff\n ff {r_no_ff}{sep}')
 
