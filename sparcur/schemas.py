@@ -1735,8 +1735,15 @@ _software_schema = {'type': 'array',
 
 subsam_common_properties = {  # FIXME these should not be in the samples sheet, or if they are they refer to the sample
     'also_in_dataset': {
-        'type': 'string',  # FIXME is a RemoteId class internally TODO EIS
-        'context_value': 'TEMP:alsoInDataset',},
+        'type': 'array',
+        'context_value': 'TEMP:alsoInDataset',
+        'items': EIS._allOf(PennsieveIdSchema),  # TODO expand to support other remote id types
+    },
+    'also_in_dataset_doi': {
+        'type': 'array',
+        'context_value': 'TEMP:alsoInDatasetDoi',
+        'items': EIS._allOf(DoiSchema),
+    },
     'species': {'anyOf': [EIS._allOf(OntTermSchema),
                           {'type': 'string'},],
                 'context_value': 'sparc:animalSubjectIsOfSpecies'},
