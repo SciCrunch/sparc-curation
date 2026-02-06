@@ -755,6 +755,7 @@ ror_pattern = idlib.Ror._id_class.canonical_regex
 
 pattern_whitespace_lead_trail = r'(^[\s]+[^\s].*|.*[^\s][\s]+$)'
 pattern_whitespace_multi = r'[\s]{2,}'
+pattern_formula = f'^='
 
 award_pattern = '^(OT2OD|OT3OD|U18|TR|U01)'  # really just no whitespace or / ?
 
@@ -766,7 +767,17 @@ class NoLTWhitespaceSchema(JSONSchema):
                         ]}
 
 
+class NoLTWhitespaceNoFormulaSchema(JSONSchema):
+    # FIXME this is NOT the best way to deal with this, but >99% of the time a leading = is wrong
+    schema = {'allOf': [{'type': 'string'},
+                        {'not': {'pattern': pattern_whitespace_lead_trail,}},
+                        {'not': {'pattern': pattern_whitespace_multi}},
+                        {'not': {'pattern': pattern_formula},}
+                        ]}
+
+
 string_noltws = NoLTWhitespaceSchema.schema
+string_noltws_noformula = NoLTWhitespaceNoFormulaSchema.schema
 
 
 class SDSEntityPathSchema(JSONSchema):
@@ -1337,25 +1348,25 @@ class DatasetDescriptionExportSchema(JSONSchema):
             'dataset_type': {'type': 'string'},
             # 1.x
             'errors': ErrorSchema.schema,
-            'template_schema_version': {'type': 'string'},
-            'name': string_noltws,
-            'description': {'type': 'string'},
+            'template_schema_version': string_noltws_noformula,
+            'name': string_noltws_noformula,
+            'description': string_noltws_noformula,
             'keywords': {'type': 'array', 'items': {'type': 'string'}},
             'acknowledgments': {'type': 'string'},
-            'license': {'type': 'string'},  # TODO spdx check
+            'license': string_noltws_noformula,  # TODO spdx check
             'funding_freetext': {'type': 'array',
                                  'minItems': 1,
                                  'items': {'type': 'string'}},
-            'completeness_of_data_set': {'type': 'string'},
-            'prior_batch_number': {'type': 'string'},
-            'title_for_complete_data_set': {'type': 'string'},
+            'completeness_of_data_set': string_noltws_noformula,
+            'prior_batch_number': string_noltws_noformula,
+            'title_for_complete_data_set': string_noltws_noformula,
             'originating_article_doi': {'type': 'array',
                                         'items': EIS._allOf(DoiSchema),
                                         #'context_value': idtype('TEMP:hasDoi'),  # FIXME convert here?
                                         },
             'number_of_subjects': {'type': 'integer'},
             'number_of_samples': {'type': 'integer'},
-            'parent_dataset_id': {'type': 'string'},  # blackfynn id
+            'parent_dataset_id': string_noltws_noformula,  # blackfynn id
             'protocol_url_or_doi': {'type': 'array',
                                     'minItems': 1,
                                     'items': _protocol_url_or_doi_schema,
