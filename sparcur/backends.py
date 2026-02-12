@@ -989,6 +989,12 @@ class BlackfynnRemote(aug.RemotePath):
                     if create_cache:
                         # FIXME I don't think existing detection is working
                         # correctly here so this get's triggered incorrectly?
+                        if child.name.endswith('.'):
+                            uh = child.identifier.uri_human(self.organization, self)
+                            msg = f'{self.id} bad file name that will break on windows {child.name} -> {child} to fix remove trailing period (.) at {uh}'
+                            log.error(msg)
+                            raise exc.BadFileNameError(msg)
+
                         self.cache / child  # construction will cause registration without needing to assign
                         assert child.cache is not None
 

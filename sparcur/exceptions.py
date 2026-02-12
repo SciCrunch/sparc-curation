@@ -187,3 +187,7 @@ class MultiFilePackageError(SparCurError):
 class CombineTestMismatchError(SparCurError):
     """ WHOOPS """
 
+
+class BadFileNameError(SparCurError):
+    """ bad file name """
+
