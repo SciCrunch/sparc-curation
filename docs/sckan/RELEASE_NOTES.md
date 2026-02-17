@@ -1,6 +1,6 @@
 # SCKAN Release Notes
 
-### Current Release: sckan-2026-01-30
+### Current Release: sckan-2026-02-11
 ### Previous Release: [sckan-2025-09-14](https://github.com/SciCrunch/NIF-Ontology/releases/tag/sckan-2025-09-14)
 
 ## Overview
