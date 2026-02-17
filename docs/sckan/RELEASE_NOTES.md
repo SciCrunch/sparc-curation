@@ -7,6 +7,32 @@
 
 This release includes significant content updates, data model enhancements, and corrections to improve data quality and consistency across the database.
 
+| neuron_category                  | model                                            | count |
+|----------------------------------|--------------------------------------------------|-------|
+| Expert-Contributed Populations   | aacar: UCLA Model of the Heart                   | 19    |
+| Expert-Contributed Populations   | bolew: Bolser-Lewis Model of Defensive Breathing | 29    |
+| Expert-Contributed Populations   | bromo: SAWG Model of Bronchomotor Control        | 6     |
+| Expert-Contributed Populations   | keast: Keast Model of Bladder Innervation        | 20    |
+| Expert-Contributed Populations   | pancr: SAWG Model of the Pancreas                | 5     |
+| Expert-Contributed Populations   | sdcol: SAWG Model of the Descending Colon        | 18    |
+| Expert-Contributed Populations   | splen: SAWG Model of the Spleen                  | 5     |
+| Expert-Contributed Populations   | sstom: SAWG Model of the Stomach                 | 14    |
+| Literature-Extracted Populations | femrep: Female Reproductive System               | 61    |
+| Literature-Extracted Populations | gastint: Gastrointestinal Connections            | 20    |
+| Literature-Extracted Populations | kidney: Kidney Connections                       | 26    |
+| Literature-Extracted Populations | liver: Liver Connections                         | 25    |
+| Literature-Extracted Populations | mmset1: Uncategorized                            | 11    |
+| Literature-Extracted Populations | mmset2cn: Cranial Nerve                          | 10    |
+| Literature-Extracted Populations | mmset4: Uncategorized                            | 17    |
+| Literature-Extracted Populations | pain1: Nociceptive Pain Connections              | 12    |
+| Literature-Extracted Populations | portal: SPARC Portal Connections                 | 5     |
+| Literature-Extracted Populations | prostate: Male Reproductive System               | 11    |
+| Literature-Extracted Populations | semves: Male Reproductive System                 | 10    |
+| Literature-Extracted Populations | senmot: Sensory-Motor Connections                | 170   |
+| Literature-Extracted Populations | swglnd: Sweat Gland                              | 8     |
+|                                  | Total:                                           | 502   |
+
+
 ## Content Updates
 
 ### New Population Additions
