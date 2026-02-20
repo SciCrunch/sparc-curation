@@ -4397,7 +4397,7 @@ def main(id=None, **kwargs):
         d = metadata.distribution(sparcur.__package__)
         ind = 8 if sys.platform == 'win32' else 7
         packs = list(d.discover())
-        alt = [p for p in [aug.RepoPath(d.origin.url[ind:]).resolve() for d in packs if d.origin] if p.working_dir]
+        alt = [p for p in [aug.RepoPath(d.origin.url[ind:]).resolve() for d in packs if hasattr(d, 'origin') and d.origin] if p.working_dir]
         rps = [p.parent for p in [aug.RepoPath(d._path).resolve() for d in packs] if p.working_dir]
         srps = set(alt) | set(rps)
         setups = [p for p in [p / 'setup.py' for p in srps] if p.exists()]
