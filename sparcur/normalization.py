@@ -170,6 +170,25 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
             # return the value that could not be normalized and then validation
             # will catch the error at a later stage
             return value
+        except idlib.exc.ResolutionError as e:
+            if hasattr(e, '__cause__') and hasattr(e.__cause__, 'response') and e.__cause__.response.status_code == 403 and isinstance(v, idlib.Doi):
+                # XXX the remote has no idea how to handle normal HEAD
+                # requests needed by scholarly infrastructure and has
+                # destroyed interoperability trying to fight of AI
+                meta = v.metadata()  # FIXME network sandbox violation
+                if meta and 'resource' in meta:
+                    msg = f'bad doi resolution for {v} -> {meta["resource"]}'
+                    log.warning(msg)
+                    normed = v
+            else:
+                if prop_error:
+                    raise e
+
+                se = str(e)
+                if se not in __logged:
+                    logd.error(e)
+                    __logged.add(se)
+                return value
         except Exception as e:
             if prop_error:
                 raise e
