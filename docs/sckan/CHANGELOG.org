@@ -23,7 +23,7 @@
 
 - alpha :: NPO synaptic connectivity
 - stretch :: ApiNATOMY species variance for whole models where not covered by NPO
-* RC 2026-02-11
+* PROD 2026-02-11
 - CMP fix bad RRIDs
 - ApiNATOMY kblad fix duplicate perfLabel
 * RC 2026-01-30

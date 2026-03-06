@@ -130,6 +130,14 @@ class XmlSource(HasErrors):
     def typeMatches(self):
         return self._isXml and self.e.getroot().tag == self.top_tag
 
+    def _debug(self):
+        import io
+        f = io.BytesIO()
+        self.e.write(f, pretty_print=True)
+        f.seek(0)
+        out = f.read()
+        print(out.decode())
+
     def mkx(self, element):
         if hasattr(element, 'xpath'):
             def xpath(path, e=element):
@@ -385,6 +393,50 @@ class ExtractLAS(XmlSource):
         }]
 
         return {'images': images}
+
+
+class ExtractHyStarSampleTable(XmlSource):
+
+    top_tag = 'SampleTable'
+    mimetype = 'application/x.vnd.hystar.sample+xml'  # TODO
+
+    def typeMatches(self):
+        if super().typeMatches():
+            st = self.xpath('/SampleTable/SampleTableHeader/@HyStarVersion')
+            if st:
+                return True
+
+    def _extract(self, *args, **kwargs):
+        # TODO nothing of obvious relevance for metadata
+        return {}
+
+
+class ExtractHyStarSubmethods(XmlSource):
+
+    top_tag = 'method'
+    mimetype = 'application/x.vnd.hystar.submethods+xml'  # TODO
+
+    def typeMatches(self):
+        if super().typeMatches():
+            st = self.xpath('/method/submethods/submethod/@program')
+            if st:
+                sst = set(st)
+                if 'HyStar_LC' in sst or 'HyStar_Autosampler' in sst:
+                    return True
+
+    def _extract(self, *args, **kwargs):
+        # TODO nothing of obvious relevance for metadata
+        return {}
+
+
+class ExtractBrukerNanoElute(XmlSource):
+
+    top_tag = '{https://www.bruker.com/compass/metadata}Metadata'
+    mimetype = 'application/x.vnd.bruker.nanoelute+xml'  # TODO
+
+    def _extract(self, *args, **kwargs):
+        # TODO nothing of obvious relevance for metadata
+        return {}
 
 
 class ExtractPVScan(XmlSource):
