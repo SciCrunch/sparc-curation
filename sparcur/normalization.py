@@ -131,9 +131,6 @@ _puod_cache = {}
 _puod_class_cache = {}
 _puod_cache_error = {}
 def protocol_url_or_doi(value, prop_error=False, __logged=set()):
-    if value in _puod_cache:
-        return _puod_cache[value]
-
     # FIXME network sandbox violation
     # FIXME can't use idlib.get_right_id because it is
     # totally broken with regard to dereferencing
@@ -147,6 +144,13 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
         out = None
     else:
         out = []
+
+    if value in _puod_cache:
+        _r = _puod_cache[value]
+        if out is None:
+            return _r[0]
+        else:
+            return _r
 
     for v in value:
         if not isinstance(v, idlib.Stream):
@@ -238,6 +242,7 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
             normed = v
 
         if out is None:
+            _puod_cache[value] = normed,
             return normed
 
         out.append(normed)

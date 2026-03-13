@@ -454,6 +454,7 @@ class ExtractPVScan(XmlSource):
         # TODO nothing of obvious relevance for metadata
         return {}
 
+
 class ExtractPVVrecSE(XmlSource):
     """ An auxillary Prairie View file that is referenced from the main PVSync
         record in the VoltageRecording section """
