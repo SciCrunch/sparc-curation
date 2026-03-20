@@ -1210,6 +1210,7 @@ class NormPerformancesFile(NormSubjectsFile):
     def specimen(self, value):
         return tuple(value.split())
 
+    participants = specimen
     subject = specimen
     sample = specimen
     site = specimen
