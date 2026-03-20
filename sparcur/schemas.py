@@ -1836,6 +1836,7 @@ class PerformanceExportSchema(JSONSchema):
             # BIDS does you do need nesting for session/run/trial or something
 
             # TODO one of these is required
+            'participants': pat_array(specimen_id_pattern),  # 3 FIXME TODO specimen + site
             'specimen': pat_array(specimen_id_pattern),  # 3
             'subject': pat_array(sub_id_pattern),  # 3
             'sample': pat_array(sam_id_pattern),  # 3
