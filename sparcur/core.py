@@ -262,7 +262,13 @@ class HasErrors:
         try:
             super().__init__(*args, **kwargs)
         except TypeError as e:  # this is so dumb
-            super().__init__()
+            if kwargs and 'template_schema_version' in kwargs:
+                try:
+                    super().__init__(*args)
+                except TypeError as e2:
+                    raise e2 from e
+            else:
+                super().__init__()
 
         self._pipeline_stage = pipeline_stage
         self._errors_set = set()
