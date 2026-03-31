@@ -1,0 +1,41 @@
+Before running the script, please make sure the following environment variables are ready:
+
+PENNSIEVE_API_SECRET
+PENNSIEVE_API_TOKEN
+PENNSIEVE_ORGANIZATION
+BIOLUCIDA_USERNAME
+BIOLUCIDA_PASSWORD
+DATASET_UUID
+
+Note: The script does not create a new collection, you will need to move the images to a collection then make the collection public if neccessary but please beware that moving an image to a new collection chages the image ids.
+It may be possible to upload an image directly into a collection but I have not tried that yet.
+
+First run the penn_bioluc.py script:
+1. For the dataset of interest, get the dataset UUID and set it with the DATASET_UUID environment variable.
+
+Steps 2 to 7 are details in the penn_bioluc.py script:
+
+2. Using the dataset UUID, get metadata and path metadata information from SciCrunch? - 
+"https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/curation-export.json" and "https://cassava.ucsd.edu/sparc/datasets/{dataset_uuid}/LATEST/path-metadata.json". Information required are pennsieve dataset id, published id, package id, filename and filesize.
+
+3. Authenticate to Pennsieve API server with curator access. From this server, we get the s3 URL for downloading/streaming the file.
+
+4. Authenticate to the Biolucida server and get the access token for further API calls
+
+5. Initiate Biolucidaupload with /upload/init, pass in the filename, filesize, chunk_size and token as parameters
+
+6. Request data of the file in chunks and send them to Biolucida using the /upload/continue endpoint
+
+7. After the last chunk has been sent, finalise the Biolucida upload by calling /upload/finish
+
+8. Timeout may occur and in that case, wait for the process to finish running and then copy and rename output.json to input.json and run the penn_bioluc.py script again.
+Based on my experience, the script may need to be rerun multiple names.
+
+9. Once the script runs successfully, copy and rename output.json to input.json then run get_id.py, a new file called output_with_id.json will be created.
+
+
+Note: If the images have been moved to a collection, all the image ids will be changed in the new collection, in that case, please run get_id.py with the environment variable COLLECTION_ID set which will allow the image_ids to be fetched from the dataset.
+
+10. The output_with_id.json should contain the basename, collection id, pennsieve package id and biolucida image id for each of the uploaded images. It may take some time for the biolucida server to process all the files and the biolucida image id may be missing for some entries in the json file, in that case please rerun step 9 again after a few hours.
+
+11. Once all image ids have been collected, with the output_with_id.json file in the directory; set the environment variable DISCOVER_ID then run bioluc_imagemap.py to map the images on biolucida server.
