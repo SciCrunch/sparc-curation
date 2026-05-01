@@ -1067,6 +1067,8 @@ note of course that you don't get dynamic binding with version since it is not t
 (define jview-semaphore (make-semaphore 1))
 (define (set-jview! dataset)
   (let ([uuid (id-uuid dataset)])
+    ; set frame-main title first for responsive feeling
+    (send frame-main set-label (format "~a | ~a | ~a" frame-title (id-short dataset) (dataset-title dataset))) ; FIXME free variable
     ; unset-current-jview is safe to call unconditionally because even
     ; if we can't draw the jview for the new dataset we definitely should
     ; stop drawing the jview for the most recently deselected dataset
@@ -2163,6 +2165,7 @@ switch to that"
 
 ;; gui setup
 
+(define frame-title "sparcur control panel")
 (define frame-main
   (new (class frame% (super-new)
          (rename-super [super-on-subwindow-char on-subwindow-char])
@@ -2173,7 +2176,7 @@ switch to that"
            (set! running? #f)
            (send frame-preferences show #f)
            (displayln "see ya later")))
-       [label "sparcur control panel"]
+       [label frame-title]
        [width 1280]
        [height 1024]))
 
