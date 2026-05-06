@@ -1769,7 +1769,10 @@ note of course that you don't get dynamic binding with version since it is not t
   (fetch-export-current-dataset))
 
 (define (cb-load-remote-json obj event)
-  (load-remote-json (current-dataset)))
+  (let ([ds (current-dataset)])
+    (thread
+     (thunk
+      (load-remote-json ds)))))
 
 (define (cb-open-export-folder obj event)
   (let*-values ([(path) (dataset-export-latest-path (current-dataset))]
