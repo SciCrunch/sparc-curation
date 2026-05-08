@@ -616,9 +616,13 @@ found that a simpler set is needed to get correct usage.
 This value was not collected for this subject and was not expected to be collected. \\
 The reason why it did not need to be collected is left as an exercise for the reader. \\
 
+Data is not relevant or the question does not apply to the subject (e.g., if someone is a non-drinker, any alcohol metric is "Not Applicable"). \\
+
 *** not-available
 This value should have been collected and might have been collected but is missing from the data. \\
 The reason why it was not collected or is missing from the data is left as an exercise for the reader. \\
+
+Data could have been collected and applied to the subject, but information was not obtained or reported. \\
 
 ** Changes from 3.0.2 to 3.0.3 for entities
 - =also in dataset doi= not added to template but is the value that
