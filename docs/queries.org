@@ -411,6 +411,7 @@ select distinct
 ?protocol
 ?n
 (sample(?dataset) AS ?datasetx)
+(sample(?award) AS ?awardx)
 ?doi_protocol
 (sample(bound(?urih_protocol)) as ?hasUri)
 (sample(bound(?some_child)) as ?hasComplexAnnos)
@@ -420,6 +421,7 @@ where {
   optional {
     #?dataset TEMP:hasProtocol ?protocol
     { ?protocol TEMP:priorInformationalConstraintOnProcessThatGenerated ?dataset } union { ?dataset TEMP:hasProtocol ?protocol }
+    optional { ?dataset TEMP:hasAwardNumber ?award }
   }
   optional { ?protocol TEMP:hasDoi ?doi_protocol }
   optional { ?protocol TEMP:hasUriHuman ?urih_protocol }
