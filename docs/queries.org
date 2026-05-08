@@ -410,8 +410,8 @@ processed.
 select distinct
 ?protocol
 ?n
-(sample(?dataset) AS ?datasetx)
-(sample(?award) AS ?awardx)
+(group_concat(distinct ?dataset; separator=";") AS ?datasetx)
+(group_concat(distinct ?award; separator=";") AS ?awardx)
 ?doi_protocol
 (sample(bound(?urih_protocol)) as ?hasUri)
 (sample(bound(?some_child)) as ?hasComplexAnnos)
