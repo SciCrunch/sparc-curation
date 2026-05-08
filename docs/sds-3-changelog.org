@@ -52,6 +52,8 @@ using the templates greater than 3.0.0.
 
   FIXME TODO do we require alphanumeric for first char in name? (probably yes?)
 
+  IMPL NOTE FOR IDS is that trailing =-= is not allowed for ids
+
   The following characters are no longer allowed in file names and no
   longer allowed in folder names (they were already technically banned
   from folders mapping to SDS entities). =@#$%^&*()+=/\|"'~;:<>{}[]?=
@@ -603,7 +605,25 @@ A female patient did not answer a question about previous pregnancies but answer
   - Add =Notes=
 
 * changelog 3.0.3
+if a doi is provided as the dataset then it will be replaced by a uuid and the doi will be retained as an additional field
+
+** Codes for missing values simplified
+Following the trial of the more complex missing value codes we have
+found that a simpler set is needed to get correct usage.
+- =not-applicable=
+- =not-available=
+*** not-applicable
+This value was not collected for this subject and was not expected to be collected. \\
+The reason why it did not need to be collected is left as an exercise for the reader. \\
+
+*** not-available
+This value should have been collected and might have been collected but is missing from the data. \\
+The reason why it was not collected or is missing from the data is left as an exercise for the reader. \\
+
 ** Changes from 3.0.2 to 3.0.3 for entities
+- =also in dataset doi= not added to template but is the value that
+  should be provided if the reference dataset identifier is a doi
+  because =also in dataset= value is always the dataset uuid
 - Add =also in dataset * id= for subjects, and samples. Optional.
   Makes it possible to reference an entity in another dataset where
   the local identifier for the entity is different than in the current
@@ -636,3 +656,15 @@ A female patient did not answer a question about previous pregnancies but answer
 - Change =Contributor role= =Description= to split out sparc specific
   and datacite roles and clarify mappings from sparc to datacite
   fields, and to add info on PI/CoI and corresponding author.
+- TODO Change =Contributor ORCiD= =Description= to indicate that contributors with the following roles must have an ORCiD: PrincipalInvestigator, CoInvestigator, CorrespondingAuthor, ContactPerson, and ProjectLeader.
+- Change =Identifier type= for datacite 4.6 schema (now includes RRID)
+- TODO Change =Identifier type= to include SPARC specific type =LocalPath=
+  includes =LocalPath= as a sparc specific type to support local protocol references
+- TODO consider Change identifier description for HasMetadata to DOI for first version of this dataset
+
+** Changes from 3.0.2 to 3.0.3 for manifest
+include internal template with all fields
+soda may not have included entity, may have used subject/sample/specimen/site/performance
+=derived from dataset=
+=derived from dataset doi=
+=derived from dataset path=
