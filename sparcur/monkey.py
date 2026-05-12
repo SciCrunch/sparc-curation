@@ -660,6 +660,19 @@ def Dataset_status_log(self):
 def Dataset_meta(self):
     return _get_json(self, f'{self._api._host}/datasets/{self.id}')
 
+@property
+def Dataset_timeline(self):
+    limit = 9999
+    j = _get_json(self, f'{self._api._host}/datasets/{self.id}/changelog/timeline?limit={limit}')
+    if 'eventGroups' in j:
+        eg = j['eventGroups']
+        for event in eg:
+            if 'eventCursor' in event:
+                ec = event['eventCursor']
+                ej = _get_json(self, f'{self._api._host}/datasets/{self.id}/changelog/events?limit={limit}&cursor={ec}')
+                event['events'] = ej['events']
+
+    return j
 
 @property
 def Organization_teams(self):

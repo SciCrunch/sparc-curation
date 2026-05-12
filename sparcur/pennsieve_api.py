@@ -64,6 +64,7 @@ Dataset.readme = monkey.Dataset_readme
 Dataset.contributors = monkey.Dataset_contributors
 Dataset.doi = monkey.Dataset_doi
 Dataset.status_log = monkey.Dataset_status_log  # XXX NOTE this overwrites a method
+Dataset.timeline = monkey.Dataset_timeline
 Dataset.packages = monkey.packages
 Dataset.packages_raw = monkey.packages_raw
 Dataset._packages = _packages
