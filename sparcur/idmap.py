@@ -58,6 +58,9 @@ def identifier_indexes():
                 if (oiid, iid) ==  (367, 258):
                     # Functional recordings from the pig intrinsic cardiac nervous system (ICN)
                     did = iid_did[oiid, iid] = RemoteId('N:dataset:0d9454ca-43d9-4fdb-ac79-01c3574e8565')
+                elif (oiid, iid) == (367, 3475):
+                    # Visualising mechanosensory afferents and autonomic innervation of the rat urinary bladder
+                    did = iid_did[oiid, iid] = RemoteId('N:dataset:275c1aa0-9f88-4802-bc0e-e743a4caeb1b')
                 else:
                     # likely cases that have been unshared and that we need historical data to map
                     # e.g. 0d945 has never been run on the single dataset pipelines as far as i can
@@ -131,3 +134,20 @@ def to_rkt(big_did, as_hash=False):
         out += '\n)'
 
     return out
+
+
+def main():
+    import json
+    from sparcur.core import JEncode
+    iout = big_did, *indexes, doi_did, doi_pat = identifier_indexes()
+    bd = {k.id: v for k, v in big_did.items()}
+    with open('/tmp/big-did.json', 'wt') as f:
+        json.dump(bd, f, indent=2, cls=JEncode)
+
+    rkt = to_rkt(big_did)
+    with open('/tmp/big-did.rkt', 'wt') as f:
+        f.write(rkt)
+
+
+if __name__ == '__main__':
+    main()
