@@ -956,18 +956,43 @@ class NormSubjectsFile(NormValues):
         else:
             return value
 
+    def also_in_dataset_doi(self, value):
+        # FIXME TODO also space separated
+        return value
+
     def also_in_dataset(self, value):
         if ' ' in value:
             for v in value.split():
                 if ',' in v:
-                    # FIXME make sure this gets surfaced in path_error_report
-                    # (along with any/all other normalization errors ...)
-                    logd.error(f'comma in also_in_dataset {value!r}')
+                    msg = f'comma in also_in_dataset {value!r}'
+                    if self.addError(msg,
+                                     pipeline_stage=self.__class__.__name__,
+                                     blame='submission',):
+                        logd.error(msg)
                     v = v.replace(',', '')
 
-                yield RemoteId(v)
+                try:
+                    yield RemoteId(v)
+                except Exception as e:
+                    log.exception(e)
+                    msg = f'{e}'
+                    if self.addError(msg,
+                                     pipeline_stage=self.__class__.__name__,
+                                     blame='submission',):
+                        logd.error(msg)
+                    yield v
+
         else:
-            yield RemoteId(value)
+            try:
+                yield RemoteId(value)
+            except Exception as e:
+                log.exception(e)
+                msg = f'{e}'
+                if self.addError(msg,
+                                 pipeline_stage=self.__class__.__name__,
+                                 blame='submission',):
+                    logd.error(msg)
+                yield value
 
     def software_url(self, value):
         value, _j = self._deatag(value)
