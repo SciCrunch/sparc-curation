@@ -779,6 +779,9 @@ class NoLTWhitespaceNoFormulaSchema(JSONSchema):
 string_noltws = NoLTWhitespaceSchema.schema
 string_noltws_noformula = NoLTWhitespaceNoFormulaSchema.schema
 
+# FIXME (N:)? due to bfpn id serialization convention that goes to dataset:
+bfpn_dataset_id_pattern = f'(N:)?dataset:{PennsieveId.uuid4_regex.pattern}'
+
 
 class SDSEntityPathSchema(JSONSchema):
     # paths that start with a known entity prefix MUST be correcly formed entity ids
@@ -840,6 +843,8 @@ def make_id_schema(cls, pattern=None, format=None):
         id_schema['pattern'] = pattern
     elif hasattr(cls, '_id_class') and hasattr(cls._id_class, 'canonical_regex'):
         id_schema['pattern'] = cls._id_class.canonical_regex
+    elif hasattr(cls, 'canonical_regex'):
+        id_schema['pattern'] = cls.canonical_regex
 
     class _IdSchema(JSONSchema):
         __name__ = cls.__name__ + 'Schema'
@@ -856,8 +861,8 @@ RorSchema = make_id_schema(idlib.Ror)
 OrcidSchema = make_id_schema(idlib.Orcid)
 PioSchema = make_id_schema(idlib.Pio)
 RridSchema = make_id_schema(idlib.Rrid)
-BlackfynnIdSchema = make_id_schema(BlackfynnId)
-PennsieveIdSchema = make_id_schema(PennsieveId)
+BlackfynnIdSchema = make_id_schema(BlackfynnId, pattern=bfpn_dataset_id_pattern)
+PennsieveIdSchema = make_id_schema(PennsieveId, pattern=bfpn_dataset_id_pattern)
 
 
 class EmbeddedIdentifierSchema(JSONSchema):

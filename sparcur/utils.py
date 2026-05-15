@@ -738,13 +738,15 @@ def make_bf_id_regex(top_level_domain):
                    '[14][0-9a-f]{3}-'  # XXX NOTE CHANGE TO BE v1 OR v4 2023-03-27
                    '[89ab][0-9a-f]{3}-'
                    '[0-9a-f]{12})')
+    types = ('package', 'collection', 'dataset', 'organization', 'user', 'team')
+    _at = '|'.join(types)
+    api_type_regex = (f'({_at})s')
     canonical_regex = (
         # XXX this is not implemented right now but could be
-        f'^https://api.{top_level_domain}/id/N:([a-z]):' + uuid4_regex + '$'
+        f'^https://api.{top_level_domain}/{api_type_regex}/N:([a-z]):' + uuid4_regex + '$'
     )
     curie_regex = '([a-z]+):' + uuid4_regex
     id_regex = 'N:' + curie_regex
-    types = ('package', 'collection', 'dataset', 'organization', 'user', 'team')
     paths = 'viewer', 'files', *[t + 's' for t in types]  # WHO LOVES CLASS SCOPE WHEEEE LOL PYTHON
     path_elem_regex = '([a-z]+)'
 
