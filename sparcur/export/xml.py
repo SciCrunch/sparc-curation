@@ -1,7 +1,7 @@
 import pathlib
 import idlib
 import rdflib
-import dicttoxml
+#import dicttoxml
 from pysercomb.pyr.types import ProtcurExpression, Quantity, AJ as AsJson
 from sparcur.core import OntTerm, UnmappedTerm, get_all_errors
 from sparcur.utils import loge, is_list_or_tuple

@@ -95,7 +95,6 @@ setup(name='sparcur',
           'augpathlib>=0.0.33',
           'beautifulsoup4',
           'pennsieve',
-          'dicttoxml',
           "ipython; python_version < '3.7'",
           'jsonschema>=3.0.1',  # need the draft 6 validator
           'ontquery>=0.2.11',
