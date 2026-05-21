@@ -266,7 +266,14 @@ class HasErrors:
                 try:
                     super().__init__(*args)
                 except TypeError as e2:
-                    raise e2 from e
+                    if isinstance(self, PurePath) and 'object.__init__' in super().__init__.__str__():
+                        # python3.11 vs >=3.12 issue with augpathlib
+                        try:
+                            super().__init__()
+                        except TypeError as e3:
+                            raise e3 from e
+                    else:
+                        raise e2 from e
             else:
                 super().__init__()
 
