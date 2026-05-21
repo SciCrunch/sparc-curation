@@ -2079,6 +2079,7 @@ runs in parallel per dataset.
 See [[(bash-pipeline-fetch-remote-metadata-all)]] for usage.
 #+name: fetch_remote_metadata_all.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata_all.py
+from pyontutils.asyncd import Async as Parallel, deferred as delayed
 from sparcur.backends import PennsieveDatasetData
 from sparcur.simple.utils import backend_pennsieve
 
@@ -2092,7 +2093,6 @@ def from_id_fetch_remote_metadata(id, project_id=None, n_jobs=12):
         if n_jobs <= 1:
             [p() for p in prepared]
         else:
-            from joblib import Parallel, delayed
             # FIXME Paralle isn't really parallel here ...
             # can't use multiprocessing due to broken aug.RemotePath implementation
             # LOL PYTHON everything is an object, except when you want to pickle it
@@ -2163,6 +2163,7 @@ a consistent view of the data from the file system snapshot.
 # because it can simply accpet a dataset id
 #+name: fetch_remote_metadata.py
 #+begin_src python :tangle ../sparcur/simple/fetch_remote_metadata.py
+from pyontutils.asyncd import Async as Parallel, deferred as delayed
 from sparcur.paths import Path
 from sparcur.backends import PennsieveDatasetData
 
@@ -2173,7 +2174,6 @@ def _from_project_path_fetch_remote_metadata(project_path, n_jobs=12, cached_ok=
                     for dataset_path in project_path.children]
         [bdd() for bdd in prepared if not (cached_ok and bdd.cache_path.exists())]
     else:
-        from joblib import Parallel, delayed
         fetch = lambda bdd: bdd() if not (cached_ok and bdd.cache_path.exists()) else None
         fetch_path = (lambda path: fetch(PennsieveDatasetData(path.cache)))
         Parallel(n_jobs=n_jobs)(delayed(fetch_path)(dataset_path)
@@ -2214,6 +2214,7 @@ if __name__ == '__main__':
 Pull a single dataset or pull all datasets or clone and pull all datasets.
 #+name: pull.py
 #+begin_src python :tangle ../sparcur/simple/pull.py
+from pyontutils.asyncd import Async as Parallel, deferred as delayed
 from sparcur.paths import Path
 from sparcur.utils import GetTimeNow
 
@@ -2240,7 +2241,6 @@ def from_path_dataset_file_structure_all(project_path,
         paths is a keyword argument that accepts a list/tuple of the subset of
         paths that should be pulled """
 
-    from joblib import Parallel, delayed
     if time_now is None:
         time_now = GetTimeNow()
 
@@ -3823,7 +3823,8 @@ Options:
 import os
 import sys
 from types import GeneratorType
-from pyontutils import clifun as clif
+import clifn as clif
+from pyontutils.asyncd import Async as Parallel, deferred as delayed
 from sparcur import exceptions as exc
 from sparcur.utils import _find_command
 from sparcur.utils import log, logd, loge, GetTimeNow, PennsieveId
@@ -4117,7 +4118,6 @@ def fetch_paths_parallel(paths, n_jobs=12, use_async=True):
         Async()(deferred(_fetch_path)(path) for path in paths)
     else:
         import pathlib
-        from joblib import Parallel, delayed
         backend = 'multiprocessing' if hasattr(sys, 'pypy_version_info') else None
         # FIXME FIXME FIXME somehow this can result in samples.xlsx being fetched to subjects.xlsx !?!??!!
         # XXX either a race condition on our end or something insane from the remote
