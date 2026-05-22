@@ -11,11 +11,11 @@ from collections import deque, defaultdict
 import idlib
 import rdflib
 import augpathlib as aug
-from joblib import Parallel, delayed
 from dateutil import parser as dateparser
 from hyputils import hypothesis as hyp
 from pyontutils.core import OntRes, OntGraph
 from pyontutils.utils import utcnowtz, isoformat, subclasses, Async, deferred
+from pyontutils.asyncd import Async as Parallel, deferred as delayed
 from pyontutils.namespaces import TEMP, isAbout  # FIXME split export pipelines into their own file?
 from pyontutils.closed_namespaces import rdf, rdfs, owl
 from protcur import document as ptcdoc
@@ -349,7 +349,7 @@ class PathPipeline(PrePipeline):
             data = {}
             he = dat.HasErrors(pipeline_stage=self.__class__.__name__ + '.transformer')
             if he.addError(e, path=self.path):
-                logd.error(e)  # FIXME isn't this were we should accumulate errors?
+                logd.exception(e)  # FIXME isn't this were we should accumulate errors?
 
             he.embedErrors(data)
             return data
@@ -1769,6 +1769,7 @@ class PipelineExtras(JSONPipeline):
         # and thus no need for a list of lambda
         lambda e, p: ('inputs' not in p and 'contributor_role' in p or
                       'inputs' not in p and 'contributor_orcid' in p or  # XXX FIXME AAAAAAAAAAAAAA
+                      'inputs' not in p and 'also_in_dataset' in p or
                       'inputs' not in p and 'protocol_url_or_doi' in p or  # FIXME resolution conflated
                       #'inputs' not in p and 'award_number' in p or  # my award number is norwar rat ...
 
