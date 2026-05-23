@@ -370,7 +370,10 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
         dict_literal = _json_identifier_expansion(obj)
     except idlib.exc.RemoteError as e:
         if hasattr(obj, '_cooldown'):
-            return obj._cooldown()  # trigger cooldown to simplify issues down the line
+            try:
+                return obj._cooldown()  # trigger cooldown to simplify issues down the line
+            except Exception as e2:
+                log.exception(e2)
 
         error = dict(error=e,
                      pipeline_stage=stage.__class__.__name__,
@@ -386,7 +389,10 @@ def dereference_all_identifiers(obj, stage, *args, path=None, addError=None, **k
 
     except idlib.exc.ResolutionError as e:
         if hasattr(obj, '_cooldown'):
-            return obj._cooldown()  # trigger cooldown to simplify issues down the line
+            try:
+                return obj._cooldown()  # trigger cooldown to simplify issues down the line
+            except Exception as e2:
+                log.exception(e2)
 
         oops = json_export_type_converter(obj)
         msg = (f'{stage.lifters.id} could not resolve '  # FIXME lifters sigh
