@@ -188,6 +188,9 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
                     # link and the newer schema retains the link field
                     msg = f'bad doi resolution for {v} -> {meta["link"]}'
                     log.warning(msg)
+                elif 'agency' in meta and meta['agency'] == 'datacite' and 'url' in meta:
+                    msg = f'bad doi resolution for {v} -> {meta["url"]}'
+                    log.warning(msg)
 
                 normed = v
 
