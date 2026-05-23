@@ -183,7 +183,14 @@ def protocol_url_or_doi(value, prop_error=False, __logged=set()):
                 if meta and 'resource' in meta:
                     msg = f'bad doi resolution for {v} -> {meta["resource"]}'
                     log.warning(msg)
-                    normed = v
+                elif meta and 'link' in meta:
+                    # some older cached meta is missing resource but has
+                    # link and the newer schema retains the link field
+                    msg = f'bad doi resolution for {v} -> {meta["link"]}'
+                    log.warning(msg)
+
+                normed = v
+
             else:
                 if prop_error:
                     raise e
