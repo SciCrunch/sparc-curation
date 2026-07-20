@@ -636,6 +636,13 @@ class ApiWrapper:
             msg = (f'{resp.status_code} {resp.reason!r} '
                    f'when fetching {resp.url}')
             raise exc.NoRemoteFileWithThatIdError(msg)
+        elif resp.status_code == 401:
+            # ssl session expires due to extremely large number of files
+            if retry_count >= retry_limit:
+                resp.raise_for_status()
+            else:
+                self.bf.__class__._api = self.bf._api_class(self.organization.id)
+                return self.get_file_url(id, file_id, retry_limit=retry_limit, retry_count=retry_count + 1)
         else:
             resp.raise_for_status()
 
