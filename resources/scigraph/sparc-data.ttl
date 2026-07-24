@@ -45,11 +45,11 @@
     ilxtr:imports-big <http://ontology.neuinfo.org/NIF/scicrunch-registry.ttl>,
         <http://ontology.neuinfo.org/NIF/extra.ttl>,
         <http://ontology.neuinfo.org/NIF/ttl/nif.ttl> ;
-    ilxtr:imports-rel <file:///tmp/scigraph-build/sparc-data/curation-export-published.owl> ;
+    ilxtr:imports-rel <file:///tmp/scigraph-build/sparc-data/curation-export-published.ttl> ;
     ilxtr:imports-dev
         <https://raw.githubusercontent.com/SciCrunch/NIF-Ontology/neurons/ttl/npo.ttl>,
         # <https://cassava.ucsd.edu/sparc/preview/exports/curation-export.ttl> ,
-        <file:///tmp/scigraph-build/sparc-data/curation-export.owl> ;
+        <file:///tmp/scigraph-build/sparc-data/curation-export.ttl> ;
     ilxtr:imports-dev <https://cassava.ucsd.edu/ApiNATOMY/ontologies/scaffold-test.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/dev-layout-conn.ttl>,
         <https://cassava.ucsd.edu/ApiNATOMY/ontologies/vagus-nerve.ttl>,
