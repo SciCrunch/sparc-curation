@@ -253,6 +253,17 @@ def bind_packages_File(File):
                     f'{self._api._host}/datasets/{self.id}/packages?'
                     f'pageSize={pageSize}&'
                     f'includeSourceFiles={str(includeSourceFiles).lower()}'
+                    '&state=UNAVAILABLE'
+                    '&state=UPLOADED'
+                    '&state=DELETING'  # must retain to identify orphan packages
+                    #'&state=DELETED'
+                    '&state=INFECTED'
+                    '&state=UPLOAD_FAILED'
+                    #'&state=RESTORING'
+                    '&state=PROCESSING'
+                    '&state=READY'
+                    '&state=PROCESSING_FAILED'
+                    '&state=ERROR'
                     f'{filename_args}'
                     f'{cursor_args}')
                 resp = session.get(_url)  # XXX FIXME infinite hang here due to SSL issue?
