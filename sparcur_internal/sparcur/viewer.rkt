@@ -1066,9 +1066,10 @@ note of course that you don't get dynamic binding with version since it is not t
 (define jviews-loading (set))
 (define jview-semaphore (make-semaphore 1))
 (define (set-jview! dataset)
-  (let ([uuid (id-uuid dataset)])
+  (let ([uuid (id-uuid dataset)]
+        [title-raw (format "~a | ~a | ~a" frame-title (id-short dataset) (dataset-title dataset))])
     ; set frame-main title first for responsive feeling
-    (send frame-main set-label (format "~a | ~a | ~a" frame-title (id-short dataset) (dataset-title dataset))) ; FIXME free variable
+    (send frame-main set-label (if (> (string-length title-raw) 200) (format "~a ..." (substring title-raw 0 196)) title-raw)) ; FIXME free variable
     ; unset-current-jview is safe to call unconditionally because even
     ; if we can't draw the jview for the new dataset we definitely should
     ; stop drawing the jview for the most recently deselected dataset
