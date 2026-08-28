@@ -2092,8 +2092,8 @@ class Shell(Dispatcher):
         inst = [i for i in wat]
         res = Async(rate=5)(deferred(i.dereference)(idlib.Auto) for i in inst)
         pis = [i for i in res if isinstance(i, idlib.Pio)]
-        #dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
-        #dois = [d['protocol']['doi'] for d in dat if d]
+        # dat = Async(rate=5)(deferred(lambda p: p.data)(i) for i in pis)
+        # dois = [d['protocol']['doi'] for d in dat if d]
         dois = [p.doi for p in pis]
         breakpoint()
 
@@ -2108,6 +2108,38 @@ class Shell(Dispatcher):
         pc = list(intr.triples_exporter.protcur)
         #apj = [pj for c in intr.anchor.children for pj in c.protocol_jsons]
         breakpoint()
+
+    def ontologyIDPopulation(self):
+        """ Update ontology id col based on exact column label
+
+            # https://gspread.readthedocs.io/en/latest/oauth2.html#oauth-client-id
+            # with google drive api enabled you can access each google sheet by name!
+        """
+        import gspread
+        import pandas as pd
+        from pyontutils.scigraph import Graph, Vocabulary
+
+        sgv = Vocabulary(cache=True, verbose=False)  # direct import seemed simple
+
+        gc = gspread.oauth()  # add OAuth2 as ~/.config/gspread/credentials.json; will prop if missing something
+        sparc_proctur = gc.open('sparc protcur annotation tags')
+        worksheet = sparc_proctur.worksheet('working-ilxtr:technique')
+        header, *body = worksheet.get_all_values()
+        df = pd.DataFrame(body, columns=header)
+
+        iris = []
+        for row in df.itertuples():
+            matches = sgv.findByTerm(term=row.exact)
+            _iris = [match['iri'] for match in matches]
+            if not iris:
+                iris.append(None)
+            elif len(iris) == 0:
+                iris.append(_iris[0])
+            else:
+                iris.append(', '.join(_iris))
+        df['ontology id'] = iris
+
+        worksheet.update([df.columns.values.tolist()] + df.values.tolist())
 
 
 class Fab(Dispatcher):
