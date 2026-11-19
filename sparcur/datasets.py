@@ -269,9 +269,17 @@ class DatasetStructure:
         return cls._newimpl(cls, path)
 
     if not aug.core.need_flavour:
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args, template_schema_version=None, **kwargs):
             self._raw_paths = []  # FIXME wat why do we need to do this manually !??!
+            self.template_schema_version = template_schema_version
             super().__init__(self, *args, **kwargs)
+    else:
+        def __init__(self, *args, template_schema_version=None, **kwargs):
+            self.template_schema_version = template_schema_version
+            try:
+                super().__init__(self, *args, **kwargs)
+            except TypeError as e:
+                super().__init__()
 
     @staticmethod
     def _setup():
